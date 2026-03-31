@@ -1,0 +1,64 @@
+package render
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/pinealctx/gcode/internal/model"
+	"github.com/pinealctx/gcode/internal/transform"
+)
+
+// writeToMapMethod generates the ToMap() map[string]any method for an update message.
+// Only non-nil optional fields are included; condition_fields are excluded since they
+// are used as WHERE conditions, not SET values.
+func writeToMapMethod(b *strings.Builder, msg transform.GoMessage, _ Context) {
+	recv := receiverName(msg.GoName)
+	fmt.Fprintf(b, "// ToMap converts %s to map[string]any for partial update APIs (e.g. GORM Updates).\n", msg.GoName)
+	b.WriteString("// Only non-nil fields are included.\n")
+	fmt.Fprintf(b, "func (%s *%s) ToMap() map[string]any {\n", recv, msg.GoName)
+	b.WriteString("um := make(map[string]any)\n")
+
+	conditionFields := conditionFieldSet(msg)
+
+	for _, f := range msg.Fields {
+		if conditionFields[f.Name] {
+			// condition_fields are WHERE conditions, not SET values.
+			continue
+		}
+		fieldExpr := recv + "." + f.GoName
+		// Use the gorm column name as the map key so that GORM's Updates(map)
+		// matches the correct database column. Falls back to proto field name
+		// when no gorm.column override is present.
+		columnKey := f.Name
+		if f.GormOptions != nil && f.GormOptions.Column != "" {
+			columnKey = f.GormOptions.Column
+		}
+
+		if strings.HasPrefix(f.GoType, "*") {
+			// Optional field: only include when non-nil.
+			fmt.Fprintf(b, "if %s != nil {\num[%q] = *%s\n}\n", fieldExpr, columnKey, fieldExpr)
+		} else if f.Cardinality == model.CardinalityRepeated {
+			// Repeated field: include when non-nil/non-empty.
+			fmt.Fprintf(b, "if len(%s) > 0 {\num[%q] = %s\n}\n", fieldExpr, columnKey, fieldExpr)
+		} else {
+			// Non-optional scalar/enum: always include.
+			fmt.Fprintf(b, "um[%q] = %s\n", columnKey, fieldExpr)
+		}
+	}
+
+	b.WriteString("return um\n}\n\n")
+}
+
+// conditionFieldSet returns the set of condition field names for an update message,
+// read directly from msg.ConditionFields (populated by the transform layer).
+// Returns nil if the message has no condition fields.
+func conditionFieldSet(msg transform.GoMessage) map[string]bool {
+	if len(msg.ConditionFields) == 0 {
+		return nil
+	}
+	result := make(map[string]bool, len(msg.ConditionFields))
+	for _, name := range msg.ConditionFields {
+		result[name] = true
+	}
+	return result
+}

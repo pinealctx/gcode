@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package compat;
+
+import "buf/validate/validate.proto";
+
+option go_package = "github.com/pinealctx/gcode/testdata/compat/pbgo;pbgo";
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+  STATUS_INACTIVE = 2;
+}
+
+message Address {
+  string street = 1;
+  string city = 2;
+}
+
+message Person {
+  string name = 1;
+  int32 age = 2;
+  bool active = 3;
+  Status status = 4;
+  Address address = 5;
+  repeated int32 scores = 6;
+  repeated string tags = 7;
+  float rating = 8;
+  int64 created_at = 9;
+  bytes avatar = 10;
+  optional string nickname = 11;
+  optional int32 level = 12;
+  optional bool verified = 13;
+  optional float score = 14;
+  optional int64 updated_at = 15;
+  optional Status prev_status = 16;
+  optional bytes fingerprint = 17;
+  string email = 18 [(buf.validate.field).string.email = true];
+}

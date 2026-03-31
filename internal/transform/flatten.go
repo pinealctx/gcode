@@ -1,0 +1,275 @@
+// Package transform converts the protobuf semantic model into a
+// Go-oriented intermediate representation suitable for code rendering.
+package transform
+
+import (
+	"github.com/pinealctx/gcode/internal/model"
+	"github.com/pinealctx/gcode/internal/naming"
+)
+
+// GoFile is the Go-oriented view of a single proto file, ready for rendering.
+type GoFile struct {
+	// Source is the original proto file path (used in the generated header).
+	Source string
+	// Package is the Go package name for the generated file.
+	Package string
+	// Messages contains all messages (including nested) flattened to top level.
+	Messages []GoMessage
+	// Enums contains all enums (including nested) flattened to top level.
+	Enums []GoEnum
+	// Services contains all service definitions with resolved Go names.
+	Services []GoService
+}
+
+// GoMessage is a flattened message with resolved Go names.
+type GoMessage struct {
+	// GoName is the Go struct name (e.g. "Person_Address" for nested types).
+	GoName string
+	// Comment lines from the proto source.
+	Comment model.Comment
+	// Fields with resolved Go names and types.
+	Fields []GoField
+	// UpdateSource is non-empty when this message was generated from an update_message
+	// annotation. Its value is the source message name, used to generate ToMap() and
+	// inherit validate rules.
+	UpdateSource string
+	// CreateSource is non-empty when this message was generated from a create_message
+	// annotation. Its value is the source message name, used to inherit validate rules.
+	CreateSource string
+	// ConditionFields lists the condition_fields declared in the update_message annotation.
+	// These are WHERE-condition fields and must not appear in ToMap() output.
+	// Only populated when UpdateSource is non-empty.
+	ConditionFields []string
+	// GormMessageOptions carries the message-level GORM annotation.
+	// Used by render to generate TableName() and decide whether to emit gorm struct tags.
+	// Nil means no GORM annotation is present.
+	GormMessageOptions *model.GormMessageOptions
+}
+
+// GoField is a message field with resolved Go naming and type info.
+// It embeds model.Field to preserve proto-level metadata (field number,
+// type kind, scalar kind, cardinality) needed by marshal/unmarshal generation.
+// GormMessageOptions carries the owning message's GORM annotation so that
+// tag providers can make per-field decisions without needing the parent GoMessage.
+type GoField struct {
+	model.Field
+	// GoName is the Go struct field name after CamelCase and conflict resolution.
+	GoName string
+	// GoType is the fully resolved Go type string (e.g. "int32", "[]byte", "*Person").
+	GoType string
+	// GormMessageOptions is copied from the owning message's GormOptions.
+	// Nil means the message has no GORM annotation and no gorm tag should be generated.
+	GormMessageOptions *model.GormMessageOptions
+}
+
+// GoEnum is a flattened enum with resolved Go names.
+type GoEnum struct {
+	// GoName is the Go type name (e.g. "Person_Status" for nested enums).
+	GoName string
+	// Comment lines from the proto source.
+	Comment model.Comment
+	// Values are the enum constants.
+	Values []GoEnumValue
+}
+
+// GoEnumValue is a single enum constant.
+type GoEnumValue struct {
+	// GoName is the Go constant name (e.g. "Person_Status_STATUS_ACTIVE").
+	GoName string
+	// Number is the proto enum value number.
+	Number int32
+	// Comment lines from the proto source.
+	Comment model.Comment
+}
+
+// GoService is a service definition with resolved Go names.
+type GoService struct {
+	// GoName is the Go interface name (e.g. "UserService").
+	GoName string
+	// Comment lines from the proto source.
+	Comment model.Comment
+	// Methods are the rpc methods of the service.
+	Methods []GoRPCMethod
+}
+
+// GoRPCMethod is a single rpc method with resolved Go type names.
+type GoRPCMethod struct {
+	// GoName is the Go method name (e.g. "CreateUser").
+	GoName string
+	// RequestType is the Go type name of the request message (e.g. "CreateUserRequest").
+	RequestType string
+	// ResponseType is the Go type name of the response message (e.g. "CreateUserResponse").
+	ResponseType string
+	// Comment lines from the proto source.
+	Comment model.Comment
+}
+
+// Flatten converts a model.File into a GoFile by:
+//  1. Extracting the Go package name from go_package option.
+//  2. Recursively flattening nested messages and enums to top level.
+//  3. Resolving Go type names, field names, and enum value names via the naming package.
+//  4. Resolving field name conflicts within each message.
+func Flatten(file model.File) GoFile {
+	pkg := goPackageName(file.GoPackage)
+
+	var messages []GoMessage
+	var enums []GoEnum
+	flattenMessages(file.Messages, file.Package, &messages, &enums)
+	flattenEnums(file.Enums, file.Package, &enums)
+
+	return GoFile{
+		Source:   file.Path,
+		Package:  pkg,
+		Messages: messages,
+		Enums:    enums,
+		Services: flattenServices(file.Services, file.Package),
+	}
+}
+
+// goPackageName extracts the package name from a go_package option value.
+// go_package can be "path/to/pkg;name" or "path/to/pkg" — we want the name part.
+func goPackageName(goPackage string) string {
+	if goPackage == "" {
+		return ""
+	}
+	// If there's a semicolon, the part after it is the package name.
+	for i := len(goPackage) - 1; i >= 0; i-- {
+		if goPackage[i] == ';' {
+			return goPackage[i+1:]
+		}
+	}
+	// Otherwise, use the last path element.
+	for i := len(goPackage) - 1; i >= 0; i-- {
+		if goPackage[i] == '/' {
+			return goPackage[i+1:]
+		}
+	}
+	return goPackage
+}
+
+func flattenMessages(msgs []model.Message, pkgName string, outMsgs *[]GoMessage, outEnums *[]GoEnum) {
+	for _, msg := range msgs {
+		goName := naming.GoTypeName(msg.FullName, pkgName)
+
+		// Collect raw field names for conflict resolution.
+		rawFieldNames := make([]string, len(msg.Fields))
+		for i, f := range msg.Fields {
+			rawFieldNames[i] = naming.GoFieldName(f.Name)
+		}
+		resolvedNames := naming.ResolveFieldNames(rawFieldNames)
+
+		fields := make([]GoField, len(msg.Fields))
+		for i, f := range msg.Fields {
+			fields[i] = GoField{
+				Field:              f,
+				GoName:             resolvedNames[i],
+				GoType:             resolveGoType(f, pkgName),
+				GormMessageOptions: msg.GormOptions,
+			}
+		}
+
+		*outMsgs = append(*outMsgs, GoMessage{
+			GoName:             goName,
+			Comment:            msg.LeadingComment,
+			Fields:             fields,
+			UpdateSource:       msg.UpdateSource,
+			CreateSource:       msg.CreateSource,
+			ConditionFields:    conditionFieldsFor(msg),
+			GormMessageOptions: msg.GormOptions,
+		})
+
+		// Recurse into nested messages and enums.
+		flattenMessages(msg.Messages, pkgName, outMsgs, outEnums)
+		flattenEnums(msg.Enums, pkgName, outEnums)
+	}
+}
+
+// conditionFieldsFor returns the condition field names for an update message.
+// Condition fields are the non-optional, non-repeated scalar/enum fields in the
+// derived update message — gen-proto generates condition_fields as non-optional
+// and all other fields as optional, so this is the authoritative way to identify them.
+// Returns nil for non-update messages (UpdateSource == "").
+func conditionFieldsFor(msg model.Message) []string {
+	if msg.UpdateSource == "" {
+		return nil
+	}
+	var result []string
+	for _, f := range msg.Fields {
+		if !f.Optional && f.Cardinality != model.CardinalityRepeated {
+			result = append(result, f.Name)
+		}
+	}
+	return result
+}
+
+// flattenServices converts model.Service definitions to GoService values with
+// resolved Go names. Service names and rpc method names use naming.GoTypeName
+// for consistency with message and enum name resolution.
+func flattenServices(services []model.Service, pkgName string) []GoService {
+	if len(services) == 0 {
+		return nil
+	}
+	result := make([]GoService, len(services))
+	for i, svc := range services {
+		methods := make([]GoRPCMethod, len(svc.RPCs))
+		for j, rpc := range svc.RPCs {
+			methods[j] = GoRPCMethod{
+				GoName:       rpc.Name,
+				RequestType:  naming.GoTypeName(rpc.RequestType, pkgName),
+				ResponseType: naming.GoTypeName(rpc.ResponseType, pkgName),
+				Comment:      rpc.LeadingComment,
+			}
+		}
+		result[i] = GoService{
+			GoName:  naming.GoTypeName(svc.FullName, pkgName),
+			Comment: svc.LeadingComment,
+			Methods: methods,
+		}
+	}
+	return result
+}
+
+func flattenEnums(enums []model.Enum, pkgName string, out *[]GoEnum) {
+	for _, e := range enums {
+		goName := naming.GoTypeName(e.FullName, pkgName)
+
+		values := make([]GoEnumValue, len(e.Values))
+		for i, v := range e.Values {
+			values[i] = GoEnumValue{
+				GoName:  naming.GoEnumValueName(goName, v.Name),
+				Number:  v.Number,
+				Comment: v.LeadingComment,
+			}
+		}
+
+		*out = append(*out, GoEnum{
+			GoName:  goName,
+			Comment: e.LeadingComment,
+			Values:  values,
+		})
+	}
+}
+
+// resolveGoType returns the Go type string for a field, including pointer
+// prefix for message types and slice prefix for repeated fields.
+func resolveGoType(f model.Field, pkgName string) string {
+	var base string
+	switch f.Type.Kind {
+	case model.FieldKindScalar:
+		base = naming.GoScalarType(f.Type.Scalar)
+	case model.FieldKindEnum:
+		base = naming.GoTypeName(f.Type.FullName, pkgName)
+	case model.FieldKindMessage:
+		base = "*" + naming.GoTypeName(f.Type.FullName, pkgName)
+	default:
+		base = "UNKNOWN"
+	}
+
+	if f.Cardinality == model.CardinalityRepeated {
+		return "[]" + base
+	}
+	if f.Optional {
+		return "*" + base
+	}
+	return base
+}

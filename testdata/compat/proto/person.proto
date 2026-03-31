@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package compat;
+
+import "buf/validate/validate.proto";
+import "gcode/options.proto";
+
+option go_package = "github.com/pinealctx/gcode/testdata/compat/dao;dao";
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+  STATUS_INACTIVE = 2;
+}
+
+message Address {
+  string street = 1;
+  string city = 2;
+}
+
+message Person {
+  option (gcode.message) = {
+    gorm: { table: "persons" }
+  };
+
+  string name = 1 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 100
+  ];
+  int32 age = 2 [
+    (buf.validate.field).int32.gte = 0,
+    (buf.validate.field).int32.lte = 150
+  ];
+  bool active = 3;
+  Status status = 4 [(buf.validate.field).enum.defined_only = true];
+  Address address = 5 [(buf.validate.field).required = true];
+  repeated int32 scores = 6 [
+    (buf.validate.field).repeated.min_items = 1,
+    (buf.validate.field).repeated.max_items = 100
+  ];
+  repeated string tags = 7 [
+    (buf.validate.field).repeated.min_items = 1,
+    (buf.validate.field).repeated.items.string.min_len = 1
+  ];
+  float rating = 8;
+  int64 created_at = 9 [
+    (gcode.field).gorm.column = "created_ts"
+  ];
+  bytes avatar = 10 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).bytes.min_len = 1
+  ];
+  optional string nickname = 11 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 10
+  ];
+  optional int32 level = 12;
+  optional bool verified = 13;
+  optional float score = 14;
+  optional int64 updated_at = 15;
+  optional Status prev_status = 16;
+  optional bytes fingerprint = 17;
+  string email = 18 [(buf.validate.field).string.email = true];
+  string role = 19 [
+    (buf.validate.field).string.in = "admin",
+    (buf.validate.field).string.in = "user",
+    (buf.validate.field).string.in = "guest"
+  ];
+  int32 type_id = 20 [
+    (buf.validate.field).int32.not_in = 0,
+    (buf.validate.field).int32.not_in = -1
+  ];
+
+  // update_message: partial update by name (scalar fields only).
+  option (gcode.update_message) = {
+    name: "PersonUpdateByName"
+    condition_fields: ["name"]
+    ignore_fields: ["address", "scores", "tags", "avatar", "fingerprint"]
+  };
+
+  // create_message: insert a new person (omit system fields and complex types).
+  option (gcode.create_message) = {
+    name: "PersonCreate"
+    ignore_fields: ["created_at", "address", "scores", "tags", "avatar", "fingerprint"]
+    required_fields: ["nickname"]
+  };
+}

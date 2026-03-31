@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package gcode;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/pinealctx/gcode/internal/options";
+
+// GormMessageOptions configures GORM-related code generation for a message.
+message GormMessageOptions {
+  string table = 1;
+}
+
+// GormFieldOptions configures GORM-related code generation for a field.
+message GormFieldOptions {
+  string column = 1;
+}
+
+// JSONFieldOptions configures JSON tag generation for a field.
+message JSONFieldOptions {
+  bool omitempty = 1;
+  bool ignore    = 2;
+}
+
+// GcodeFieldOptions groups all gcode field-level annotations.
+message GcodeFieldOptions {
+  GormFieldOptions gorm             = 1;
+  JSONFieldOptions json             = 2;
+  // validate_message overrides the default error message for all constraints
+  // on this field when non-empty.
+  string           validate_message = 3;
+}
+
+// GcodeMessageOptions groups all gcode message-level annotations.
+message GcodeMessageOptions {
+  GormMessageOptions gorm = 1;
+}
+
+extend google.protobuf.MessageOptions {
+  GcodeMessageOptions message = 50001;
+}
+
+extend google.protobuf.FieldOptions {
+  GcodeFieldOptions field = 50002;
+}
+
+// UpdateMessageOptions configures generation of a partial-update message derived from this message.
+// Multiple options may be declared to generate multiple update messages.
+message UpdateMessageOptions {
+  // name is the generated message name (e.g. "UserUpdateByID").
+  string name = 1;
+  // condition_fields are the WHERE-condition fields; generated as non-optional (required).
+  repeated string condition_fields = 2;
+  // ignore_fields are excluded from the generated message.
+  repeated string ignore_fields = 3;
+}
+
+// CreateMessageOptions configures generation of a create (insert) message derived from this message.
+// Multiple options may be declared to generate multiple create messages.
+message CreateMessageOptions {
+  // name is the generated message name (e.g. "UserCreate").
+  string name = 1;
+  // ignore_fields are excluded from the generated message.
+  repeated string ignore_fields = 2;
+  // required_fields are forced to non-optional even if the source field is optional.
+  repeated string required_fields = 3;
+}
+
+extend google.protobuf.MessageOptions {
+  // update_message declares a partial-update message to generate from this message.
+  // May be repeated to generate multiple update messages.
+  repeated UpdateMessageOptions update_message = 50003;
+  // create_message declares a create (insert) message to generate from this message.
+  // May be repeated to generate multiple create messages.
+  repeated CreateMessageOptions create_message = 50004;
+  // update_source is written by gcode gen-proto into generated *.update.proto files.
+  // It records the source message name and triggers ToMap() generation in stage 2.
+  // Internal: written by gcode gen-proto; do not set manually.
+  string update_source = 50005;
+  // create_source is written by gcode gen-proto into generated *.create.proto files.
+  // It records the source message name for stage 2 validate inheritance.
+  // Internal: written by gcode gen-proto; do not set manually.
+  string create_source = 50006;
+}
