@@ -4,17 +4,18 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/pinealctx/gcode/internal/config"
 	"github.com/pinealctx/gcode/internal/parser"
 	"github.com/pinealctx/gcode/internal/source"
 	"github.com/pinealctx/gcode/internal/transform"
+	"github.com/pinealctx/gcode/internal/tsrender"
 )
 
 // RunGenTS implements the gen-ts subcommand: scans the input directory,
 // parses proto files, flattens to GoFile IR, and generates TypeScript output.
-// The current skeleton validates config and runs the pipeline up to Flatten,
-// but does not yet render TS files.
 func RunGenTS(ctx context.Context, args []string) error {
 	cfg, err := config.ParseGenTS(args)
 	if err != nil {
@@ -44,10 +45,27 @@ func RunGenTS(ctx context.Context, args []string) error {
 		return fmt.Errorf("create output directory %q: %w", cfg.OutputDir, err)
 	}
 
-	// Flatten all files (TS renderer will consume GoFile IR in subtask_2).
 	for _, f := range files {
-		_ = transform.Flatten(f)
+		gf := transform.Flatten(f)
+
+		tsSrc, err := tsrender.TSFile(gf)
+		if err != nil {
+			return fmt.Errorf("render ts %q: %w", f.Path, err)
+		}
+
+		outPath := filepath.Join(cfg.OutputDir, tsOutputFileName(f.Path))
+		if err := os.WriteFile(outPath, tsSrc, 0o600); err != nil {
+			return fmt.Errorf("write %q: %w", outPath, err)
+		}
 	}
 
 	return nil
+}
+
+// tsOutputFileName derives the .pb.ts output filename from a proto file path.
+// e.g. "subdir/person.proto" → "person.pb.ts"
+func tsOutputFileName(protoPath string) string {
+	base := filepath.Base(protoPath)
+	name := strings.TrimSuffix(base, ".proto")
+	return name + ".pb.ts"
 }
