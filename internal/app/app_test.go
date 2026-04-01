@@ -7,14 +7,6 @@ import (
 	"testing"
 )
 
-// writeProtoFile writes a proto file into dir for testing.
-func writeProtoFile(t *testing.T, dir, name, content string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
-		t.Fatalf("write proto file %q: %v", name, err)
-	}
-}
-
 // TestRunE2EAnnotations is the end-to-end acceptance test for phase 2.
 // It exercises the full pipeline: proto with gcode annotations → Parse →
 // Flatten → render.File → generated Go source, then verifies struct tags.
@@ -26,7 +18,7 @@ func TestRunE2EAnnotations(t *testing.T) {
 	inputDir := t.TempDir()
 	outputDir := t.TempDir()
 
-	writeProtoFile(t, inputDir, "user.proto", `syntax = "proto3";
+	writeFile(t, filepath.Join(inputDir, "user.proto"), `syntax = "proto3";
 package example;
 option go_package = "example";
 
@@ -87,7 +79,7 @@ func TestRunE2EBackwardCompat(t *testing.T) {
 	inputDir := t.TempDir()
 	outputDir := t.TempDir()
 
-	writeProtoFile(t, inputDir, "plain.proto", `syntax = "proto3";
+	writeFile(t, filepath.Join(inputDir, "plain.proto"), `syntax = "proto3";
 package plain;
 option go_package = "plain";
 
@@ -121,7 +113,7 @@ func TestRunE2EJSONIgnorePrecedence(t *testing.T) {
 	inputDir := t.TempDir()
 	outputDir := t.TempDir()
 
-	writeProtoFile(t, inputDir, "prec.proto", `syntax = "proto3";
+	writeFile(t, filepath.Join(inputDir, "prec.proto"), `syntax = "proto3";
 package prec;
 option go_package = "prec";
 
@@ -155,7 +147,7 @@ func TestRunE2EGormWithJSONIgnore(t *testing.T) {
 	inputDir := t.TempDir()
 	outputDir := t.TempDir()
 
-	writeProtoFile(t, inputDir, "combo.proto", `syntax = "proto3";
+	writeFile(t, filepath.Join(inputDir, "combo.proto"), `syntax = "proto3";
 package combo;
 option go_package = "combo";
 
@@ -220,7 +212,7 @@ func TestRun_ReadOnlyOutputDir(t *testing.T) {
 	inputDir := t.TempDir()
 	outputDir := t.TempDir()
 
-	writeProtoFile(t, inputDir, "plain.proto", `syntax = "proto3";
+	writeFile(t, filepath.Join(inputDir, "plain.proto"), `syntax = "proto3";
 package test;
 option go_package = "example.com/test;testpb";
 message Plain { string name = 1; }
