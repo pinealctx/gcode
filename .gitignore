@@ -6,3 +6,5 @@ __pycache__
 .process
 CLAUDE.md
 node_modules
+/gen
+package-lock.json
