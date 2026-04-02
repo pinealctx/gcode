@@ -23,6 +23,10 @@ gcode [flags]                 从 proto 文件生成 Go 代码
 
 gcode gen-proto [flags]       生成派生 proto 文件（*.update.proto / *.create.proto）
   -in string                  输入 proto 目录（生成文件写入同一目录）
+
+gcode gen-ts [flags]          从 proto 文件生成 TypeScript 类型定义
+  -in string                  输入 proto 目录
+  -out string                 输出目录
 ```
 
 ---
@@ -569,3 +573,110 @@ r.Use(TimeoutMiddleware(5 * time.Second))
 | `(buf.validate.field).enum.defined_only`  | enum          | 只允许已定义的枚举值           |
 | `(buf.validate.field).required`           | message/bytes | 不允许 nil / 空                |
 | `(buf.validate.field).message.required`   | message       | 嵌套 message 不允许 nil        |
+
+---
+
+## TypeScript 代码生成
+
+gcode 从 proto 文件生成 TypeScript 类型定义，为前端提供类型安全和一致的验证元数据。
+
+### 前置条件
+
+无额外依赖。`gen-ts` 命令使用与 Go 生成相同的 proto 解析流水线。
+
+### 生成 TS 文件
+
+如果 proto 文件使用了 `gcode.update_message` / `gcode.create_message` 注解，需要先运行 `gen-proto`（见上方 Go 部分第二步）生成派生 proto 文件。然后：
+
+```bash
+gcode gen-ts -in proto/ -out ts/
+```
+
+生成结果：
+
+```
+ts/
+  person.pb.ts              ← Person interface + Status enum + PersonRules 验证元数据
+  person.create.pb.ts       ← PersonCreate interface（从 person.pb.ts import Status）
+  person.update.pb.ts       ← PersonUpdateByName interface（从 person.pb.ts import Status）
+  person_service.pb.ts      ← 请求/响应 interface + 验证元数据
+```
+
+### 生成内容
+
+**Interface** — proto message 生成为 TypeScript interface，属性名使用 camelCase：
+
+```typescript
+export interface Person {
+  name: string
+  age: number
+  status: Status
+  scores: number[]
+  nickname?: string  // optional 字段 → T | undefined
+}
+```
+
+**Enum** — proto enum 生成为 TypeScript enum + 名称映射 Record：
+
+```typescript
+export enum Status {
+  STATUS_UNSPECIFIED = 0,
+  STATUS_ACTIVE = 1,
+  STATUS_INACTIVE = 2,
+}
+
+export const StatusName: Record<Status, string> = {
+  [Status.STATUS_UNSPECIFIED]: "STATUS_UNSPECIFIED",
+  [Status.STATUS_ACTIVE]: "STATUS_ACTIVE",
+  [Status.STATUS_INACTIVE]: "STATUS_INACTIVE",
+} as const
+```
+
+**验证元数据** — `buf/validate` 注解生成为带类型的常量对象：
+
+```typescript
+export const PersonRules = {
+  name: { required: false, type: "string", minLength: 1, maxLength: 100 },
+  age: { required: false, type: "integer", minimum: 0, maximum: 150 },
+  email: { required: false, type: "string", format: "email" },
+} as const
+```
+
+**跨文件 import** — 在其他 `.pb.ts` 文件中定义的类型会自动生成 import 语句：
+
+```typescript
+import { Status } from "./person.pb.js"
+```
+
+### 类型映射
+
+| Proto 类型                    | TypeScript 类型     | 说明                        |
+| ----------------------------- | ------------------- | --------------------------- |
+| int32, uint32, float, double  | `number`            |                             |
+| int64, uint64                 | `string`            | 避免 JS 精度丢失             |
+| bool                          | `boolean`           |                             |
+| string                        | `string`            |                             |
+| bytes                         | `string`            | base64 编码                 |
+| enum                          | `enum` + `Record`   | 数字枚举 + 名称映射          |
+| repeated T                    | `T[]`               |                             |
+| optional T                    | `T \| undefined`    | 简写：`field?: T`           |
+| message                       | `interface`         |                             |
+
+### 验证生成产物
+
+`testdata/compat/ts-test/` 中提供了自动化验证：
+
+```bash
+cd testdata/compat/ts-test
+
+# 安装依赖（仅首次）
+npm install
+
+# 类型检查 — 对所有生成文件执行 tsc --noEmit
+npm run typecheck
+
+# 运行时测试 — 验证枚举值、名称映射、验证规则、跨文件 import
+npm test
+```
+
+这些测试也通过 `go test ./testdata/compat/...`（TestTSTypeCheck、TestTSRuntime）集成到 Go 测试中，当本地有 Node.js 时自动调用 npm。

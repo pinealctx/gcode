@@ -284,3 +284,27 @@ Two-layer error code mechanism:
 - `db.Model(&Person{}).Updates(req.ToMap())` correctly matches database column names even when column name overrides are present
 - `(gcode.field).gorm.column` consistently affects both struct tags and `ToMap()` keys
 - The render-layer inheritance uses shallow copy, producing no side effects — the caller's `GoFile` is not modified
+
+---
+
+## D15: TypeScript generation — pure types, no runtime serialization
+
+**Problem**: Should gcode generate a full TypeScript SDK (HTTP client, serialization) or just type definitions?
+
+**Constraints**:
+- gcode's primary goal is Go code generation; TypeScript support is supplementary
+- Frontend projects use diverse HTTP clients (fetch, axios, tRPC) and validation libraries (zod, yup, ajv)
+- Proto annotations define validation rules that should be reusable across frontend libraries
+- protobuf binary serialization on the frontend adds complexity with limited benefit for JSON-based APIs
+
+**Decision**: Generate pure type definitions only:
+- `interface` for proto messages (camelCase property names matching Go JSON tags)
+- `enum` + name mapping `Record` for proto enums
+- Validation metadata as typed `const` objects (library-agnostic format)
+- ES Module format with `.js` extension imports for maximum compatibility
+
+**Consequences**:
+- Frontend gets type safety and validation metadata without being locked into a specific library
+- No runtime serialization — frontend consumes data via JSON fetch, which is the dominant pattern
+- Validation metadata can drive form validation, UI constraints, or be converted to zod/yup schemas
+- `gen-ts` is a separate subcommand, cleanly decoupled from Go generation

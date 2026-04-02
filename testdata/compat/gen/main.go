@@ -1,10 +1,11 @@
-// gen regenerates all static testdata snapshots under testdata/compat/dao/.
+// gen regenerates all static testdata snapshots under testdata/compat/.
 // Run from the module root:
 //
 //	go run ./testdata/compat/gen/
 //
 // Step 1: gen-proto generates intermediate update/create proto files into proto/.
 // Step 2: gcode generates all Go DAO/RPC files from proto/ into dao/.
+// Step 3: gen-ts generates TypeScript files from proto/ into ts/.
 package main
 
 import (
@@ -33,6 +34,11 @@ func run() error {
 	// Step 2: generate all Go DAO/RPC files from proto/ into dao/.
 	if err := app.Run(ctx, []string{"-in", "testdata/compat/proto", "-out", "testdata/compat/dao"}); err != nil {
 		return fmt.Errorf("gcode: %w", err)
+	}
+
+	// Step 3: generate TypeScript files from proto/ into ts/.
+	if err := app.RunGenTS(ctx, []string{"-in", "testdata/compat/proto", "-out", "testdata/compat/ts"}); err != nil {
+		return fmt.Errorf("gen-ts: %w", err)
 	}
 
 	return nil

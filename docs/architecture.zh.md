@@ -44,6 +44,23 @@ gcode 是一个纯 Go 的 CLI 工具，从 `.proto` 文件生成 Go 代码。不
   *.pb.http.go             gin HTTP handler 工厂函数
 ```
 
+TypeScript 生成使用并行流水线，共用相同的 parser 和 transform 阶段：
+
+```
+.proto 文件
+    │
+    ▼
+[source → parser → model → transform]
+    │
+    ▼
+[tsrender]       Go 中间表示 → TypeScript 源码字符串，
+                通过 TypeRegistry 解析跨文件类型引用并生成 ES module import 语句
+    │
+    ▼
+生成文件
+  *.pb.ts                  interface、enum、enum 名称映射、验证元数据
+```
+
 ---
 
 ## 各层职责
@@ -100,6 +117,16 @@ gcode 是一个纯 Go 的 CLI 工具，从 `.proto` 文件生成 Go 代码。不
 
 proto leading comment 全部透传到生成代码：struct/field/enum（`*.pb.dao.go`）、service interface/method（`*.pb.rpc.go`）、HTTP handler（`*.pb.http.go`）均已支持。
 
+### tsrender
+
+将 `transform.GoFile` 渲染为 TypeScript 源码。使用 `TypeRegistry` 解析跨文件类型引用并生成 ES module import 语句。
+
+| 函数              | 输出文件     | 内容                                            |
+| ----------------- | ------------ | ----------------------------------------------- |
+| `tsrender.TSFile` | `*.pb.ts`    | interface、enum、enum 名称映射、验证元数据       |
+
+生成代码为纯类型定义（无运行时序列化）。跨文件类型通过相对路径 + `.js` 扩展名 import（如 `import { Status } from "./person.pb.js"`），兼容所有 moduleResolution 模式。
+
 ### runtime
 
 protobuf wire format 编码原语（varint、ZigZag、tag、length-delimited、size 计算）。生成的 `MarshalBinary`/`UnmarshalBinary` 直接调用此包，不依赖官方 protobuf 反射机制。公开包，用户项目可直接引用。
@@ -135,6 +162,7 @@ HTTP adapter 运行时辅助包。提供：
 | `*.pb.dao.validate.go` | 所有 proto 文件             | `Validate() error` 方法，覆盖全部 buf/validate 约束类型                                                                                               |
 | `*.pb.rpc.go`          | proto 文件含 `service` 定义 | Go interface，方法签名 `Method(ctx context.Context, req *XxxRequest) (*XxxResponse, error)`                                                           |
 | `*.pb.http.go`         | proto 文件含 `service` 定义 | gin handler 工厂函数 `XxxHandler(svc XxxService) gin.HandlerFunc`，内置 bind → validate → svc 调用流程                                                |
+| `*.pb.ts`              | `gcode gen-ts` 子命令       | TypeScript interface、enum、enum 名称映射、验证元数据、跨文件 ES module import                                                                        |
 
 ---
 
@@ -144,13 +172,14 @@ HTTP adapter 运行时辅助包。提供：
 github.com/pinealctx/gcode/
 ├── cmd/gcode/              CLI 入口
 ├── internal/
-│   ├── app/                流水线编排（Run / RunGenProto）
+│   ├── app/                流水线编排（Run / RunGenProto / RunGenTS）
 │   ├── config/             CLI 参数解析与校验
 │   ├── model/              中间语义模型
 │   ├── parser/             proto → model
 │   ├── naming/             protobuf-to-Go 命名规则
 │   ├── transform/          model → Go 中间表示
 │   ├── render/             Go 中间表示 → Go 源码
+│   ├── tsrender/           Go 中间表示 → TypeScript 源码
 │   └── source/             目录扫描与文件发现
 ├── options/                gcode_options.proto（embed 源）
 ├── runtime/                wire format 编码原语（公开包）
@@ -161,6 +190,8 @@ github.com/pinealctx/gcode/
     ├── proto/              proto 源文件
     ├── dao/                生成的 Go 文件（快照）
     ├── pbgo/               protoc-gen-go 官方输出（wire 兼容性基准）
+    ├── ts/                 生成的 TS 文件（快照，ESM）
+    ├── ts-test/            TS 运行时验证（tsc + tsx，由 Go 测试调用）
     └── gen/main.go         重新生成所有快照的入口
 ```
 

@@ -23,6 +23,10 @@ gcode [flags]                 Generate Go code from proto files
 
 gcode gen-proto [flags]       Generate derived proto files (*.update.proto / *.create.proto)
   -in string                  Input proto directory (generated files are written to the same directory)
+
+gcode gen-ts [flags]          Generate TypeScript type definitions from proto files
+  -in string                  Input proto directory
+  -out string                 Output directory
 ```
 
 ---
@@ -568,3 +572,110 @@ For detailed documentation and examples, see [Annotations Reference](annotations
 | `(buf.validate.field).enum.defined_only`  | enum          | Only allow defined enum values                     |
 | `(buf.validate.field).required`           | message/bytes | Disallow nil / empty                               |
 | `(buf.validate.field).message.required`   | message       | Nested message must not be nil                     |
+
+---
+
+## TypeScript Generation
+
+gcode generates TypeScript type definitions from proto files, enabling type-safe frontend code with consistent validation metadata.
+
+### Prerequisites
+
+No additional dependencies. The `gen-ts` command uses the same proto parsing pipeline as Go generation.
+
+### Generate TS files
+
+If your proto files use `gcode.update_message` / `gcode.create_message` annotations, run `gen-proto` first (see Step 2 in the Go section above) to generate the derived proto files. Then:
+
+```bash
+gcode gen-ts -in proto/ -out ts/
+```
+
+Result:
+
+```
+ts/
+  person.pb.ts              ← Person interface + Status enum + PersonRules validation metadata
+  person.create.pb.ts       ← PersonCreate interface (imports Status from person.pb.ts)
+  person.update.pb.ts       ← PersonUpdateByName interface (imports Status from person.pb.ts)
+  person_service.pb.ts      ← request/response interfaces + validation metadata
+```
+
+### What is generated
+
+**Interfaces** — proto messages become TypeScript interfaces with camelCase property names:
+
+```typescript
+export interface Person {
+  name: string
+  age: number
+  status: Status
+  scores: number[]
+  nickname?: string  // optional field → T | undefined
+}
+```
+
+**Enums** — proto enums become TypeScript enums with a name mapping record:
+
+```typescript
+export enum Status {
+  STATUS_UNSPECIFIED = 0,
+  STATUS_ACTIVE = 1,
+  STATUS_INACTIVE = 2,
+}
+
+export const StatusName: Record<Status, string> = {
+  [Status.STATUS_UNSPECIFIED]: "STATUS_UNSPECIFIED",
+  [Status.STATUS_ACTIVE]: "STATUS_ACTIVE",
+  [Status.STATUS_INACTIVE]: "STATUS_INACTIVE",
+} as const
+```
+
+**Validation metadata** — `buf/validate` annotations become typed constant objects:
+
+```typescript
+export const PersonRules = {
+  name: { required: false, type: "string", minLength: 1, maxLength: 100 },
+  age: { required: false, type: "integer", minimum: 0, maximum: 150 },
+  email: { required: false, type: "string", format: "email" },
+} as const
+```
+
+**Cross-file imports** — types defined in another `.pb.ts` file are automatically imported:
+
+```typescript
+import { Status } from "./person.pb.js"
+```
+
+### Type mapping
+
+| Proto type                    | TypeScript type     | Notes                        |
+| ----------------------------- | ------------------- | ---------------------------- |
+| int32, uint32, float, double  | `number`            |                              |
+| int64, uint64                 | `string`            | Avoids JS precision loss     |
+| bool                          | `boolean`           |                              |
+| string                        | `string`            |                              |
+| bytes                         | `string`            | base64 encoded               |
+| enum                          | `enum` + `Record`   | Numeric enum + name mapping  |
+| repeated T                    | `T[]`               |                              |
+| optional T                    | `T \| undefined`    | Shorthand: `field?: T`       |
+| message                       | `interface`         |                              |
+
+### Verify generated output
+
+The compatibility test suite in `testdata/compat/ts-test/` provides automated verification:
+
+```bash
+cd testdata/compat/ts-test
+
+# Install dependencies (first time only)
+npm install
+
+# Type check — tsc --noEmit on all generated files
+npm run typecheck
+
+# Runtime tests — verify enum values, name mapping, validation rules, cross-file imports
+npm test
+```
+
+These tests are also integrated into Go via `go test ./testdata/compat/...` (TestTSTypeCheck, TestTSRuntime), which automatically invokes npm when Node.js is available.

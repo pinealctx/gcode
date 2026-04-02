@@ -17,6 +17,7 @@
 - **validate 内置** — 复用 `buf/validate` 注解语法，生成 `Validate() error` 方法，无需额外工具
 - **派生 message 自动生成** — 通过注解声明 update/create 派生 message，自动继承 validate 规则
 - **gin HTTP adapter** — 生成 handler 工厂函数，与 service interface 解耦，路由完全由用户控制
+- **TypeScript 生成** — 通过 `gcode gen-ts` 从 proto 文件生成 TypeScript interface、enum 和验证元数据
 - **注释透传** — proto leading comment 全部透传到生成代码（struct、field、enum、service、handler）
 
 ---
@@ -117,6 +118,16 @@ func main() {
 
 > **派生 message**：使用 `gcode.update_message` 或 `gcode.create_message` 注解时，需先运行 `gcode gen-proto -in proto/` 生成中间 proto 文件，再运行 `gcode -in proto/ -out dao/`。详见 [开箱即用指南 — 第二步](docs/getting-started.zh.md#第二步生成派生-proto)。
 
+**5. 生成 TypeScript 类型（可选）**
+
+如果需要前端类型定义：
+
+```bash
+gcode gen-ts -in proto/ -out ts/
+```
+
+生成 `.pb.ts` 文件，包含 TypeScript interface、enum 和验证元数据。详见 [开箱即用指南 — TypeScript 代码生成](docs/getting-started.zh.md#typescript-代码生成)。
+
 ---
 
 ## 文档
@@ -126,7 +137,7 @@ func main() {
 | [开箱即用指南](docs/getting-started.zh.md) | 完整 8 步示例（proto 到 HTTP 服务）、注解速查表 |
 | [架构概览](docs/architecture.zh.md)        | 整体流水线、各层职责、目录结构                  |
 | [注解参考](docs/annotations.zh.md)         | 所有注解的详细说明和示例                        |
-| [设计决策](docs/design-decisions.zh.md)    | 关键架构决策（ADR 风格，D1-D14）                |
+| [设计决策](docs/design-decisions.zh.md)    | 关键架构决策（ADR 风格，D1-D15）                |
 
 ---
 

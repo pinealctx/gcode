@@ -19,8 +19,13 @@ const modulePath = "github.com/pinealctx/gcode"
 
 // Run is the process entry used by the CLI main package.
 func Run(ctx context.Context, args []string) error {
-	if len(args) > 0 && args[0] == "gen-proto" {
-		return RunGenProto(ctx, args[1:])
+	if len(args) > 0 {
+		switch args[0] {
+		case "gen-proto":
+			return RunGenProto(ctx, args[1:])
+		case "gen-ts":
+			return RunGenTS(ctx, args[1:])
+		}
 	}
 	cfg, err := config.Parse(args)
 	if err != nil {
