@@ -78,7 +78,7 @@ func TestTSFileBasic(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestTSFileEnum(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestTSFileOptionalFields(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestTSFileRepeatedFields(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestTSFileMessageField(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestTSFileInt64AsString(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -271,7 +271,7 @@ func TestTSFileBytesAsString(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestTSFileOptionalBytes(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -321,7 +321,7 @@ func TestTSFileEmpty(t *testing.T) {
 		Package: "test",
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -348,7 +348,7 @@ func TestTSFileHeader(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -384,7 +384,7 @@ func TestTSFileEnumWithComment(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -419,7 +419,7 @@ func TestTSFileEnumField(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -453,7 +453,7 @@ func TestTSFileJSONName(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -489,7 +489,7 @@ func TestTSFileRepeatedEnumField(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -520,7 +520,7 @@ func TestTSFileRepeatedMessageField(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -551,7 +551,7 @@ func TestTSFileNonOptionalMessageField(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -584,6 +584,223 @@ func TestTSFieldTypeUnknownKind(t *testing.T) {
 	if got != "unknown" {
 		t.Errorf("tsFieldType(unknown kind) = %q, want %q", got, "unknown")
 	}
+}
+
+func TestTSFileCrossFileImport(t *testing.T) {
+	t.Parallel()
+
+	// Simulate a file that references types defined in another file.
+	gf := transform.GoFile{
+		Source:       "order.proto",
+		Package:      "myapp",
+		ProtoPackage: "myapp",
+		Messages: []transform.GoMessage{
+			{
+				GoName: "Order",
+				Fields: []transform.GoField{
+					enumField("status", "status", "myapp.Status"),
+					messageField("customer", "customer", "myapp.Customer", false),
+				},
+			},
+		},
+	}
+
+	registry := TypeRegistry{
+		"Status":   "common.pb.ts",
+		"Customer": "user.pb.ts",
+	}
+
+	out, err := TSFile(gf, registry)
+	if err != nil {
+		t.Fatalf("TSFile returned error: %v", err)
+	}
+
+	s := string(out)
+	// Should have imports for both cross-file types.
+	assertContains(t, s, `import { Status } from "./common.pb.js"`)
+	assertContains(t, s, `import { Customer } from "./user.pb.js"`)
+	// Field types should use short names (not Compat_ prefixed).
+	assertContains(t, s, "  status: Status\n")
+	assertContains(t, s, "  customer: Customer\n")
+}
+
+func TestTSFileSameFileNoImport(t *testing.T) {
+	t.Parallel()
+
+	// Status enum is defined in the same file — no import should be generated.
+	gf := transform.GoFile{
+		Source:       "combined.proto",
+		Package:      "myapp",
+		ProtoPackage: "myapp",
+		Enums: []transform.GoEnum{
+			{
+				GoName: "Status",
+				Values: []transform.GoEnumValue{
+					{GoName: "Status_ACTIVE", Number: 1},
+				},
+			},
+		},
+		Messages: []transform.GoMessage{
+			{
+				GoName: "Msg",
+				Fields: []transform.GoField{
+					enumField("status", "status", "myapp.Status"),
+				},
+			},
+		},
+	}
+
+	registry := TypeRegistry{
+		"Status": "combined.pb.ts",
+	}
+
+	out, err := TSFile(gf, registry)
+	if err != nil {
+		t.Fatalf("TSFile returned error: %v", err)
+	}
+
+	s := string(out)
+	// No import for Status — it's defined in the same file.
+	if strings.Contains(s, "import") {
+		t.Errorf("should have no imports for same-file types, got:\n%s", s)
+	}
+	assertContains(t, s, "  status: Status\n")
+}
+
+func TestTSFileMultipleTypesFromSameSource(t *testing.T) {
+	t.Parallel()
+
+	// Two types from the same source file should be combined in one import.
+	gf := transform.GoFile{
+		Source:       "service.proto",
+		Package:      "myapp",
+		ProtoPackage: "myapp",
+		Messages: []transform.GoMessage{
+			{
+				GoName: "Response",
+				Fields: []transform.GoField{
+					enumField("status", "status", "myapp.Status"),
+					messageField("data", "data", "myapp.Payload", false),
+				},
+			},
+		},
+	}
+
+	registry := TypeRegistry{
+		"Status":  "common.pb.ts",
+		"Payload": "common.pb.ts",
+	}
+
+	out, err := TSFile(gf, registry)
+	if err != nil {
+		t.Fatalf("TSFile returned error: %v", err)
+	}
+
+	s := string(out)
+	// Both types should be in a single import statement.
+	assertContains(t, s, `import { Payload, Status } from "./common.pb.js"`)
+}
+
+func TestTSFileRepeatedCrossFileImport(t *testing.T) {
+	t.Parallel()
+
+	// Repeated field referencing a cross-file type should generate import.
+	gf := transform.GoFile{
+		Source:       "batch.proto",
+		Package:      "myapp",
+		ProtoPackage: "myapp",
+		Messages: []transform.GoMessage{
+			{
+				GoName: "Batch",
+				Fields: []transform.GoField{
+					repeatedField("items", "items", model.FieldKindMessage, "", "myapp.Item"),
+					repeatedField("flags", "flags", model.FieldKindEnum, "", "myapp.Flag"),
+				},
+			},
+		},
+	}
+
+	registry := TypeRegistry{
+		"Item": "types.pb.ts",
+		"Flag": "enums.pb.ts",
+	}
+
+	out, err := TSFile(gf, registry)
+	if err != nil {
+		t.Fatalf("TSFile returned error: %v", err)
+	}
+
+	s := string(out)
+	assertContains(t, s, `import { Flag } from "./enums.pb.js"`)
+	assertContains(t, s, `import { Item } from "./types.pb.js"`)
+	assertContains(t, s, "  items: Item[]\n")
+	assertContains(t, s, "  flags: Flag[]\n")
+}
+
+func TestTSFileRegistryMissNoImport(t *testing.T) {
+	t.Parallel()
+
+	// Field references a type not in the registry — no import, still renders.
+	gf := transform.GoFile{
+		Source:       "svc.proto",
+		Package:      "myapp",
+		ProtoPackage: "myapp",
+		Messages: []transform.GoMessage{
+			{
+				GoName: "Req",
+				Fields: []transform.GoField{
+					enumField("kind", "kind", "myapp.Kind"),
+				},
+			},
+		},
+	}
+
+	out, err := TSFile(gf, nil)
+	if err != nil {
+		t.Fatalf("TSFile returned error: %v", err)
+	}
+
+	s := string(out)
+	// No import — type not in registry.
+	if strings.Contains(s, "import") {
+		t.Errorf("should have no imports when type not in registry, got:\n%s", s)
+	}
+	// Field should still render with the resolved type name.
+	assertContains(t, s, "  kind: Kind\n")
+}
+
+func TestTSFileMismatchedProtoPackage(t *testing.T) {
+	t.Parallel()
+
+	// Field FullName uses a different proto package than the current file.
+	// GoTypeName should NOT strip the prefix, producing a qualified name.
+	gf := transform.GoFile{
+		Source:       "order.proto",
+		Package:      "myapp",
+		ProtoPackage: "ordersvc",
+		Messages: []transform.GoMessage{
+			{
+				GoName: "Order",
+				Fields: []transform.GoField{
+					enumField("status", "status", "catalog.Status"),
+				},
+			},
+		},
+	}
+
+	registry := TypeRegistry{
+		"Catalog_Status": "catalog.pb.ts",
+	}
+
+	out, err := TSFile(gf, registry)
+	if err != nil {
+		t.Fatalf("TSFile returned error: %v", err)
+	}
+
+	s := string(out)
+	// Type name from mismatched package should be qualified.
+	assertContains(t, s, "  status: Catalog_Status\n")
+	assertContains(t, s, `import { Catalog_Status } from "./catalog.pb.js"`)
 }
 
 // assertContains is a test helper that checks s contains want.

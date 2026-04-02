@@ -13,6 +13,9 @@ type GoFile struct {
 	Source string
 	// Package is the Go package name for the generated file.
 	Package string
+	// ProtoPackage is the proto package name (e.g., "compat"). Used by the
+	// TS renderer to compute correct short type names for cross-file references.
+	ProtoPackage string
 	// Messages contains all messages (including nested) flattened to top level.
 	Messages []GoMessage
 	// Enums contains all enums (including nested) flattened to top level.
@@ -118,11 +121,12 @@ func Flatten(file model.File) GoFile {
 	flattenEnums(file.Enums, file.Package, &enums)
 
 	return GoFile{
-		Source:   file.Path,
-		Package:  pkg,
-		Messages: messages,
-		Enums:    enums,
-		Services: flattenServices(file.Services, file.Package),
+		Source:       file.Path,
+		Package:      pkg,
+		ProtoPackage: file.Package,
+		Messages:     messages,
+		Enums:        enums,
+		Services:     flattenServices(file.Services, file.Package),
 	}
 }
 

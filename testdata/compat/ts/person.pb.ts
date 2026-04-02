@@ -22,8 +22,8 @@ export interface Person {
   name: string
   age: number
   active: boolean
-  status: Compat_Status
-  address: Compat_Address
+  status: Status
+  address: Address
   scores: number[]
   tags: string[]
   rating: number
@@ -34,7 +34,7 @@ export interface Person {
   verified?: boolean
   score?: number
   updatedAt?: string
-  prevStatus?: Compat_Status
+  prevStatus?: Status
   fingerprint?: string
   email: string
   role: string

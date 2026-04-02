@@ -73,8 +73,8 @@ func TestRunGenTS_NoProtoFiles(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty input directory, got nil")
 	}
-	if !strings.Contains(err.Error(), "no .proto files found") {
-		t.Errorf("error = %q, want no .proto files found error", err.Error())
+	if !errors.Is(err, config.ErrNoProtoFiles) {
+		t.Errorf("error = %q, want ErrNoProtoFiles", err.Error())
 	}
 }
 

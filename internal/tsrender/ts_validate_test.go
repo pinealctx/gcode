@@ -724,7 +724,7 @@ func TestValidationFullFile(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}

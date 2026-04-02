@@ -28,7 +28,7 @@ func RunGenTS(ctx context.Context, args []string) error {
 	}
 
 	if len(scanResult.Files) == 0 {
-		return fmt.Errorf("no .proto files found in %q", cfg.InputDir)
+		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, config.ErrNoProtoFiles)
 	}
 
 	files, err := parser.Parse(ctx, []string{scanResult.ImportPath}, scanResult.Files)
@@ -45,15 +45,32 @@ func RunGenTS(ctx context.Context, args []string) error {
 		return fmt.Errorf("create output directory %q: %w", cfg.OutputDir, err)
 	}
 
-	for _, f := range files {
-		gf := transform.Flatten(f)
+	// First pass: flatten all files.
+	goFiles := make([]transform.GoFile, len(files))
+	for i, f := range files {
+		goFiles[i] = transform.Flatten(f)
+	}
 
-		tsSrc, err := tsrender.TSFile(gf)
+	// Build type registry: GoName → source .pb.ts output file name.
+	registry := make(tsrender.TypeRegistry)
+	for i, gf := range goFiles {
+		srcFile := tsOutputFileName(files[i].Path)
+		for _, enum := range gf.Enums {
+			registry[enum.GoName] = srcFile
+		}
+		for _, msg := range gf.Messages {
+			registry[msg.GoName] = srcFile
+		}
+	}
+
+	// Second pass: render TS files with type registry for cross-file imports.
+	for i, gf := range goFiles {
+		tsSrc, err := tsrender.TSFile(gf, registry)
 		if err != nil {
-			return fmt.Errorf("render ts %q: %w", f.Path, err)
+			return fmt.Errorf("render ts %q: %w", files[i].Path, err)
 		}
 
-		outPath := filepath.Join(cfg.OutputDir, tsOutputFileName(f.Path))
+		outPath := filepath.Join(cfg.OutputDir, tsOutputFileName(files[i].Path))
 		if err := os.WriteFile(outPath, tsSrc, 0o600); err != nil {
 			return fmt.Errorf("write %q: %w", outPath, err)
 		}
