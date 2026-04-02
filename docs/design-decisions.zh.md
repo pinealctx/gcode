@@ -284,3 +284,27 @@
 - `db.Model(&Person{}).Updates(req.ToMap())` 能正确匹配数据库列名，即使字段有列名覆盖
 - `(gcode.field).gorm.column` 注解同时影响 struct tag 和 `ToMap()` key，保持一致性
 - render 层的继承逻辑使用浅拷贝，不产生副作用，调用方的 `GoFile` 不被修改
+
+---
+
+## D15：TypeScript 生成 — 纯类型定义，不做运行时序列化
+
+**问题**：gcode 应该生成完整的 TypeScript SDK（HTTP 客户端、序列化）还是只生成类型定义？
+
+**约束**：
+- gcode 的核心目标是 Go 代码生成，TypeScript 支持是补充功能
+- 前端项目使用不同的 HTTP 客户端（fetch、axios、tRPC）和校验库（zod、yup、ajv）
+- proto 注解定义了验证规则，应可在不同前端库中复用
+- 前端做 protobuf 二进制序列化增加了复杂度，但对 JSON API 收益有限
+
+**决策**：只生成纯类型定义：
+- `interface` 用于 proto message（属性名使用 camelCase，与 Go JSON tag 一致）
+- `enum` + 名称映射 `Record` 用于 proto enum
+- 验证元数据为带类型的 `const` 对象（不绑定特定库）
+- ES Module 格式，import 使用 `.js` 扩展名（最大兼容性）
+
+**影响**：
+- 前端获得类型安全和验证元数据，不绑定特定库
+- 无运行时序列化——前端通过 JSON fetch 消费数据（这是主流模式）
+- 验证元数据可驱动表单校验、UI 约束，或转换为 zod/yup schema
+- `gen-ts` 作为独立子命令，与 Go 生成完全解耦

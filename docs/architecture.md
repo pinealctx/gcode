@@ -44,6 +44,23 @@ Generated files
   *.pb.http.go             gin HTTP handler factory functions
 ```
 
+TypeScript generation follows a parallel pipeline using the same parser and transform stages:
+
+```
+.proto files
+    │
+    ▼
+[source → parser → model → transform]
+    │
+    ▼
+[tsrender]       Go IR → TypeScript source string,
+                 with TypeRegistry for cross-file import resolution
+    │
+    ▼
+Generated files
+  *.pb.ts                  interfaces, enums, enum name mapping, validation metadata
+```
+
 ---
 
 ## Layer Responsibilities
@@ -100,6 +117,16 @@ All functions call `go/format.Source` at the end to ensure consistent code style
 
 Proto leading comments are passed through to all generated code: structs/fields/enums (`*.pb.dao.go`), service interfaces/methods (`*.pb.rpc.go`), and HTTP handlers (`*.pb.http.go`).
 
+### tsrender
+
+Renders `transform.GoFile` to TypeScript source code. Uses a `TypeRegistry` to resolve cross-file type references and generate ES module import statements.
+
+| Function          | Output file  | Content                                                    |
+| ----------------- | ------------ | ---------------------------------------------------------- |
+| `tsrender.TSFile` | `*.pb.ts`    | interfaces, enums, enum name mapping, validation metadata  |
+
+Generated code is pure type definitions (no runtime serialization). Cross-file types are imported via relative paths with `.js` extension (e.g. `import { Status } from "./person.pb.js"`) for maximum module resolution compatibility.
+
 ### runtime
 
 Protobuf wire format encoding primitives (varint, ZigZag, tag, length-delimited, size calculation). Generated `MarshalBinary`/`UnmarshalBinary` call this package directly, with no dependency on the official protobuf reflection mechanism. Public package, importable by user projects.
@@ -135,6 +162,7 @@ Public package, importable by user projects.
 | `*.pb.dao.validate.go` | All proto files                        | `Validate() error` methods covering all buf/validate constraint types                                                                                                            |
 | `*.pb.rpc.go`          | Proto files with `service` definitions | Go interface, method signature: `Method(ctx context.Context, req *XxxRequest) (*XxxResponse, error)`                                                                             |
 | `*.pb.http.go`         | Proto files with `service` definitions | gin handler factory functions `XxxHandler(svc XxxService) gin.HandlerFunc`, with built-in bind → validate → svc call flow                                                        |
+| `*.pb.ts`              | `gcode gen-ts` subcommand              | TypeScript interfaces, enums, enum name mapping, validation metadata, cross-file ES module imports                                                                               |
 
 ---
 
@@ -144,13 +172,14 @@ Public package, importable by user projects.
 github.com/pinealctx/gcode/
 ├── cmd/gcode/              CLI entry point
 ├── internal/
-│   ├── app/                Pipeline orchestration (Run / RunGenProto)
+│   ├── app/                Pipeline orchestration (Run / RunGenProto / RunGenTS)
 │   ├── config/             CLI argument parsing and validation
 │   ├── model/              Intermediate semantic model
 │   ├── parser/             proto → model
 │   ├── naming/             protobuf-to-Go naming rules
 │   ├── transform/          model → Go intermediate representation
 │   ├── render/             Go IR → Go source code
+│   ├── tsrender/           Go IR → TypeScript source code
 │   └── source/             Directory scanning and file discovery
 ├── options/                gcode_options.proto (embed source)
 ├── runtime/                Wire format encoding primitives (public package)
@@ -160,6 +189,8 @@ github.com/pinealctx/gcode/
     ├── proto/              Proto source files
     ├── dao/                Generated Go files (snapshots)
     ├── pbgo/               protoc-gen-go output (wire compatibility baseline)
+    ├── ts/                 Generated TS files (snapshots, ESM)
+    ├── ts-test/            TS runtime verification (tsc + tsx, invoked by Go tests)
     └── gen/main.go         Entry point to regenerate all snapshots
 ```
 
