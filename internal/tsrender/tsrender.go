@@ -28,6 +28,10 @@ func TSFile(gf transform.GoFile) ([]byte, error) {
 		writeTSInterface(&b, msg, gf.Package)
 	}
 
+	for _, msg := range gf.Messages {
+		writeTSValidationRules(&b, msg)
+	}
+
 	return []byte(b.String()), nil
 }
 
@@ -157,4 +161,415 @@ func writeTSInterface(b *strings.Builder, msg transform.GoMessage, pkgName strin
 		}
 	}
 	b.WriteString("}\n\n")
+}
+
+// tsValidationType returns the TS metadata "type" value for a GoField.
+// This differs from tsScalarType/tsFieldType which produce interface types.
+func tsValidationType(f transform.GoField) string {
+	if f.Cardinality == model.CardinalityRepeated {
+		return "array"
+	}
+	switch f.Type.Kind {
+	case model.FieldKindScalar:
+		switch f.Type.Scalar {
+		case model.ScalarString, model.ScalarBytes:
+			return "string"
+		case model.ScalarInt32, model.ScalarSint32, model.ScalarSfixed32,
+			model.ScalarUint32, model.ScalarFixed32,
+			model.ScalarInt64, model.ScalarSint64, model.ScalarSfixed64,
+			model.ScalarUint64, model.ScalarFixed64:
+			return "integer"
+		case model.ScalarFloat, model.ScalarDouble:
+			return "number"
+		case model.ScalarBool:
+			return "boolean"
+		default:
+			return "unknown"
+		}
+	case model.FieldKindEnum:
+		return "enum"
+	case model.FieldKindMessage:
+		return "object"
+	default:
+		return "unknown"
+	}
+}
+
+// writeTSValidationRules generates a validation rules constant for a message.
+// Only fields with ValidateOptions produce entries; others are silently omitted.
+//
+// Example output:
+//
+//	export const PersonRules = {
+//	  name: { required: true, type: "string", minLength: 1 } },
+//	} as const
+func writeTSValidationRules(b *strings.Builder, msg transform.GoMessage) {
+	// Collect fields that have validation rules.
+	type fieldEntry struct {
+		name  string
+		field transform.GoField
+	}
+	var entries []fieldEntry
+	for _, f := range msg.Fields {
+		if f.ValidateOptions != nil {
+			entries = append(entries, fieldEntry{name: f.JSONName, field: f})
+		}
+	}
+	if len(entries) == 0 {
+		return
+	}
+
+	fmt.Fprintf(b, "export const %sRules = {\n", msg.GoName)
+	for i, e := range entries {
+		writeTSFieldRules(b, e.name, e.field, "  ")
+		if i < len(entries)-1 {
+			b.WriteString(",\n")
+		} else {
+			b.WriteString("\n")
+		}
+	}
+	b.WriteString("} as const\n\n")
+}
+
+// writeTSFieldRules writes all validation rules for a single field.
+func writeTSFieldRules(b *strings.Builder, jsonName string, f transform.GoField, indent string) {
+	vo := f.ValidateOptions
+
+	fmt.Fprintf(b, "%s%s: { ", indent, jsonName)
+
+	// required
+	fmt.Fprintf(b, "required: %t", vo.Required)
+
+	// type
+	fmt.Fprintf(b, ", type: %q", tsValidationType(f))
+
+	// String constraints
+	if vo.MinLen != nil {
+		fmt.Fprintf(b, ", minLength: %d", *vo.MinLen)
+	}
+	if vo.MaxLen != nil {
+		fmt.Fprintf(b, ", maxLength: %d", *vo.MaxLen)
+	}
+	if vo.Pattern != "" {
+		fmt.Fprintf(b, ", pattern: %q", vo.Pattern)
+	}
+	if vo.Email {
+		fmt.Fprintf(b, ", format: %q", "email")
+	}
+	if vo.URI {
+		fmt.Fprintf(b, ", format: %q", "uri")
+	}
+	if len(vo.InStr) > 0 {
+		b.WriteString(", enum: [")
+		for i, v := range vo.InStr {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%q", v)
+		}
+		b.WriteString("]")
+	}
+	if len(vo.NotInStr) > 0 {
+		b.WriteString(", notIn: [")
+		for i, v := range vo.NotInStr {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%q", v)
+		}
+		b.WriteString("]")
+	}
+
+	// Signed integer constraints
+	if vo.GTEInt != nil {
+		fmt.Fprintf(b, ", minimum: %d", *vo.GTEInt)
+	}
+	if vo.LTEInt != nil {
+		fmt.Fprintf(b, ", maximum: %d", *vo.LTEInt)
+	}
+	if vo.GTInt != nil {
+		fmt.Fprintf(b, ", exclusiveMinimum: %d", *vo.GTInt)
+	}
+	if vo.LTInt != nil {
+		fmt.Fprintf(b, ", exclusiveMaximum: %d", *vo.LTInt)
+	}
+	if len(vo.InInt) > 0 {
+		b.WriteString(", enum: [")
+		for i, v := range vo.InInt {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", v)
+		}
+		b.WriteString("]")
+	}
+	if len(vo.NotInInt) > 0 {
+		b.WriteString(", notIn: [")
+		for i, v := range vo.NotInInt {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", v)
+		}
+		b.WriteString("]")
+	}
+
+	// Unsigned integer constraints
+	if vo.GTEUint != nil {
+		fmt.Fprintf(b, ", minimum: %d", *vo.GTEUint)
+	}
+	if vo.LTEUint != nil {
+		fmt.Fprintf(b, ", maximum: %d", *vo.LTEUint)
+	}
+	if vo.GTUint != nil {
+		fmt.Fprintf(b, ", exclusiveMinimum: %d", *vo.GTUint)
+	}
+	if vo.LTUint != nil {
+		fmt.Fprintf(b, ", exclusiveMaximum: %d", *vo.LTUint)
+	}
+	if len(vo.InUint) > 0 {
+		b.WriteString(", enum: [")
+		for i, v := range vo.InUint {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", v)
+		}
+		b.WriteString("]")
+	}
+	if len(vo.NotInUint) > 0 {
+		b.WriteString(", notIn: [")
+		for i, v := range vo.NotInUint {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", v)
+		}
+		b.WriteString("]")
+	}
+
+	// Float constraints
+	if vo.GTEFloat != nil {
+		fmt.Fprintf(b, ", minimum: %g", *vo.GTEFloat)
+	}
+	if vo.LTEFloat != nil {
+		fmt.Fprintf(b, ", maximum: %g", *vo.LTEFloat)
+	}
+	if vo.GTFloat != nil {
+		fmt.Fprintf(b, ", exclusiveMinimum: %g", *vo.GTFloat)
+	}
+	if vo.LTFloat != nil {
+		fmt.Fprintf(b, ", exclusiveMaximum: %g", *vo.LTFloat)
+	}
+
+	// Enum constraints
+	if vo.DefinedOnly {
+		b.WriteString(", definedOnly: true")
+	}
+
+	// Repeated constraints
+	if vo.MinItems != nil {
+		fmt.Fprintf(b, ", minItems: %d", *vo.MinItems)
+	}
+	if vo.MaxItems != nil {
+		fmt.Fprintf(b, ", maxItems: %d", *vo.MaxItems)
+	}
+	if vo.Items != nil {
+		b.WriteString(", items: { ")
+		writeItemRules(b, vo.Items)
+		b.WriteString(" }")
+	}
+
+	b.WriteString(" }")
+}
+
+// writeItemRules writes validation rules for repeated field items (inner constraints).
+// These are simpler than top-level field rules: no required/type prefix, no nested items.
+func writeItemRules(b *strings.Builder, vo *model.ValidateFieldOptions) {
+	// type is always emitted for items
+	// Items inherit the element scalar type, but we don't have the field here.
+	// The caller should handle type; for items we write constraints only.
+
+	if vo.MinLen != nil {
+		fmt.Fprintf(b, "minLength: %d", *vo.MinLen)
+	}
+	if vo.MaxLen != nil {
+		if vo.MinLen != nil {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "maxLength: %d", *vo.MaxLen)
+	}
+	if vo.Pattern != "" {
+		if vo.MinLen != nil || vo.MaxLen != nil {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "pattern: %q", vo.Pattern)
+	}
+	if vo.Email {
+		if vo.MinLen != nil || vo.MaxLen != nil || vo.Pattern != "" {
+			b.WriteString(", ")
+		}
+		b.WriteString("format: \"email\"")
+	}
+	if vo.URI {
+		if vo.MinLen != nil || vo.MaxLen != nil || vo.Pattern != "" || vo.Email {
+			b.WriteString(", ")
+		}
+		b.WriteString("format: \"uri\"")
+	}
+
+	// Integer constraints
+	needsComma := vo.MinLen != nil || vo.MaxLen != nil || vo.Pattern != "" || vo.Email || vo.URI
+	if vo.GTEInt != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "minimum: %d", *vo.GTEInt)
+		needsComma = true
+	}
+	if vo.LTEInt != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "maximum: %d", *vo.LTEInt)
+		needsComma = true
+	}
+	if vo.GTInt != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "exclusiveMinimum: %d", *vo.GTInt)
+		needsComma = true
+	}
+	if vo.LTInt != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "exclusiveMaximum: %d", *vo.LTInt)
+		needsComma = true
+	}
+	if len(vo.InInt) > 0 {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		b.WriteString("enum: [")
+		for i, v := range vo.InInt {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", v)
+		}
+		b.WriteString("]")
+		needsComma = true
+	}
+	if len(vo.NotInInt) > 0 {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		b.WriteString("notIn: [")
+		for i, v := range vo.NotInInt {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", v)
+		}
+		b.WriteString("]")
+		needsComma = true
+	}
+
+	// Unsigned integer constraints
+	if vo.GTEUint != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "minimum: %d", *vo.GTEUint)
+		needsComma = true
+	}
+	if vo.LTEUint != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "maximum: %d", *vo.LTEUint)
+		needsComma = true
+	}
+	if vo.GTUint != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "exclusiveMinimum: %d", *vo.GTUint)
+		needsComma = true
+	}
+	if vo.LTUint != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "exclusiveMaximum: %d", *vo.LTUint)
+		needsComma = true
+	}
+	if len(vo.InUint) > 0 {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		b.WriteString("enum: [")
+		for i, v := range vo.InUint {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", v)
+		}
+		b.WriteString("]")
+		needsComma = true
+	}
+	if len(vo.NotInUint) > 0 {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		b.WriteString("notIn: [")
+		for i, v := range vo.NotInUint {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", v)
+		}
+		b.WriteString("]")
+		needsComma = true
+	}
+
+	// Float constraints
+	if vo.GTEFloat != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "minimum: %g", *vo.GTEFloat)
+		needsComma = true
+	}
+	if vo.LTEFloat != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "maximum: %g", *vo.LTEFloat)
+		needsComma = true
+	}
+	if vo.GTFloat != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "exclusiveMinimum: %g", *vo.GTFloat)
+		needsComma = true
+	}
+	if vo.LTFloat != nil {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(b, "exclusiveMaximum: %g", *vo.LTFloat)
+		needsComma = true
+	}
+
+	// DefinedOnly for enum items
+	if vo.DefinedOnly {
+		if needsComma {
+			b.WriteString(", ")
+		}
+		b.WriteString("definedOnly: true")
+	}
 }
