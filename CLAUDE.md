@@ -154,23 +154,24 @@ gcode/
 ├── cmd/
 │   └── gcode/                   # CLI 入口，调用应用层
 ├── internal/
-│   ├── app/                     # 应用层入口。Run 主命令路由（gen-dao/gen-proto），RunGenProto 中间 proto 生成 pipeline
-│   ├── config/                  # CLI 参数解析与配置校验。GenDAOConfig、GenProtoConfig 及 Validate()
+│   ├── app/                     # 应用层入口。Run 主命令路由（gen-dao/gen-proto/gen-ts），RunGenProto 中间 proto 生成 pipeline
+│   ├── config/                  # CLI 参数解析与配置校验。GenDAOConfig、GenProtoConfig、GenTSConfig 及 Validate()
 │   ├── model/                   # 中间语义模型。File/Message/Field/Enum/Service/RPC + 注解结构体
 │   ├── parser/                  # protocompile proto 编译 → model 映射。embeddedResolver 支持 gcode options
 │   ├── naming/                  # protobuf-to-Go 命名规则（GoCamelCase、类型名、字段名、标量映射）
 │   ├── transform/               # model → Go 中间表示转换（展平、命名计算、类型解析、service 展平）
 │   ├── render/                  # Go 源码渲染。File→dao.go, ValidateFile→validate.go, RPCFile→rpc.go, HTTPFile→http.go
-│   ├── tsrender/                # TypeScript 源码渲染。TSFile→.pb.ts（interface, enum, enum name mapping）
+│   ├── tsrender/                # TypeScript 源码渲染。TSFile→.pb.ts（interface, enum, enum name mapping, validation metadata）
 │   └── source/                  # .proto 文件发现与路径安全校验
 ├── options/                     # proto 定义（embed 源）+ embed.go。gcode custom options。公开包
 ├── runtime/                     # protobuf wire format 编码原语。公开包
 ├── validateruntime/             # 校验运行时。ValidationError、IsEmail/IsURI、MatchPattern。公开包
 ├── httpruntime/                 # HTTP 运行时。Response/Error 信封、CodedError、DefaultErrorHandler。公开包
 ├── testdata/
-│   └── compat/                  # 兼容性测试套件（wire/validate/update/RPC/HTTP 端到端 + fuzz/bench）
+│   └── compat/                  # 兼容性测试套件（wire/validate/update/RPC/HTTP/TS 端到端 + fuzz/bench）
 │       ├── bench-results/       # benchmark 历史结果，支持 benchstat 跨版本 diff
-│       └── gen/main.go          # 重新生成所有快照
+│       ├── ts/                  # TS 兼容性测试快照（.pb.ts golden files）
+│       └── gen/main.go          # 重新生成所有快照（Go DAO + TS）
 ├── scripts/
 │   └── bench.sh                 # 运行 benchmark 并写入 bench-results/
 └── docs/                        # 面向用户的文档（中英双语：README、architecture、getting-started、annotations、design-decisions）
