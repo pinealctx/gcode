@@ -6,7 +6,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -91,4 +93,59 @@ func TestTSSnapshot(t *testing.T) {
 			}
 		})
 	}
+}
+
+// _tsTestDir is the directory containing the TS runtime test project.
+const _tsTestDir = "ts-test"
+
+// requireNode skips the test if Node.js is not available.
+func requireNode(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skip("node not found in PATH, skipping TS runtime test")
+	}
+}
+
+// runNpm runs an npm command in the ts-test directory.
+func runNpm(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("npm", args...)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("npm %s: %v", strings.Join(args, " "), err)
+	}
+}
+
+// TestTSTypeCheck runs tsc --noEmit on the generated TS files.
+func TestTSTypeCheck(t *testing.T) {
+	requireNode(t)
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping npm-based test on Windows")
+	}
+
+	tsDir, err := filepath.Abs(_tsTestDir)
+	if err != nil {
+		t.Fatalf("resolve ts-test dir: %v", err)
+	}
+
+	runNpm(t, tsDir, "install")
+	runNpm(t, tsDir, "run", "typecheck")
+}
+
+// TestTSRuntime runs the TS runtime test suite via tsx.
+func TestTSRuntime(t *testing.T) {
+	requireNode(t)
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping npm-based test on Windows")
+	}
+
+	tsDir, err := filepath.Abs(_tsTestDir)
+	if err != nil {
+		t.Fatalf("resolve ts-test dir: %v", err)
+	}
+
+	runNpm(t, tsDir, "install")
+	runNpm(t, tsDir, "test")
 }

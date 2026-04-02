@@ -5,3 +5,4 @@ __pycache__
 .mcp.json
 .process
 CLAUDE.md
+node_modules

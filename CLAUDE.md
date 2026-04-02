@@ -170,7 +170,8 @@ gcode/
 ├── testdata/
 │   └── compat/                  # 兼容性测试套件（wire/validate/update/RPC/HTTP/TS 端到端 + fuzz/bench）
 │       ├── bench-results/       # benchmark 历史结果，支持 benchstat 跨版本 diff
-│       ├── ts/                  # TS 兼容性测试快照（.pb.ts golden files）
+│       ├── ts/                  # TS 兼容性测试快照（.pb.ts golden files + package.json for ESM）
+│       ├── ts-test/             # TS 运行时验证（tsc --noEmit + tsx test.ts，Go 测试调用 npm）
 │       └── gen/main.go          # 重新生成所有快照（Go DAO + TS）
 ├── scripts/
 │   └── bench.sh                 # 运行 benchmark 并写入 bench-results/
