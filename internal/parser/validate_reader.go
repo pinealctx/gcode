@@ -40,7 +40,8 @@ func readValidateOptions(
 	return parseFieldConstraints(fc, kind, fieldFullName)
 }
 
-// placeholder to be replaced
+// parseFieldConstraints dispatches field-level buf.validate constraints by proto kind
+// and fills a ValidateFieldOptions. Returns nil if no constraints are set.
 // kind is the proto field kind, used to select the correct constraint group.
 // fieldFullName is used in error messages.
 func parseFieldConstraints(fc *dynamicpb.Message, kind protoreflect.Kind, fieldFullName string) (*model.ValidateFieldOptions, error) {
@@ -183,7 +184,11 @@ func parseStringRules(r *dynamicpb.Message, opts *model.ValidateFieldOptions, fi
 	opts.Email = getBoolField(r, "email")
 	opts.URI = getBoolField(r, "uri")
 
-	// in set — empty in set is a user error (always fails)
+	// in set — empty in set is a user error (always fails).
+	// Defensive check: proto repeated fields with zero elements do not set hasField,
+	// so this branch is only reachable if a caller constructs a dynamicpb.Message
+	// with an explicitly-set empty list, which cannot happen through normal proto
+	// compilation. The check is retained as a safety net.
 	if hasField(r, "in") {
 		inVals := getListField(r, "in")
 		if len(inVals) == 0 {

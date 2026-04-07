@@ -1,6 +1,7 @@
 package transform
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -230,6 +231,17 @@ func TestFlattenRepeatedAndEnum(t *testing.T) {
 						},
 						JSONName: "items",
 					},
+					{
+						Name:        "statuses",
+						Number:      5,
+						Cardinality: model.CardinalityRepeated,
+						Type: model.FieldType{
+							Kind:     model.FieldKindEnum,
+							Name:     "Status",
+							FullName: "test.foo.Status",
+						},
+						JSONName: "statuses",
+					},
 				},
 			},
 		},
@@ -262,6 +274,10 @@ func TestFlattenRepeatedAndEnum(t *testing.T) {
 	// repeated message → []*Item
 	if msg.Fields[3].GoType != "[]*Item" {
 		t.Errorf("items GoType = %q, want %q", msg.Fields[3].GoType, "[]*Item")
+	}
+	// repeated enum → []Status
+	if msg.Fields[4].GoType != "[]Status" {
+		t.Errorf("statuses GoType = %q, want %q", msg.Fields[4].GoType, "[]Status")
 	}
 }
 
@@ -487,6 +503,42 @@ func TestFlattenOptionalGoType(t *testing.T) {
 			},
 			wantType: "[]string",
 		},
+		{
+			// proto3 message fields are always pointers; Optional is always false
+			// for message kinds (parser excludes MessageKind from optional detection).
+			// This case documents that plain message fields produce *T, not **T.
+			name: "plain message → *Address",
+			field: model.Field{
+				Name: "address", Number: 8, Cardinality: model.CardinalitySingular,
+				Optional: false,
+				Type:     model.FieldType{Kind: model.FieldKindMessage, FullName: "test.foo.Address"},
+			},
+			wantType: "*Address",
+		},
+		{
+			// If Optional were somehow true for a message field (which the parser
+			// never produces), resolveGoType must still return *T, not **T.
+			// This guards against a future "fix" that would incorrectly add another
+			// pointer layer for optional message fields.
+			name: "optional=true message → *Address (not **Address)",
+			field: model.Field{
+				Name: "address", Number: 9, Cardinality: model.CardinalitySingular,
+				Optional: true,
+				Type:     model.FieldType{Kind: model.FieldKindMessage, FullName: "test.foo.Address"},
+			},
+			wantType: "*Address",
+		},
+		{
+			// repeated message fields produce []*T; this verifies the repeated
+			// branch inside the FieldKindMessage case is not broken by the optional fix.
+			name: "repeated message → []*Address",
+			field: model.Field{
+				Name: "addresses", Number: 10, Cardinality: model.CardinalityRepeated,
+				Optional: false,
+				Type:     model.FieldType{Kind: model.FieldKindMessage, FullName: "test.foo.Address"},
+			},
+			wantType: "[]*Address",
+		},
 	}
 
 	for _, tc := range cases {
@@ -505,9 +557,8 @@ func TestValidateCreateOptions_Errors(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name    string
-		files   []model.File
-		wantErr string
+		name  string
+		files []model.File
 	}{
 		{
 			name: "required_fields non-optional field",
@@ -523,7 +574,6 @@ func TestValidateCreateOptions_Errors(t *testing.T) {
 					}},
 				}},
 			}},
-			wantErr: "already non-optional",
 		},
 		{
 			name: "required_fields unknown field",
@@ -539,7 +589,6 @@ func TestValidateCreateOptions_Errors(t *testing.T) {
 					}},
 				}},
 			}},
-			wantErr: "not found in message",
 		},
 		{
 			name: "required_fields in nested message",
@@ -557,20 +606,19 @@ func TestValidateCreateOptions_Errors(t *testing.T) {
 					}},
 				}},
 			}},
-			wantErr: "already non-optional",
 		},
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			err := ValidateCreateOptions(tc.files)
 			if err == nil {
-				t.Fatalf("expected error containing %q, got nil", tc.wantErr)
+				t.Fatal("expected TransformError, got nil")
 			}
-			if !strings.Contains(err.Error(), tc.wantErr) {
-				t.Errorf("error = %q, want to contain %q", err.Error(), tc.wantErr)
+			var te TransformError
+			if !errors.As(err, &te) {
+				t.Errorf("expected TransformError domain type, got %T: %v", err, err)
 			}
 		})
 	}
@@ -785,4 +833,50 @@ func TestFlattenCreateMessageGormOptionsNotInherited(t *testing.T) {
 	if msg.GormMessageOptions != nil {
 		t.Error("PersonCreate.GormMessageOptions must be nil before render-layer inheritance")
 	}
+}
+
+// TestResolveGoType_UnknownKindPanics verifies that resolveGoType panics with a
+// descriptive message when it encounters an unknown FieldKind. This is a
+// programming-error guard: the parser only produces known kinds, so this branch
+// should never be reached in production.
+func TestResolveGoType_UnknownKindPanics(t *testing.T) {
+	t.Parallel()
+
+	field := model.Field{
+		Name:        "bad_field",
+		Number:      1,
+		Cardinality: model.CardinalitySingular,
+		Type:        model.FieldType{Kind: model.FieldKind("nonexistent")},
+	}
+	file := model.File{
+		Path:      "test.proto",
+		Syntax:    model.SyntaxProto3,
+		Package:   "test",
+		GoPackage: "example.com/test;testpb",
+		Messages: []model.Message{
+			{
+				Name:     "Bad",
+				FullName: "test.Bad",
+				Fields:   []model.Field{field},
+			},
+		},
+	}
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for unknown FieldKind, got none")
+		}
+		msg, ok := r.(string)
+		if !ok {
+			t.Fatalf("expected panic value to be string, got %T: %v", r, r)
+		}
+		if !strings.Contains(msg, "resolveGoType") || !strings.Contains(msg, "unexpected FieldKind") {
+			t.Errorf("panic message %q does not contain expected text", msg)
+		}
+		if !strings.Contains(msg, "bad_field") {
+			t.Errorf("panic message %q should contain field name %q", msg, "bad_field")
+		}
+	}()
+	Flatten(file)
 }

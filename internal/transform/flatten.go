@@ -266,7 +266,15 @@ func resolveGoType(f model.Field, pkgName string) string {
 	case model.FieldKindEnum:
 		base = naming.GoTypeName(f.Type.FullName, pkgName)
 	case model.FieldKindMessage:
+		// Message fields are always pointers; the optional keyword has no additional
+		// effect on message types (nil already represents "not set"). We handle both
+		// cardinalities here and return early to skip the Optional branch below,
+		// avoiding **T for optional message fields.
 		base = "*" + naming.GoTypeName(f.Type.FullName, pkgName)
+		if f.Cardinality == model.CardinalityRepeated {
+			return "[]" + base
+		}
+		return base
 	default:
 		panic(fmt.Sprintf("resolveGoType: unexpected FieldKind %v for field %q", f.Type.Kind, f.Name))
 	}

@@ -67,6 +67,7 @@ message Config {
 	mustNotContain(t, src, "phone no gorm", `phone" gorm:`)
 	// secret_key: ignore, no gorm tag
 	mustContain(t, src, "secret_key ignore", `json:"-"`)
+	mustNotContain(t, src, "secret_key no gorm", `secret_key" gorm:`)
 
 	// --- Config: no gorm annotation — only json tags ---
 	mustNotContain(t, src, "Config no gorm", `gorm:"column:key"`)
@@ -231,8 +232,8 @@ message Plain { string name = 1; }
 	if err == nil {
 		t.Fatal("expected error for read-only output directory, got nil")
 	}
-	if !strings.Contains(err.Error(), "permission denied") {
-		t.Errorf("error = %q, want to contain 'permission denied'", err.Error())
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Errorf("expected fs.ErrPermission, got %T: %v", err, err)
 	}
 }
 
@@ -266,6 +267,13 @@ message B { Status status = 1; }
 	if !errors.As(err, &ae) {
 		t.Errorf("expected AppError domain type, got %T: %v", err, err)
 	}
+	entries, readErr := os.ReadDir(outputDir)
+	if readErr != nil {
+		t.Fatalf("ReadDir: %v", readErr)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected empty output dir on collision, got %d entries", len(entries))
+	}
 }
 
 func TestRun_EmptyDirectory(t *testing.T) {
@@ -280,5 +288,126 @@ func TestRun_EmptyDirectory(t *testing.T) {
 	}
 	if !errors.Is(err, config.ErrNoProtoFiles) {
 		t.Errorf("expected config.ErrNoProtoFiles, got %T: %v", err, err)
+	}
+}
+
+// TestRun_MessageEnumNameCollision verifies that a message and an enum with the
+// same Go name across different proto files are detected and rejected with an
+// AppError before any output is written.
+func TestRun_MessageEnumNameCollision(t *testing.T) {
+	t.Parallel()
+
+	inputDir := t.TempDir()
+	outputDir := t.TempDir()
+
+	writeFile(t, filepath.Join(inputDir, "a.proto"), `syntax = "proto3";
+package pkg_a;
+option go_package = "example.com/test;testpb";
+message Status { int32 code = 1; }
+`)
+	writeFile(t, filepath.Join(inputDir, "b.proto"), `syntax = "proto3";
+package pkg_b;
+option go_package = "example.com/test;testpb";
+enum Status { STATUS_UNKNOWN = 0; STATUS_ACTIVE = 1; }
+message B { Status status = 1; }
+`)
+
+	err := Run(t.Context(), []string{"-in", inputDir, "-out", outputDir})
+	if err == nil {
+		t.Fatal("expected error for message/enum name collision, got nil")
+	}
+	var ae AppError
+	if !errors.As(err, &ae) {
+		t.Errorf("expected AppError domain type, got %T: %v", err, err)
+	}
+	// Collision is detected before render; output directory must be empty.
+	entries, readErr := os.ReadDir(outputDir)
+	if readErr != nil {
+		t.Fatalf("ReadDir: %v", readErr)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected empty output dir on collision, got %d entries", len(entries))
+	}
+}
+
+// TestRun_MessageNameCollision verifies that two proto files defining a message
+// with the same Go name are detected and rejected with an AppError.
+func TestRun_MessageNameCollision(t *testing.T) {
+	t.Parallel()
+
+	inputDir := t.TempDir()
+	outputDir := t.TempDir()
+
+	writeFile(t, filepath.Join(inputDir, "a.proto"), `syntax = "proto3";
+package pkg_a;
+option go_package = "example.com/test;testpb";
+message User { string name = 1; }
+`)
+	writeFile(t, filepath.Join(inputDir, "b.proto"), `syntax = "proto3";
+package pkg_b;
+option go_package = "example.com/test;testpb";
+message User { int32 id = 1; }
+`)
+
+	err := Run(t.Context(), []string{"-in", inputDir, "-out", outputDir})
+	if err == nil {
+		t.Fatal("expected error for message name collision, got nil")
+	}
+	var ae AppError
+	if !errors.As(err, &ae) {
+		t.Errorf("expected AppError domain type, got %T: %v", err, err)
+	}
+	entries, readErr := os.ReadDir(outputDir)
+	if readErr != nil {
+		t.Fatalf("ReadDir: %v", readErr)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected empty output dir on collision, got %d entries", len(entries))
+	}
+}
+
+// TestRun_OutputFileNameCollision verifies that two proto files in different
+// subdirectories with the same basename are detected and rejected before any
+// output is written.
+func TestRun_OutputFileNameCollision(t *testing.T) {
+	t.Parallel()
+
+	inputDir := t.TempDir()
+	outputDir := t.TempDir()
+
+	sub1 := filepath.Join(inputDir, "sub1")
+	sub2 := filepath.Join(inputDir, "sub2")
+	if err := os.MkdirAll(sub1, 0o755); err != nil {
+		t.Fatalf("mkdir sub1: %v", err)
+	}
+	if err := os.MkdirAll(sub2, 0o755); err != nil {
+		t.Fatalf("mkdir sub2: %v", err)
+	}
+
+	writeFile(t, filepath.Join(sub1, "user.proto"), `syntax = "proto3";
+package pkg_a;
+option go_package = "example.com/test;testpb";
+message UserA { string name = 1; }
+`)
+	writeFile(t, filepath.Join(sub2, "user.proto"), `syntax = "proto3";
+package pkg_b;
+option go_package = "example.com/test;testpb";
+message UserB { int32 id = 1; }
+`)
+
+	err := Run(t.Context(), []string{"-in", inputDir, "-out", outputDir})
+	if err == nil {
+		t.Fatal("expected error for output filename collision, got nil")
+	}
+	var ae AppError
+	if !errors.As(err, &ae) {
+		t.Errorf("expected AppError domain type, got %T: %v", err, err)
+	}
+	entries, readErr := os.ReadDir(outputDir)
+	if readErr != nil {
+		t.Fatalf("ReadDir: %v", readErr)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected empty output dir on collision, got %d entries", len(entries))
 	}
 }

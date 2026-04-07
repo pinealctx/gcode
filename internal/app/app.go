@@ -63,7 +63,7 @@ func Run(ctx context.Context, args []string) error {
 	for _, f := range files {
 		for _, name := range []string{outputFileName(f.Path), rpcOutputFileName(f.Path), httpOutputFileName(f.Path)} {
 			if prev, ok := seen[name]; ok {
-				return fmt.Errorf("output filename collision: %q and %q both produce %q", prev, f.Path, name)
+				return errorx.NewSentinelf[appTag]("output filename collision: %q and %q both produce %q", prev, f.Path, name)
 			}
 			seen[name] = f.Path
 		}
@@ -77,24 +77,37 @@ func Run(ctx context.Context, args []string) error {
 	flattened := make([]flattenedFile, 0, len(files))
 	msgIndex := make(map[string]*transform.GoMessage)
 	enumIndex := make(map[string]transform.GoEnum)
+	// msgSrc and enumSrc track the source proto file for each GoName, used in collision error messages.
+	msgSrc := make(map[string]string)
+	enumSrc := make(map[string]string)
 	for _, f := range files {
 		gf := transform.Flatten(f)
 		for i := range gf.Messages {
 			m := &gf.Messages[i]
 			if _, exists := msgIndex[m.GoName]; exists {
-				return errorx.NewSentinelf[appTag]("message name collision: %q appears in multiple proto files; cross-file same-name messages are not supported", m.GoName)
+				return errorx.NewSentinelf[appTag]("message name collision: %q defined in both %q and %q; cross-file same-name messages are not supported", m.GoName, msgSrc[m.GoName], f.Path)
 			}
 			msgIndex[m.GoName] = m
+			msgSrc[m.GoName] = f.Path
 		}
 		for _, e := range gf.Enums {
 			if _, exists := enumIndex[e.GoName]; exists {
-				return errorx.NewSentinelf[appTag]("enum name collision: %q appears in multiple proto files; cross-file same-name enums are not supported", e.GoName)
+				return errorx.NewSentinelf[appTag]("enum name collision: %q defined in both %q and %q; cross-file same-name enums are not supported", e.GoName, enumSrc[e.GoName], f.Path)
 			}
 			enumIndex[e.GoName] = e
+			enumSrc[e.GoName] = f.Path
 		}
 		flattened = append(flattened, flattenedFile{src: f, gf: gf})
 	}
 	rctx := render.Context{MessageIndex: msgIndex, EnumIndex: enumIndex}
+
+	// Check for cross-type name collisions: a message and an enum with the same
+	// GoName would produce two Go types with the same name in the same package.
+	for goName := range msgIndex {
+		if _, exists := enumIndex[goName]; exists {
+			return errorx.NewSentinelf[appTag]("name collision: %q defined as message in %q and as enum in %q; cross-type same-name types are not supported", goName, msgSrc[goName], enumSrc[goName])
+		}
+	}
 
 	// Generate and write each file.
 	for _, ff := range flattened {
