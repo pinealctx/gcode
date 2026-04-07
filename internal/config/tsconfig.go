@@ -1,16 +1,8 @@
 package config
 
 import (
-	"errors"
 	"flag"
 	"fmt"
-)
-
-// Sentinels for gen-ts validation errors, enabling errors.Is matching in callers and tests.
-var (
-	ErrMissingTSInputDir  = errors.New("validate gen-ts config: missing -in")
-	ErrMissingTSOutputDir = errors.New("validate gen-ts config: missing -out")
-	ErrNoProtoFiles       = errors.New("no .proto files found")
 )
 
 // GenTSConfig contains configuration for the gen-ts subcommand.

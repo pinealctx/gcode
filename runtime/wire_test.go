@@ -351,3 +351,33 @@ func TestRoundtripVarint(t *testing.T) {
 		}
 	}
 }
+
+// TestSizeTag verifies that SizeTag returns the correct byte count for field tags,
+// including large field numbers that would overflow int32 before the uint64 cast fix.
+func TestSizeTag(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		fieldNumber int
+		want        int
+	}{
+		{1, 1},         // tag = 8, fits in 1 byte
+		{15, 1},        // tag = 120, fits in 1 byte (max 1-byte tag)
+		{16, 2},        // tag = 128, needs 2 bytes
+		{2047, 2},      // tag = 16376, fits in 2 bytes
+		{2048, 3},      // tag = 16384, needs 3 bytes
+		{536870911, 5}, // proto max field number (2^29-1); tag = 4294967288, needs 5 bytes
+	}
+
+	for _, tt := range tests {
+		got := SizeTag(tt.fieldNumber)
+		if got != tt.want {
+			t.Errorf("SizeTag(%d) = %d, want %d", tt.fieldNumber, got, tt.want)
+		}
+		// Cross-check: SizeTag must equal len(AppendTag(...)) for any wire type.
+		encoded := AppendTag(nil, tt.fieldNumber, WireVarint)
+		if got != len(encoded) {
+			t.Errorf("SizeTag(%d) = %d, but AppendTag produced %d bytes", tt.fieldNumber, got, len(encoded))
+		}
+	}
+}

@@ -14,7 +14,7 @@ import (
 func CreatePersonHandler(svc PersonService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req PersonCreate
-		if err := c.ShouldBind(&req); err != nil {
+		if err := c.ShouldBindJSON(&req); err != nil {
 			_ = c.Error(err)
 			return
 		}
@@ -34,7 +34,7 @@ func CreatePersonHandler(svc PersonService) gin.HandlerFunc {
 func GetPersonHandler(svc PersonService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req GetPersonRequest
-		if err := c.ShouldBind(&req); err != nil {
+		if err := c.ShouldBindJSON(&req); err != nil {
 			_ = c.Error(err)
 			return
 		}
@@ -55,7 +55,7 @@ func GetPersonHandler(svc PersonService) gin.HandlerFunc {
 func UpdatePersonHandler(svc PersonService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req PersonUpdateByName
-		if err := c.ShouldBind(&req); err != nil {
+		if err := c.ShouldBindJSON(&req); err != nil {
 			_ = c.Error(err)
 			return
 		}
@@ -75,7 +75,7 @@ func UpdatePersonHandler(svc PersonService) gin.HandlerFunc {
 func DeletePersonHandler(svc PersonService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req DeletePersonRequest
-		if err := c.ShouldBind(&req); err != nil {
+		if err := c.ShouldBindJSON(&req); err != nil {
 			_ = c.Error(err)
 			return
 		}

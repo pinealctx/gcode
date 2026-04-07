@@ -137,7 +137,7 @@ func TestCreatePersonHandlerSuccess(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 0 {
+	if resp.Code != httpruntime.CodeOK {
 		t.Errorf("expected code 0, got %d", resp.Code)
 	}
 	if resp.Error != nil {
@@ -168,7 +168,7 @@ func TestCreatePersonHandlerSvcError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 500 {
+	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500, got %d", resp.Code)
 	}
 	if resp.Error == nil || resp.Error.Msg != "db unavailable" {
@@ -205,7 +205,7 @@ func TestCreatePersonHandlerBindError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 500 {
+	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500 for bind failure, got %d", resp.Code)
 	}
 }
@@ -234,7 +234,7 @@ func TestUpdatePersonHandlerDerivedMessage(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 0 {
+	if resp.Code != httpruntime.CodeOK {
 		t.Errorf("expected code 0, got %d (error: %+v)", resp.Code, resp.Error)
 	}
 }
@@ -267,7 +267,7 @@ func TestUpdatePersonHandlerBindError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 500 {
+	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500 for bind failure, got %d", resp.Code)
 	}
 }
@@ -304,7 +304,7 @@ func TestCreatePersonHandlerValidationError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 400 {
+	if resp.Code != httpruntime.CodeValidationErr {
 		t.Errorf("expected code 400 for validation failure, got %d (body: %s)", resp.Code, w.Body.String())
 	}
 }
@@ -332,7 +332,7 @@ func TestUpdatePersonHandlerSvcError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 500 {
+	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500, got %d", resp.Code)
 	}
 	if resp.Error == nil || resp.Error.Msg != "update failed" {
@@ -365,7 +365,7 @@ func TestGetPersonHandlerSuccess(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 0 {
+	if resp.Code != httpruntime.CodeOK {
 		t.Errorf("expected code 0, got %d (error: %+v)", resp.Code, resp.Error)
 	}
 }
@@ -393,7 +393,7 @@ func TestGetPersonHandlerSvcError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 500 {
+	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500, got %d", resp.Code)
 	}
 	if resp.Error == nil || resp.Error.Msg != "not found" {
@@ -429,7 +429,7 @@ func TestGetPersonHandlerBindError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 500 {
+	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500 for bind failure, got %d", resp.Code)
 	}
 }
@@ -459,7 +459,7 @@ func TestDeletePersonHandlerSuccess(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 0 {
+	if resp.Code != httpruntime.CodeOK {
 		t.Errorf("expected code 0, got %d (error: %+v)", resp.Code, resp.Error)
 	}
 }
@@ -487,7 +487,7 @@ func TestDeletePersonHandlerSvcError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 500 {
+	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500, got %d", resp.Code)
 	}
 	if resp.Error == nil || resp.Error.Msg != "delete failed" {
@@ -523,7 +523,7 @@ func TestDeletePersonHandlerBindError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 500 {
+	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500 for bind failure, got %d", resp.Code)
 	}
 }
@@ -558,7 +558,7 @@ func TestGetPersonHandlerValidationError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 400 {
+	if resp.Code != httpruntime.CodeValidationErr {
 		t.Errorf("expected code 400 for validation failure, got %d (body: %s)", resp.Code, w.Body.String())
 	}
 }
@@ -593,7 +593,7 @@ func TestDeletePersonHandlerValidationError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != 400 {
+	if resp.Code != httpruntime.CodeValidationErr {
 		t.Errorf("expected code 400 for validation failure, got %d (body: %s)", resp.Code, w.Body.String())
 	}
 }

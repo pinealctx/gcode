@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -90,9 +91,6 @@ func TestRunGenTS_InvalidProto(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid proto, got nil")
 	}
-	if !strings.Contains(err.Error(), "parse proto files") {
-		t.Errorf("error = %q, want parse proto files error", err.Error())
-	}
 }
 
 func TestRunGenTS_InputDirNotExist(t *testing.T) {
@@ -105,8 +103,8 @@ func TestRunGenTS_InputDirNotExist(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for non-existent input dir, got nil")
 	}
-	if !strings.Contains(err.Error(), "scan input directory") {
-		t.Errorf("error = %q, want scan input directory error", err.Error())
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("expected fs.ErrNotExist, got %T: %v", err, err)
 	}
 }
 

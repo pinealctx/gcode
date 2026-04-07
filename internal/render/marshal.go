@@ -510,7 +510,7 @@ func wireTypeConst(wt int) string {
 // Since wire_type is at most 5 (3 bits), the tag value is field_number*8 + wt.
 // For field numbers 1-15, tag fits in 1 byte; 16-2047 in 2 bytes, etc.
 func tagSizeConst(fieldNumber int) int {
-	v := uint64(fieldNumber << 3)
+	v := uint64(fieldNumber) << 3
 	n := 1
 	for v >= 0x80 {
 		v >>= 7

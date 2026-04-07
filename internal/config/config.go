@@ -1,14 +1,8 @@
 package config
 
 import (
-	"errors"
 	"flag"
 	"fmt"
-)
-
-const (
-	DuplicateSingularError    = "error"
-	DuplicateSingularLastWins = "last-wins"
 )
 
 // GenProtoConfig contains configuration for the gen-proto subcommand.
@@ -41,16 +35,14 @@ func ParseGenProto(args []string) (GenProtoConfig, error) {
 // Validate validates gen-proto configuration values.
 func (c GenProtoConfig) Validate() error {
 	if c.InputDir == "" {
-		return errors.New("validate gen-proto config: missing -in")
+		return ErrMissingProtoInputDir
 	}
 	return nil
 }
 
 type Config struct {
-	InputDir                  string
-	OutputDir                 string
-	DuplicateSingularStrategy string
-	AllowJSONUnknownFields    bool
+	InputDir  string
+	OutputDir string
 }
 
 // Parse parses CLI arguments into a validated configuration.
@@ -60,8 +52,6 @@ func Parse(args []string) (Config, error) {
 	fs := flag.NewFlagSet("gcode", flag.ContinueOnError)
 	fs.StringVar(&cfg.InputDir, "in", "", "input proto directory")
 	fs.StringVar(&cfg.OutputDir, "out", "", "output directory")
-	fs.StringVar(&cfg.DuplicateSingularStrategy, "duplicate-singular", DuplicateSingularError, "duplicate singular field strategy: error|last-wins")
-	fs.BoolVar(&cfg.AllowJSONUnknownFields, "allow-json-unknown-fields", false, "allow unknown JSON fields during unmarshal")
 
 	if err := fs.Parse(args); err != nil {
 		return Config{}, fmt.Errorf("parse cli flags: %w", err)
@@ -81,16 +71,10 @@ func Parse(args []string) (Config, error) {
 // Validate validates configuration values.
 func (c Config) Validate() error {
 	if c.InputDir == "" {
-		return errors.New("validate cli config: missing -in")
+		return ErrMissingInputDir
 	}
 	if c.OutputDir == "" {
-		return errors.New("validate cli config: missing -out")
+		return ErrMissingOutputDir
 	}
-
-	switch c.DuplicateSingularStrategy {
-	case DuplicateSingularError, DuplicateSingularLastWins:
-		return nil
-	default:
-		return fmt.Errorf("validate cli config: unsupported -duplicate-singular value %q", c.DuplicateSingularStrategy)
-	}
+	return nil
 }

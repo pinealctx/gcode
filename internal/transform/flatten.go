@@ -3,6 +3,8 @@
 package transform
 
 import (
+	"fmt"
+
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/naming"
 )
@@ -266,7 +268,7 @@ func resolveGoType(f model.Field, pkgName string) string {
 	case model.FieldKindMessage:
 		base = "*" + naming.GoTypeName(f.Type.FullName, pkgName)
 	default:
-		base = "UNKNOWN"
+		panic(fmt.Sprintf("resolveGoType: unexpected FieldKind %v for field %q", f.Type.Kind, f.Name))
 	}
 
 	if f.Cardinality == model.CardinalityRepeated {

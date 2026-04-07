@@ -170,7 +170,7 @@ func TestHTTPFileHandlerSignatureFormat(t *testing.T) {
 }
 
 // TestHTTPFileErrorPaths verifies that the generated handler contains the correct
-// error-handling structure: ShouldBind → req.Validate() → svc call, with all error
+// error-handling structure: ShouldBindJSON → req.Validate() → svc call, with all error
 // paths using c.Error(err)+return (not ErrResponse), in the correct order.
 func TestHTTPFileErrorPaths(t *testing.T) {
 	t.Parallel()
@@ -196,15 +196,15 @@ func TestHTTPFileErrorPaths(t *testing.T) {
 
 	// All three steps must be present.
 	containsAll(t, src, map[string]string{
-		"ShouldBind":   "ShouldBind(",
-		"req.Validate": "req.Validate()",
-		"c.Error":      "c.Error(err)",
+		"ShouldBindJSON": "ShouldBindJSON(",
+		"req.Validate":   "req.Validate()",
+		"c.Error":        "c.Error(err)",
 	})
 	// ErrResponse must NOT appear — errors are forwarded via c.Error.
 	if strings.Contains(src, "httpruntime.ErrResponse") {
 		t.Errorf("ErrResponse should not appear in generated handler (use c.Error instead):\n%s", src)
 	}
-	// Order: ShouldBind < req.Validate() < svc call.
+	// Order: ShouldBindJSON < req.Validate() < svc call.
 	// Search within the handler body (after the opening brace) to avoid matching
 	// "svc" in the import path "github.com/pinealctx/gcode/httpruntime".
 	handlerStart := strings.Index(src, "return func(c *gin.Context)")
@@ -212,11 +212,11 @@ func TestHTTPFileErrorPaths(t *testing.T) {
 		t.Fatalf("handler body not found in:\n%s", src)
 	}
 	body := src[handlerStart:]
-	bindPos := strings.Index(body, "ShouldBind(")
+	bindPos := strings.Index(body, "ShouldBindJSON(")
 	validatePos := strings.Index(body, "req.Validate()")
 	svcPos := strings.Index(body, "svc.")
 	if bindPos >= validatePos || validatePos >= svcPos {
-		t.Errorf("expected order ShouldBind(%d) < Validate(%d) < svc(%d) in handler body:\n%s",
+		t.Errorf("expected order ShouldBindJSON(%d) < Validate(%d) < svc(%d) in handler body:\n%s",
 			bindPos, validatePos, svcPos, body)
 	}
 }

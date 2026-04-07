@@ -1,8 +1,9 @@
 package parser
 
 import (
-	"fmt"
 	"regexp"
+
+	"github.com/pinealctx/x/errorx"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -111,7 +112,7 @@ func parseFieldConstraints(fc *dynamicpb.Message, kind protoreflect.Kind, fieldF
 	case protoreflect.BoolKind:
 		// bool required is not supported
 		if opts.Required {
-			return nil, fmt.Errorf("field %q (bool): required constraint is not supported for bool fields", fieldFullName)
+			return nil, errorx.NewSentinelf[parserTag]("field %q (bool): required constraint is not supported for bool fields", fieldFullName)
 		}
 
 	case protoreflect.BytesKind:
@@ -168,13 +169,13 @@ func parseStringRules(r *dynamicpb.Message, opts *model.ValidateFieldOptions, fi
 	}
 	// validate min_len <= max_len
 	if opts.MinLen != nil && opts.MaxLen != nil && *opts.MinLen > *opts.MaxLen {
-		return fmt.Errorf("field %q (string): min_len (%d) must be <= max_len (%d)", fieldFullName, *opts.MinLen, *opts.MaxLen)
+		return errorx.NewSentinelf[parserTag]("field %q (string): min_len (%d) must be <= max_len (%d)", fieldFullName, *opts.MinLen, *opts.MaxLen)
 	}
 	if hasField(r, "pattern") {
 		p := getStringField(r, "pattern")
 		if p != "" {
 			if _, err := regexp.Compile(p); err != nil {
-				return fmt.Errorf("field %q (string): pattern %q is not a valid RE2 regexp: %w", fieldFullName, p, err)
+				return errorx.NewSentinelf[parserTag]("field %q (string): pattern %q is not a valid RE2 regexp", fieldFullName, p)
 			}
 			opts.Pattern = p
 		}
@@ -186,7 +187,7 @@ func parseStringRules(r *dynamicpb.Message, opts *model.ValidateFieldOptions, fi
 	if hasField(r, "in") {
 		inVals := getListField(r, "in")
 		if len(inVals) == 0 {
-			return fmt.Errorf("field %q (string): in set is empty, constraint will always fail", fieldFullName)
+			return errorx.NewSentinelf[parserTag]("field %q (string): in set is empty, constraint will always fail", fieldFullName)
 		}
 		strs := make([]string, len(inVals))
 		for i, v := range inVals {
@@ -196,7 +197,7 @@ func parseStringRules(r *dynamicpb.Message, opts *model.ValidateFieldOptions, fi
 		if opts.Required {
 			for _, s := range strs {
 				if s == "" {
-					return fmt.Errorf("field %q (string): in set contains empty string, which conflicts with required=true", fieldFullName)
+					return errorx.NewSentinelf[parserTag]("field %q (string): in set contains empty string, which conflicts with required=true", fieldFullName)
 				}
 			}
 		}
@@ -322,7 +323,7 @@ func parseBytesRules(r *dynamicpb.Message, opts *model.ValidateFieldOptions, fie
 		opts.MaxLen = &v
 	}
 	if opts.MinLen != nil && opts.MaxLen != nil && *opts.MinLen > *opts.MaxLen {
-		return fmt.Errorf("field %q (bytes): min_len (%d) must be <= max_len (%d)", fieldFullName, *opts.MinLen, *opts.MaxLen)
+		return errorx.NewSentinelf[parserTag]("field %q (bytes): min_len (%d) must be <= max_len (%d)", fieldFullName, *opts.MinLen, *opts.MaxLen)
 	}
 	return nil
 }
@@ -338,7 +339,7 @@ func parseRepeatedRules(r *dynamicpb.Message, opts *model.ValidateFieldOptions, 
 		opts.MaxItems = &v
 	}
 	if opts.MinItems != nil && opts.MaxItems != nil && *opts.MinItems > *opts.MaxItems {
-		return fmt.Errorf("field %q (repeated): min_items (%d) must be <= max_items (%d)", fieldFullName, *opts.MinItems, *opts.MaxItems)
+		return errorx.NewSentinelf[parserTag]("field %q (repeated): min_items (%d) must be <= max_items (%d)", fieldFullName, *opts.MinItems, *opts.MaxItems)
 	}
 	// items: element-level FieldConstraints; kind is unknown here, so we probe
 	// which sub-rule message is present and dispatch accordingly.
@@ -404,6 +405,11 @@ func parseItemConstraints(fc *dynamicpb.Message, fieldFullName string) (*model.V
 		if opts.DefinedOnly {
 			hasAny = true
 		}
+	}
+
+	// required is not supported for repeated items; use min_len: 1 instead.
+	if getBoolField(fc, "required") {
+		return nil, errorx.NewSentinelf[parserTag]("field %q: required constraint is not supported for repeated items; use min_len: 1 to reject empty values", fieldFullName)
 	}
 
 	if !hasAny {

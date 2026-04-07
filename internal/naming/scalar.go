@@ -1,6 +1,10 @@
 package naming
 
-import "github.com/pinealctx/gcode/internal/model"
+import (
+	"fmt"
+
+	"github.com/pinealctx/gcode/internal/model"
+)
 
 // GoScalarType returns the Go type string for a protobuf scalar kind.
 func GoScalarType(kind model.ScalarKind) string {
@@ -24,6 +28,6 @@ func GoScalarType(kind model.ScalarKind) string {
 	case model.ScalarBytes:
 		return "[]byte"
 	default:
-		return "UNKNOWN"
+		panic(fmt.Sprintf("GoScalarType: unexpected ScalarKind %v", kind))
 	}
 }

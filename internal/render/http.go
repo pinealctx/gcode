@@ -48,7 +48,7 @@ func writeServiceHandlers(b *strings.Builder, svc transform.GoService) {
 		fmt.Fprintf(b, "func %sHandler(svc %s) gin.HandlerFunc {\n", m.GoName, svc.GoName)
 		b.WriteString("\treturn func(c *gin.Context) {\n")
 		fmt.Fprintf(b, "\t\tvar req %s\n", m.RequestType)
-		b.WriteString("\t\tif err := c.ShouldBind(&req); err != nil {\n")
+		b.WriteString("\t\tif err := c.ShouldBindJSON(&req); err != nil {\n")
 		b.WriteString("\t\t\t_ = c.Error(err)\n")
 		b.WriteString("\t\t\treturn\n")
 		b.WriteString("\t\t}\n")

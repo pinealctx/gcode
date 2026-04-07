@@ -1,11 +1,13 @@
 package naming
 
 // reservedFieldNames contains method names that protoc-gen-go reserves on
-// generated message types. Field names that collide with these (or their
-// Get* accessors) are suffixed with '_' until unique.
+// generated message types, plus method names that gcode itself generates.
+// Field names that collide with these (or their Get* accessors) are suffixed
+// with '_' until unique.
 //
 // Ported from google.golang.org/protobuf/compiler/protogen.newMessage.
 var reservedFieldNames = map[string]bool{
+	// protoc-gen-go reserved names
 	"Reset":               true,
 	"String":              true,
 	"ProtoMessage":        true,
@@ -14,6 +16,14 @@ var reservedFieldNames = map[string]bool{
 	"ExtensionRangeArray": true,
 	"ExtensionMap":        true,
 	"Descriptor":          true,
+	// gcode generated method names
+	"Size":                   true,
+	"MarshalBinary":          true,
+	"MarshalAppend":          true,
+	"UnmarshalBinary":        true,
+	"UnmarshalBinaryLenient": true,
+	"Validate":               true,
+	"ToMap":                  true,
 }
 
 // ResolveFieldNames takes a slice of raw Go field names (already

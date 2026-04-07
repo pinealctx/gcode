@@ -18,8 +18,6 @@ CLI 参数：
 gcode [flags]                 从 proto 文件生成 Go 代码
   -in string                  输入 proto 目录
   -out string                 输出目录
-  -allow-json-unknown-fields  JSON 反序列化时允许未知字段
-  -duplicate-singular string  重复标量字段策略：error|last-wins（默认 "error"）
 
 gcode gen-proto [flags]       生成派生 proto 文件（*.update.proto / *.create.proto）
   -in string                  输入 proto 目录（生成文件写入同一目录）

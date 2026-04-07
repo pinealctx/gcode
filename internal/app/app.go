@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pinealctx/x/errorx"
+
 	"github.com/pinealctx/gcode/internal/config"
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/parser"
@@ -38,7 +40,7 @@ func Run(ctx context.Context, args []string) error {
 	}
 
 	if len(scanResult.Files) == 0 {
-		return fmt.Errorf("no .proto files found in %q", cfg.InputDir)
+		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, config.ErrNoProtoFiles)
 	}
 
 	files, err := parser.Parse(ctx, []string{scanResult.ImportPath}, scanResult.Files)
@@ -80,11 +82,14 @@ func Run(ctx context.Context, args []string) error {
 		for i := range gf.Messages {
 			m := &gf.Messages[i]
 			if _, exists := msgIndex[m.GoName]; exists {
-				return fmt.Errorf("message name collision: %q appears in multiple proto files; cross-file same-name messages are not supported", m.GoName)
+				return errorx.NewSentinelf[appTag]("message name collision: %q appears in multiple proto files; cross-file same-name messages are not supported", m.GoName)
 			}
 			msgIndex[m.GoName] = m
 		}
 		for _, e := range gf.Enums {
+			if _, exists := enumIndex[e.GoName]; exists {
+				return errorx.NewSentinelf[appTag]("enum name collision: %q appears in multiple proto files; cross-file same-name enums are not supported", e.GoName)
+			}
 			enumIndex[e.GoName] = e
 		}
 		flattened = append(flattened, flattenedFile{src: f, gf: gf})

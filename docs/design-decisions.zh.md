@@ -170,7 +170,7 @@
 
 **决策**：
 - 生成 handler 工厂函数 `XxxHandler(svc XxxService) gin.HandlerFunc`，接收 interface 而非具体类型
-- 统一使用 `c.ShouldBind`（根据 Content-Type 自动选择 JSON/form/query），不支持 path param
+- 统一使用 `c.ShouldBindJSON`（强制 JSON body），不支持 path param
 - handler 内置 `req.Validate()` 调用（bind 后、svc 调用前），同时 `Validate()` 作为公共方法可在其他场景复用
 - 使用 `c.Request.Context()` 传递请求 context，保留 deadline/cancel/trace 信息
 

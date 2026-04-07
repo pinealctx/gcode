@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pinealctx/x/errorx"
 
 	"github.com/pinealctx/gcode/validateruntime"
 )
@@ -33,24 +34,49 @@ type Error struct {
 // ErrResponse implements this interface, its Code() value is used; otherwise
 // the default code 500 applies.
 type CodedError interface {
+	error
 	Code() int
 }
 
-// OKResponse constructs a success Response with code 0 and the given data.
+// BizCode is the business error code type for application-defined errors.
+// Use errorx.Error[BizCode] to define typed business errors that integrate
+// with ErrResponse without implementing CodedError manually:
+//
+//	var ErrUnprocessable = errorx.New(httpruntime.BizCode(422), "unprocessable entity")
+//
+// BizCode values are application-defined and have no inherent relation to HTTP
+// status codes. The numeric value is carried as-is in the response Code field.
+type BizCode int
+
+const (
+	// CodeOK is the response code for successful requests.
+	CodeOK = 0
+	// CodeDefaultErr is the response code used when no specific business code is available.
+	CodeDefaultErr = 500
+	// CodeValidationErr is the response code for validation failures (ValidationError).
+	CodeValidationErr = 400
+)
+
+// OKResponse constructs a success Response with code CodeOK (0) and the given data.
 func OKResponse(data any) Response {
-	return Response{Code: 0, Data: data}
+	return Response{Code: CodeOK, Data: data}
 }
 
 // ErrResponse constructs an error Response from err.
-// If err implements CodedError, its Code() is used as the response code.
-// Otherwise the response code defaults to 500.
-// If err is nil, ErrResponse returns a generic code-500 error response.
+// Code resolution order:
+//  1. If err (or any error in its chain) is *errorx.Error[BizCode], its Code field is used.
+//  2. If err implements CodedError, its Code() value is used.
+//  3. Otherwise the response code defaults to CodeDefaultErr (500).
+//
+// If err is nil, ErrResponse returns a generic CodeDefaultErr response.
 func ErrResponse(err error) Response {
 	if err == nil {
-		return Response{Code: 500, Error: &Error{Msg: "internal error"}}
+		return Response{Code: CodeDefaultErr, Error: &Error{Msg: "internal error"}}
 	}
-	code := 500
-	if ce, ok := err.(CodedError); ok {
+	code := CodeDefaultErr
+	if he, ok := errors.AsType[*errorx.Error[BizCode]](err); ok {
+		code = int(he.Code)
+	} else if ce, ok := errors.AsType[CodedError](err); ok {
 		code = ce.Code()
 	}
 	return Response{Code: code, Error: &Error{Msg: err.Error()}}
@@ -59,8 +85,11 @@ func ErrResponse(err error) Response {
 // DefaultErrorHandler returns a gin middleware that writes a JSON error response
 // for any errors accumulated via c.Error() during handler execution.
 // ValidationError maps to code 400; all other errors map to code 500 (or the
-// code returned by CodedError.Code() if the error implements that interface).
+// code returned by CodedError.Code() / errorx.Error[BizCode] if applicable).
 // Only the last error (c.Errors.Last()) is used when multiple errors are present.
+//
+// Note: when the error is (or wraps) a *validateruntime.ValidationError, the
+// response Msg is taken from the ValidationError itself, not from any outer wrapper.
 //
 // WARNING: Generated handlers use c.Error(err)+return and do not write their own
 // error responses. If this middleware is not registered, error paths will return
@@ -73,9 +102,8 @@ func DefaultErrorHandler() gin.HandlerFunc {
 			return
 		}
 		err := c.Errors.Last().Err
-		var ve *validateruntime.ValidationError
-		if errors.As(err, &ve) {
-			c.JSON(http.StatusOK, Response{Code: 400, Error: &Error{Msg: ve.Error()}})
+		if ve, ok := errors.AsType[*validateruntime.ValidationError](err); ok {
+			c.JSON(http.StatusOK, Response{Code: CodeValidationErr, Error: &Error{Msg: ve.Error()}})
 		} else {
 			c.JSON(http.StatusOK, ErrResponse(err))
 		}

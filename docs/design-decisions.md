@@ -170,7 +170,7 @@ This document records the key architectural decisions for gcode, using ADR (Arch
 
 **Decision**:
 - Generate handler factory functions `XxxHandler(svc XxxService) gin.HandlerFunc` accepting an interface, not a concrete type
-- Use `c.ShouldBind` uniformly (auto-selects JSON/form/query based on Content-Type); no path param support
+- Use `c.ShouldBindJSON` uniformly (enforces JSON body; no path param support)
 - Handlers call `req.Validate()` built-in (after bind, before svc call); `Validate()` remains a public method for reuse in other contexts
 - Use `c.Request.Context()` to propagate request context, preserving deadline/cancel/trace information
 

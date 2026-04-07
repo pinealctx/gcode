@@ -18,7 +18,7 @@ const (
 
 // AppendTag appends a protobuf field tag (field_number << 3 | wire_type).
 func AppendTag(b []byte, fieldNumber int, wireType int) []byte {
-	return AppendVarint(b, uint64(fieldNumber<<3|wireType))
+	return AppendVarint(b, uint64(fieldNumber)<<3|uint64(wireType))
 }
 
 // AppendVarint appends a base-128 varint-encoded uint64.
@@ -98,7 +98,7 @@ func SizeVarint(v uint64) int {
 
 // SizeTag returns the number of bytes needed to encode a field tag.
 func SizeTag(fieldNumber int) int {
-	return SizeVarint(uint64(fieldNumber << 3))
+	return SizeVarint(uint64(fieldNumber) << 3)
 }
 
 // DecodeZigZag32 decodes a ZigZag-encoded uint64 back to int32.

@@ -71,14 +71,20 @@ func MsgOr(override, defaultMsg string) string {
 func MatchPattern(s, pattern string) bool {
 	var re *regexp.Regexp
 	if v, ok := patternCache.Load(pattern); ok {
-		re, _ = v.(*regexp.Regexp)
+		re, ok = v.(*regexp.Regexp)
+		if !ok || re == nil {
+			return false
+		}
 	} else {
 		compiled, err := regexp.Compile(pattern)
 		if err != nil {
 			return false
 		}
 		actual, _ := patternCache.LoadOrStore(pattern, compiled)
-		re, _ = actual.(*regexp.Regexp)
+		re, ok = actual.(*regexp.Regexp)
+		if !ok || re == nil {
+			return false
+		}
 	}
 	return re.MatchString(s)
 }

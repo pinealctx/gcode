@@ -18,8 +18,6 @@ CLI flags:
 gcode [flags]                 Generate Go code from proto files
   -in string                  Input proto directory
   -out string                 Output directory
-  -allow-json-unknown-fields  Allow unknown JSON fields during unmarshal
-  -duplicate-singular string  Duplicate singular field strategy: error|last-wins (default "error")
 
 gcode gen-proto [flags]       Generate derived proto files (*.update.proto / *.create.proto)
   -in string                  Input proto directory (generated files are written to the same directory)

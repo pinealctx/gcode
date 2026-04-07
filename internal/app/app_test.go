@@ -1,10 +1,14 @@
 package app
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/pinealctx/gcode/internal/config"
 )
 
 // TestRunE2EAnnotations is the end-to-end acceptance test for phase 2.
@@ -197,8 +201,8 @@ func TestRun_NonExistentInputDir(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for non-existent input directory, got nil")
 	}
-	if !strings.Contains(err.Error(), "scan input directory") {
-		t.Errorf("error = %q, want to contain 'scan input directory'", err.Error())
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("expected fs.ErrNotExist, got %T: %v", err, err)
 	}
 }
 
@@ -229,5 +233,52 @@ message Plain { string name = 1; }
 	}
 	if !strings.Contains(err.Error(), "permission denied") {
 		t.Errorf("error = %q, want to contain 'permission denied'", err.Error())
+	}
+}
+
+func TestRun_EnumNameCollision(t *testing.T) {
+	t.Parallel()
+
+	inputDir := t.TempDir()
+	outputDir := t.TempDir()
+
+	// Two different proto packages define the same enum name "Status".
+	// The proto compiler allows this (different packages), but gcode's
+	// cross-file GoName index must detect the collision.
+	writeFile(t, filepath.Join(inputDir, "a.proto"), `syntax = "proto3";
+package pkg_a;
+option go_package = "example.com/test;testpb";
+enum Status { STATUS_UNKNOWN = 0; STATUS_ACTIVE = 1; }
+message A { Status status = 1; }
+`)
+	writeFile(t, filepath.Join(inputDir, "b.proto"), `syntax = "proto3";
+package pkg_b;
+option go_package = "example.com/test;testpb";
+enum Status { STATUS_UNKNOWN = 0; STATUS_INACTIVE = 1; }
+message B { Status status = 1; }
+`)
+
+	err := Run(t.Context(), []string{"-in", inputDir, "-out", outputDir})
+	if err == nil {
+		t.Fatal("expected error for enum name collision, got nil")
+	}
+	var ae AppError
+	if !errors.As(err, &ae) {
+		t.Errorf("expected AppError domain type, got %T: %v", err, err)
+	}
+}
+
+func TestRun_EmptyDirectory(t *testing.T) {
+	t.Parallel()
+
+	inputDir := t.TempDir()
+	outputDir := t.TempDir()
+
+	err := Run(t.Context(), []string{"-in", inputDir, "-out", outputDir})
+	if err == nil {
+		t.Fatal("expected error for empty directory, got nil")
+	}
+	if !errors.Is(err, config.ErrNoProtoFiles) {
+		t.Errorf("expected config.ErrNoProtoFiles, got %T: %v", err, err)
 	}
 }

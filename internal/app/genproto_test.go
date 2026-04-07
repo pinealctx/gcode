@@ -1,11 +1,13 @@
 package app
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/pinealctx/gcode/internal/config"
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/parser"
 )
@@ -353,8 +355,8 @@ func TestRunGenProto_MissingInFlag(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing -in flag, got nil")
 	}
-	if !strings.Contains(err.Error(), "-in") {
-		t.Errorf("error = %q, want to mention '-in'", err.Error())
+	if !errors.Is(err, config.ErrMissingProtoInputDir) {
+		t.Errorf("expected config.ErrMissingProtoInputDir, got %T: %v", err, err)
 	}
 }
 
@@ -367,8 +369,8 @@ func TestRunGenProto_EmptyDirectory(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty directory, got nil")
 	}
-	if !strings.Contains(err.Error(), "no .proto files") {
-		t.Errorf("error = %q, want to mention 'no .proto files'", err.Error())
+	if !errors.Is(err, config.ErrNoProtoFiles) {
+		t.Errorf("expected config.ErrNoProtoFiles, got %T: %v", err, err)
 	}
 }
 

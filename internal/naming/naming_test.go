@@ -199,6 +199,11 @@ func TestResolveFieldNames(t *testing.T) {
 			input: []string{"Marshal", "Unmarshal"},
 			want:  []string{"Marshal_", "Unmarshal_"},
 		},
+		{
+			name:  "gcode generated method names",
+			input: []string{"Size", "Validate", "ToMap", "MarshalBinary", "MarshalAppend", "UnmarshalBinary", "UnmarshalBinaryLenient"},
+			want:  []string{"Size_", "Validate_", "ToMap_", "MarshalBinary_", "MarshalAppend_", "UnmarshalBinary_", "UnmarshalBinaryLenient_"},
+		},
 	}
 
 	for _, tt := range tests {
