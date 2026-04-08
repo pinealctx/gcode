@@ -28,7 +28,7 @@ func RunGenProto(ctx context.Context, args []string) error {
 	}
 
 	if len(scanResult.Files) == 0 {
-		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, config.ErrNoProtoFiles)
+		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, source.ErrNoProtoFiles)
 	}
 
 	files, err := parser.Parse(ctx, []string{scanResult.ImportPath}, scanResult.Files)
@@ -74,7 +74,7 @@ func generateIntermediateProtos(f model.File, outputDir string) error {
 		if err != nil {
 			return fmt.Errorf("build update proto: %w", err)
 		}
-		if err := os.WriteFile(updatePath, []byte(content), 0o600); err != nil {
+		if err := os.WriteFile(updatePath, []byte(content), 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
 			return fmt.Errorf("write %q: %w", updatePath, err)
 		}
 	}
@@ -84,7 +84,7 @@ func generateIntermediateProtos(f model.File, outputDir string) error {
 		if err != nil {
 			return fmt.Errorf("build create proto: %w", err)
 		}
-		if err := os.WriteFile(createPath, []byte(content), 0o600); err != nil {
+		if err := os.WriteFile(createPath, []byte(content), 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
 			return fmt.Errorf("write %q: %w", createPath, err)
 		}
 	}
@@ -162,6 +162,11 @@ func buildCreateProto(f model.File, relPath string, msgs []model.Message) (strin
 
 // buildUpdateMessage generates a single update message block.
 func buildUpdateMessage(msg model.Message, opt model.UpdateMessageOptions) (string, error) {
+	// parser does not validate that Name is non-empty; guard here to avoid
+	// generating invalid proto syntax ("message  {").
+	if opt.Name == "" {
+		return "", fmt.Errorf("update_message annotation on %q: name must not be empty", msg.FullName)
+	}
 	ignoreSet := stringSet(opt.IgnoreFields)
 	conditionSet := stringSet(opt.ConditionFields)
 
@@ -187,6 +192,11 @@ func buildUpdateMessage(msg model.Message, opt model.UpdateMessageOptions) (stri
 
 // buildCreateMessage generates a single create message block.
 func buildCreateMessage(msg model.Message, opt model.CreateMessageOptions) (string, error) {
+	// parser does not validate that Name is non-empty; guard here to avoid
+	// generating invalid proto syntax ("message  {").
+	if opt.Name == "" {
+		return "", fmt.Errorf("create_message annotation on %q: name must not be empty", msg.FullName)
+	}
 	ignoreSet := stringSet(opt.IgnoreFields)
 	requiredSet := stringSet(opt.RequiredFields)
 

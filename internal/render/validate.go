@@ -273,35 +273,45 @@ func writeStringValidation(b *strings.Builder, fieldExpr, fieldName, vm string, 
 	}
 }
 
+// writeStringInCheck writes an "in" membership check for a string field.
 func writeStringInCheck(b *strings.Builder, fieldExpr, fieldName, vm string, vals []string) {
-	b.WriteString("{\nfound := false\n")
-	b.WriteString("for _, v := range []string{")
-	for i, s := range vals {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "%q", s)
-	}
-	b.WriteString("} {\n")
-	fmt.Fprintf(b, "if %s == v {\nfound = true\nbreak\n}\n}\n", fieldExpr)
-	// build display list
-	display := buildStringList(vals)
-	fmt.Fprintf(b, "if !found {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"in\", Message: validateruntime.MsgOr(%q, \"must be one of %s\")}\n}\n}\n",
-		fieldName, vm, display)
+	writeStringSetCheck(b, fieldExpr, fieldName, vm, vals, false)
 }
 
+// writeStringNotInCheck writes a "not_in" membership check for a string field.
 func writeStringNotInCheck(b *strings.Builder, fieldExpr, fieldName, vm string, vals []string) {
-	b.WriteString("for _, v := range []string{")
-	for i, s := range vals {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "%q", s)
-	}
-	b.WriteString("} {\n")
+	writeStringSetCheck(b, fieldExpr, fieldName, vm, vals, true)
+}
+
+// writeStringSetCheck writes an in/not_in membership check for a string field.
+// negate=false generates an "in" check; negate=true generates a "not_in" check.
+func writeStringSetCheck(b *strings.Builder, fieldExpr, fieldName, vm string, vals []string, negate bool) {
 	display := buildStringList(vals)
-	fmt.Fprintf(b, "if %s == v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"not_in\", Message: validateruntime.MsgOr(%q, \"must not be one of %s\")}\n}\n}\n",
-		fieldExpr, fieldName, vm, display)
+	if !negate {
+		b.WriteString("{\nfound := false\n")
+		b.WriteString("for _, v := range []string{")
+		for i, s := range vals {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%q", s)
+		}
+		b.WriteString("} {\n")
+		fmt.Fprintf(b, "if %s == v {\nfound = true\nbreak\n}\n}\n", fieldExpr)
+		fmt.Fprintf(b, "if !found {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"in\", Message: validateruntime.MsgOr(%q, \"must be one of %s\")}\n}\n}\n",
+			fieldName, vm, display)
+	} else {
+		b.WriteString("for _, v := range []string{")
+		for i, s := range vals {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%q", s)
+		}
+		b.WriteString("} {\n")
+		fmt.Fprintf(b, "if %s == v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"not_in\", Message: validateruntime.MsgOr(%q, \"must not be one of %s\")}\n}\n}\n",
+			fieldExpr, fieldName, vm, display)
+	}
 }
 
 // writeBytesValidation writes bytes field constraints.
@@ -448,19 +458,19 @@ func writeUnsignedNotInCheck(b *strings.Builder, fieldExpr, fieldName, vm string
 // writeFloatValidation writes float/double field constraints.
 func writeFloatValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions, _ model.ScalarKind) {
 	if vo.GTFloat != nil {
-		fmt.Fprintf(b, "if %s <= %v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %v\")}\n}\n",
+		fmt.Fprintf(b, "if %s <= %g {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %g\")}\n}\n",
 			fieldExpr, *vo.GTFloat, fieldName, vm, *vo.GTFloat)
 	}
 	if vo.GTEFloat != nil {
-		fmt.Fprintf(b, "if %s < %v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"gte\", Message: validateruntime.MsgOr(%q, \"must be >= %v\")}\n}\n",
+		fmt.Fprintf(b, "if %s < %g {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"gte\", Message: validateruntime.MsgOr(%q, \"must be >= %g\")}\n}\n",
 			fieldExpr, *vo.GTEFloat, fieldName, vm, *vo.GTEFloat)
 	}
 	if vo.LTFloat != nil {
-		fmt.Fprintf(b, "if %s >= %v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"lt\", Message: validateruntime.MsgOr(%q, \"must be < %v\")}\n}\n",
+		fmt.Fprintf(b, "if %s >= %g {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"lt\", Message: validateruntime.MsgOr(%q, \"must be < %g\")}\n}\n",
 			fieldExpr, *vo.LTFloat, fieldName, vm, *vo.LTFloat)
 	}
 	if vo.LTEFloat != nil {
-		fmt.Fprintf(b, "if %s > %v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %v\")}\n}\n",
+		fmt.Fprintf(b, "if %s > %g {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %g\")}\n}\n",
 			fieldExpr, *vo.LTEFloat, fieldName, vm, *vo.LTEFloat)
 	}
 }
@@ -587,19 +597,19 @@ func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, i
 	}
 	// float items
 	if items.GTFloat != nil {
-		fmt.Fprintf(b, "if v <= %v {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %v\")}\n}\n",
+		fmt.Fprintf(b, "if v <= %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %g\")}\n}\n",
 			*items.GTFloat, elemField, vm, *items.GTFloat)
 	}
 	if items.GTEFloat != nil {
-		fmt.Fprintf(b, "if v < %v {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"gte\", Message: validateruntime.MsgOr(%q, \"must be >= %v\")}\n}\n",
+		fmt.Fprintf(b, "if v < %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"gte\", Message: validateruntime.MsgOr(%q, \"must be >= %g\")}\n}\n",
 			*items.GTEFloat, elemField, vm, *items.GTEFloat)
 	}
 	if items.LTFloat != nil {
-		fmt.Fprintf(b, "if v >= %v {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lt\", Message: validateruntime.MsgOr(%q, \"must be < %v\")}\n}\n",
+		fmt.Fprintf(b, "if v >= %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lt\", Message: validateruntime.MsgOr(%q, \"must be < %g\")}\n}\n",
 			*items.LTFloat, elemField, vm, *items.LTFloat)
 	}
 	if items.LTEFloat != nil {
-		fmt.Fprintf(b, "if v > %v {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %v\")}\n}\n",
+		fmt.Fprintf(b, "if v > %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %g\")}\n}\n",
 			*items.LTEFloat, elemField, vm, *items.LTEFloat)
 	}
 	// required for string/bytes items

@@ -22,5 +22,4 @@ var (
 	// gen-ts flags
 	ErrMissingTSInputDir  = ConfigError("validate gen-ts config: missing -in")
 	ErrMissingTSOutputDir = ConfigError("validate gen-ts config: missing -out")
-	ErrNoProtoFiles       = ConfigError("no .proto files found")
 )

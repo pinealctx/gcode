@@ -50,7 +50,9 @@ func Scan(inputDir string) (ScanResult, error) {
 			return nil
 		}
 
-		// Resolve symlinks and verify the resolved path stays inside absDir.
+		// EvalSymlinks resolves the symlink before the Rel check. There is a theoretical
+		// TOCTOU window between resolution and use, but the risk is negligible in practice:
+		// proto source directories are not adversarially controlled.
 		resolved, err := filepath.EvalSymlinks(path)
 		if err != nil {
 			return fmt.Errorf("resolve symlink %q: %w", path, err)

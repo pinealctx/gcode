@@ -10,6 +10,7 @@ import (
 	"github.com/pinealctx/gcode/internal/config"
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/parser"
+	"github.com/pinealctx/gcode/internal/source"
 )
 
 // writeFile writes content to path, creating parent dirs as needed.
@@ -369,8 +370,8 @@ func TestRunGenProto_EmptyDirectory(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty directory, got nil")
 	}
-	if !errors.Is(err, config.ErrNoProtoFiles) {
-		t.Errorf("expected config.ErrNoProtoFiles, got %T: %v", err, err)
+	if !errors.Is(err, source.ErrNoProtoFiles) {
+		t.Errorf("expected source.ErrNoProtoFiles, got %T: %v", err, err)
 	}
 }
 
@@ -678,5 +679,33 @@ message User {
 	}
 	if !strings.Contains(err.Error(), "remove stale") {
 		t.Errorf("error = %q, want to contain 'remove stale'", err.Error())
+	}
+}
+
+func TestBuildUpdateMessage_EmptyName(t *testing.T) {
+	t.Parallel()
+
+	msg := model.Message{FullName: "pkg.Person"}
+	opt := model.UpdateMessageOptions{Name: ""}
+	_, err := buildUpdateMessage(msg, opt)
+	if err == nil {
+		t.Fatal("expected error for empty opt.Name, got nil")
+	}
+	if !strings.Contains(err.Error(), "name must not be empty") {
+		t.Errorf("error = %q, want to contain 'name must not be empty'", err.Error())
+	}
+}
+
+func TestBuildCreateMessage_EmptyName(t *testing.T) {
+	t.Parallel()
+
+	msg := model.Message{FullName: "pkg.Person"}
+	opt := model.CreateMessageOptions{Name: ""}
+	_, err := buildCreateMessage(msg, opt)
+	if err == nil {
+		t.Fatal("expected error for empty opt.Name, got nil")
+	}
+	if !strings.Contains(err.Error(), "name must not be empty") {
+		t.Errorf("error = %q, want to contain 'name must not be empty'", err.Error())
 	}
 }

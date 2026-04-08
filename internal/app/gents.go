@@ -28,7 +28,7 @@ func RunGenTS(ctx context.Context, args []string) error {
 	}
 
 	if len(scanResult.Files) == 0 {
-		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, config.ErrNoProtoFiles)
+		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, source.ErrNoProtoFiles)
 	}
 
 	files, err := parser.Parse(ctx, []string{scanResult.ImportPath}, scanResult.Files)
@@ -76,7 +76,7 @@ func RunGenTS(ctx context.Context, args []string) error {
 		}
 
 		outPath := filepath.Join(cfg.OutputDir, tsOutputFileName(files[i].Path))
-		if err := os.WriteFile(outPath, tsSrc, 0o600); err != nil {
+		if err := os.WriteFile(outPath, tsSrc, 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
 			return fmt.Errorf("write %q: %w", outPath, err)
 		}
 	}

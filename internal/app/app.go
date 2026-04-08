@@ -46,7 +46,7 @@ func Run(ctx context.Context, args []string) error {
 	}
 
 	if len(scanResult.Files) == 0 {
-		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, config.ErrNoProtoFiles)
+		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, source.ErrNoProtoFiles)
 	}
 
 	files, err := parser.Parse(ctx, []string{scanResult.ImportPath}, scanResult.Files)
@@ -117,7 +117,7 @@ func Run(ctx context.Context, args []string) error {
 		}
 
 		outPath := filepath.Join(cfg.OutputDir, outputFileName(ff.src.Path))
-		if err := os.WriteFile(outPath, src, 0o600); err != nil {
+		if err := os.WriteFile(outPath, src, 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
 			return fmt.Errorf("write %q: %w", outPath, err)
 		}
 
@@ -127,7 +127,7 @@ func Run(ctx context.Context, args []string) error {
 		}
 
 		validateOutPath := filepath.Join(cfg.OutputDir, validateOutputFileName(ff.src.Path))
-		if err := os.WriteFile(validateOutPath, validateSrc, 0o600); err != nil {
+		if err := os.WriteFile(validateOutPath, validateSrc, 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
 			return fmt.Errorf("write validate %q: %w", validateOutPath, err)
 		}
 
@@ -137,7 +137,7 @@ func Run(ctx context.Context, args []string) error {
 				return fmt.Errorf("render rpc %q: %w", ff.src.Path, err)
 			}
 			rpcOutPath := filepath.Join(cfg.OutputDir, rpcOutputFileName(ff.src.Path))
-			if err := os.WriteFile(rpcOutPath, rpcSrc, 0o600); err != nil {
+			if err := os.WriteFile(rpcOutPath, rpcSrc, 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
 				return fmt.Errorf("write rpc %q: %w", rpcOutPath, err)
 			}
 
@@ -146,7 +146,7 @@ func Run(ctx context.Context, args []string) error {
 				return fmt.Errorf("render http %q: %w", ff.src.Path, err)
 			}
 			httpOutPath := filepath.Join(cfg.OutputDir, httpOutputFileName(ff.src.Path))
-			if err := os.WriteFile(httpOutPath, httpSrc, 0o600); err != nil {
+			if err := os.WriteFile(httpOutPath, httpSrc, 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
 				return fmt.Errorf("write http %q: %w", httpOutPath, err)
 			}
 		}
