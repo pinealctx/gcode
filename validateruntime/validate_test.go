@@ -103,6 +103,34 @@ func TestMatchPatternCaching(t *testing.T) {
 	}
 }
 
+// TestMsgOr verifies that MsgOr returns the override when non-empty and the
+// default message when the override is empty.
+func TestMsgOr(t *testing.T) {
+	// override non-empty: returns override.
+	if got := MsgOr("custom message", "default"); got != "custom message" {
+		t.Errorf("MsgOr(non-empty, default) = %q, want %q", got, "custom message")
+	}
+	// override empty: returns defaultMsg.
+	if got := MsgOr("", "default"); got != "default" {
+		t.Errorf("MsgOr(\"\", default) = %q, want %q", got, "default")
+	}
+}
+
+// TestURIValidatorReplacement verifies that replacing URIValidator changes the
+// behavior of IsURI, mirroring the pattern used by TestEmailValidatorReplacement.
+func TestURIValidatorReplacement(t *testing.T) {
+	orig := URIValidator
+	defer func() { URIValidator = orig }()
+
+	URIValidator = func(s string) bool { return s == "allowed://uri" }
+	if !IsURI("allowed://uri") {
+		t.Error("replaced URIValidator: want true for allowed://uri")
+	}
+	if IsURI("https://example.com") {
+		t.Error("replaced URIValidator: want false for https://example.com")
+	}
+}
+
 func TestEmailValidatorReplacement(t *testing.T) {
 	orig := EmailValidator
 	defer func() { EmailValidator = orig }()

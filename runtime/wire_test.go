@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"math"
+	"strings"
 	"testing"
 )
 
@@ -352,8 +354,256 @@ func TestRoundtripVarint(t *testing.T) {
 	}
 }
 
-// TestSizeTag verifies that SizeTag returns the correct byte count for field tags,
-// including large field numbers that would overflow int32 before the uint64 cast fix.
+// TestAppendSint verifies that AppendSint32 and AppendSint64 produce the correct
+// ZigZag-encoded varint bytes, including boundary values.
+func TestAppendSint(t *testing.T) {
+	t.Parallel()
+
+	// AppendSint32: ZigZag encode then varint append.
+	// 0 → ZigZag 0 → [0x00]
+	got := AppendSint32(nil, 0)
+	if len(got) != 1 || got[0] != 0x00 {
+		t.Errorf("AppendSint32(0) = %v, want [0x00]", got)
+	}
+	// -1 → ZigZag 1 → [0x01]
+	got = AppendSint32(nil, -1)
+	if len(got) != 1 || got[0] != 0x01 {
+		t.Errorf("AppendSint32(-1) = %v, want [0x01]", got)
+	}
+	// 1 → ZigZag 2 → [0x02]
+	got = AppendSint32(nil, 1)
+	if len(got) != 1 || got[0] != 0x02 {
+		t.Errorf("AppendSint32(1) = %v, want [0x02]", got)
+	}
+
+	// AppendSint64: same ZigZag logic for int64.
+	got64 := AppendSint64(nil, 0)
+	if len(got64) != 1 || got64[0] != 0x00 {
+		t.Errorf("AppendSint64(0) = %v, want [0x00]", got64)
+	}
+	got64 = AppendSint64(nil, -1)
+	if len(got64) != 1 || got64[0] != 0x01 {
+		t.Errorf("AppendSint64(-1) = %v, want [0x01]", got64)
+	}
+
+	// Boundary values: MaxInt32 → ZigZag 4294967294 → 5-byte varint.
+	got = AppendSint32(nil, math.MaxInt32)
+	if len(got) != 5 {
+		t.Errorf("AppendSint32(MaxInt32) len = %d, want 5", len(got))
+	}
+	// MinInt32 → ZigZag 4294967295 → 5-byte varint.
+	got = AppendSint32(nil, math.MinInt32)
+	if len(got) != 5 {
+		t.Errorf("AppendSint32(MinInt32) len = %d, want 5", len(got))
+	}
+	// MaxInt64 → ZigZag 18446744073709551614 → 10-byte varint.
+	got64 = AppendSint64(nil, math.MaxInt64)
+	if len(got64) != 10 {
+		t.Errorf("AppendSint64(MaxInt64) len = %d, want 10", len(got64))
+	}
+	// MinInt64 → ZigZag 18446744073709551615 → 10-byte varint.
+	got64 = AppendSint64(nil, math.MinInt64)
+	if len(got64) != 10 {
+		t.Errorf("AppendSint64(MinInt64) len = %d, want 10", len(got64))
+	}
+}
+
+func TestAppendFloatDouble(t *testing.T) {
+	t.Parallel()
+
+	// AppendFloat: float32 as fixed32 (4 bytes little-endian).
+	got := AppendFloat(nil, 0.0)
+	if len(got) != 4 {
+		t.Fatalf("AppendFloat(0.0) len = %d, want 4", len(got))
+	}
+	// 0.0 float32 bits = 0x00000000
+	for i, b := range got {
+		if b != 0 {
+			t.Errorf("AppendFloat(0.0)[%d] = 0x%02x, want 0x00", i, b)
+		}
+	}
+
+	// 1.0 float32 bits = 0x3F800000 → little-endian [0x00, 0x00, 0x80, 0x3F]
+	got = AppendFloat(nil, 1.0)
+	if len(got) != 4 || got[3] != 0x3F || got[2] != 0x80 || got[1] != 0x00 || got[0] != 0x00 {
+		t.Errorf("AppendFloat(1.0) = %v, want [0x00 0x00 0x80 0x3F]", got)
+	}
+
+	// AppendDouble: float64 as fixed64 (8 bytes little-endian).
+	got64 := AppendDouble(nil, 0.0)
+	if len(got64) != 8 {
+		t.Fatalf("AppendDouble(0.0) len = %d, want 8", len(got64))
+	}
+	for i, b := range got64 {
+		if b != 0 {
+			t.Errorf("AppendDouble(0.0)[%d] = 0x%02x, want 0x00", i, b)
+		}
+	}
+}
+
+func TestAppendBytes(t *testing.T) {
+	t.Parallel()
+
+	// nil slice → length prefix 0 + no payload
+	got := AppendBytes(nil, nil)
+	if len(got) != 1 || got[0] != 0 {
+		t.Errorf("AppendBytes(nil) = %v, want [0x00]", got)
+	}
+
+	// []byte{1,2,3} → length prefix 3 + payload
+	got = AppendBytes(nil, []byte{1, 2, 3})
+	if len(got) != 4 || got[0] != 3 || got[1] != 1 || got[2] != 2 || got[3] != 3 {
+		t.Errorf("AppendBytes([1,2,3]) = %v, want [3 1 2 3]", got)
+	}
+}
+
+func TestSizeFunctions(t *testing.T) {
+	t.Parallel()
+
+	// SizeBool: always 1.
+	if SizeBool(true) != 1 || SizeBool(false) != 1 {
+		t.Error("SizeBool must always return 1")
+	}
+
+	// SizeInt32: negative values sign-extend to 10 bytes.
+	if SizeInt32(0) != 1 {
+		t.Errorf("SizeInt32(0) = %d, want 1", SizeInt32(0))
+	}
+	if SizeInt32(-1) != 10 {
+		t.Errorf("SizeInt32(-1) = %d, want 10", SizeInt32(-1))
+	}
+	if SizeInt32(1) != 1 {
+		t.Errorf("SizeInt32(1) = %d, want 1", SizeInt32(1))
+	}
+
+	// SizeInt64.
+	if SizeInt64(0) != 1 {
+		t.Errorf("SizeInt64(0) = %d, want 1", SizeInt64(0))
+	}
+	if SizeInt64(-1) != 10 {
+		t.Errorf("SizeInt64(-1) = %d, want 10", SizeInt64(-1))
+	}
+
+	// SizeUint32 / SizeUint64.
+	if SizeUint32(0) != 1 || SizeUint32(128) != 2 {
+		t.Errorf("SizeUint32 unexpected: 0→%d, 128→%d", SizeUint32(0), SizeUint32(128))
+	}
+	if SizeUint64(0) != 1 || SizeUint64(128) != 2 {
+		t.Errorf("SizeUint64 unexpected: 0→%d, 128→%d", SizeUint64(0), SizeUint64(128))
+	}
+
+	// SizeSint32 / SizeSint64: ZigZag, so -1 → 1 (1 byte).
+	if SizeSint32(0) != 1 || SizeSint32(-1) != 1 || SizeSint32(1) != 1 {
+		t.Errorf("SizeSint32 unexpected: 0→%d, -1→%d, 1→%d", SizeSint32(0), SizeSint32(-1), SizeSint32(1))
+	}
+	if SizeSint64(0) != 1 || SizeSint64(-1) != 1 {
+		t.Errorf("SizeSint64 unexpected: 0→%d, -1→%d", SizeSint64(0), SizeSint64(-1))
+	}
+
+	// Fixed-size types.
+	if SizeFloat(0) != 4 || SizeFloat(1.5) != 4 {
+		t.Error("SizeFloat must always return 4")
+	}
+	if SizeDouble(0) != 8 || SizeDouble(1.5) != 8 {
+		t.Error("SizeDouble must always return 8")
+	}
+	if SizeFixed32(0) != 4 || SizeFixed32(^uint32(0)) != 4 {
+		t.Error("SizeFixed32 must always return 4")
+	}
+	if SizeFixed64(0) != 8 || SizeFixed64(^uint64(0)) != 8 {
+		t.Error("SizeFixed64 must always return 8")
+	}
+	if SizeSfixed32(0) != 4 || SizeSfixed32(-1) != 4 {
+		t.Error("SizeSfixed32 must always return 4")
+	}
+	if SizeSfixed64(0) != 8 || SizeSfixed64(-1) != 8 {
+		t.Error("SizeSfixed64 must always return 8")
+	}
+
+	// SizeString.
+	if SizeString("") != 1 {
+		t.Errorf("SizeString(\"\") = %d, want 1", SizeString(""))
+	}
+	// SizeString: length >= 128 crosses varint byte boundary (2-byte prefix).
+	if SizeString("hi") != 3 {
+		t.Errorf("SizeString(\"hi\") = %d, want 3", SizeString("hi"))
+	}
+	s128 := strings.Repeat("x", 128)
+	if SizeString(s128) != 130 {
+		t.Errorf("SizeString(128-byte) = %d, want 130", SizeString(s128))
+	}
+
+	// SizeBytes.
+	if SizeBytes(nil) != 1 {
+		t.Errorf("SizeBytes(nil) = %d, want 1", SizeBytes(nil))
+	}
+	if SizeBytes([]byte{1, 2}) != 3 {
+		t.Errorf("SizeBytes([1,2]) = %d, want 3", SizeBytes([]byte{1, 2}))
+	}
+	b128 := make([]byte, 128)
+	if SizeBytes(b128) != 130 {
+		t.Errorf("SizeBytes(128-byte) = %d, want 130", SizeBytes(b128))
+	}
+
+	// SizeEnum: same as SizeInt32 for non-negative values.
+	if SizeEnum(0) != 1 || SizeEnum(1) != 1 || SizeEnum(128) != 2 {
+		t.Errorf("SizeEnum unexpected: 0→%d, 1→%d, 128→%d", SizeEnum(0), SizeEnum(1), SizeEnum(128))
+	}
+}
+
+func TestIsZeroFloatDouble(t *testing.T) {
+	t.Parallel()
+
+	// Positive zero.
+	if !IsZeroFloat(0.0) {
+		t.Error("IsZeroFloat(+0.0) = false, want true")
+	}
+	if !IsZeroDouble(0.0) {
+		t.Error("IsZeroDouble(+0.0) = false, want true")
+	}
+
+	// Non-zero values.
+	if IsZeroFloat(1.0) {
+		t.Error("IsZeroFloat(1.0) = true, want false")
+	}
+	if IsZeroDouble(1.0) {
+		t.Error("IsZeroDouble(1.0) = true, want false")
+	}
+
+	// Negative zero: bits differ from positive zero, so IsZero returns false.
+	negZeroF := float32(math.Float32frombits(0x80000000))
+	if IsZeroFloat(negZeroF) {
+		t.Error("IsZeroFloat(-0.0) = true, want false (negative zero has different bits)")
+	}
+	negZeroD := math.Float64frombits(0x8000000000000000)
+	if IsZeroDouble(negZeroD) {
+		t.Error("IsZeroDouble(-0.0) = true, want false (negative zero has different bits)")
+	}
+}
+
+func TestErrorString(t *testing.T) {
+	t.Parallel()
+
+	if ErrTruncated.Error() != "protobuf: truncated message" {
+		t.Errorf("ErrTruncated.Error() = %q", ErrTruncated.Error())
+	}
+	if ErrOverflow.Error() != "protobuf: varint overflow" {
+		t.Errorf("ErrOverflow.Error() = %q", ErrOverflow.Error())
+	}
+	if ErrWireType.Error() != "protobuf: wrong wire type" {
+		t.Errorf("ErrWireType.Error() = %q", ErrWireType.Error())
+	}
+	if ErrPackedLen.Error() != "protobuf: packed field length mismatch" {
+		t.Errorf("ErrPackedLen.Error() = %q", ErrPackedLen.Error())
+	}
+	if ErrDuplicateField.Error() != "protobuf: duplicate non-repeated field" {
+		t.Errorf("ErrDuplicateField.Error() = %q", ErrDuplicateField.Error())
+	}
+	if ErrUnknownWireType.Error() != "protobuf: unknown wire type" {
+		t.Errorf("ErrUnknownWireType.Error() = %q", ErrUnknownWireType.Error())
+	}
+}
+
 func TestSizeTag(t *testing.T) {
 	t.Parallel()
 
