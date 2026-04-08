@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"go/format"
+	"maps"
 	"strings"
 
 	"github.com/pinealctx/gcode/internal/model"
@@ -70,12 +71,8 @@ func writeValidateMethod(b *strings.Builder, msg transform.GoMessage, enumByGoNa
 			mergedEnums := enumByGoName
 			if ctx.EnumIndex != nil {
 				mergedEnums = make(map[string]transform.GoEnum, len(enumByGoName)+len(ctx.EnumIndex))
-				for k, v := range ctx.EnumIndex {
-					mergedEnums[k] = v
-				}
-				for k, v := range enumByGoName {
-					mergedEnums[k] = v
-				}
+				maps.Copy(mergedEnums, ctx.EnumIndex)
+				maps.Copy(mergedEnums, enumByGoName) // local file takes precedence
 			}
 			writeInheritedValidation(b, recv, msg, srcMsg, mergedEnums)
 			b.WriteString("return nil\n}\n\n")
@@ -84,11 +81,20 @@ func writeValidateMethod(b *strings.Builder, msg transform.GoMessage, enumByGoNa
 	}
 
 	// Standard validate: use the message's own field validate rules.
+	// Merge ctx.EnumIndex so that defined_only checks work even when the enum
+	// is defined in a different file (e.g. Status in person.proto referenced
+	// from AllValidate in all_types.proto).
+	effectiveEnums := enumByGoName
+	if ctx.EnumIndex != nil {
+		effectiveEnums = make(map[string]transform.GoEnum, len(enumByGoName)+len(ctx.EnumIndex))
+		maps.Copy(effectiveEnums, ctx.EnumIndex)
+		maps.Copy(effectiveEnums, enumByGoName) // local file takes precedence
+	}
 	for _, f := range msg.Fields {
 		if f.ValidateOptions == nil && f.Type.Kind != model.FieldKindMessage {
 			continue
 		}
-		writeFieldValidation(b, recv, f, enumByGoName)
+		writeFieldValidation(b, recv, f, effectiveEnums)
 	}
 	b.WriteString("return nil\n}\n\n")
 }

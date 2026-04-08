@@ -85,6 +85,12 @@ func (a *AllValidate) Validate() error {
 		}
 	}
 	if a.OStatus != nil {
+		switch *a.OStatus {
+		case Status_STATUS_UNSPECIFIED, Status_STATUS_ACTIVE, Status_STATUS_INACTIVE:
+		// ok
+		default:
+			return &validateruntime.ValidationError{Field: "o_status", Rule: "defined_only", Message: validateruntime.MsgOr("", "must be a defined enum value")}
+		}
 	}
 	if a.BMinmax != nil {
 		if len(a.BMinmax) < 1 {
