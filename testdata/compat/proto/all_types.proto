@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package compat;
+
+import "buf/validate/validate.proto";
+import "gcode/options.proto";
+import "person.proto";
+
+option go_package = "github.com/pinealctx/gcode/testdata/compat/dao;dao";
+
+// AllScalars covers every scalar wire type not present in person.proto.
+message AllScalars {
+  option (gcode.message) = {
+    gorm: { table: "all_scalars" }
+  };
+
+  sint32   f_sint32   = 1;
+  sint64   f_sint64   = 2;
+  sfixed32 f_sfixed32 = 3;
+  sfixed64 f_sfixed64 = 4;
+  double   f_double   = 5;
+  fixed32  f_fixed32  = 6;
+  fixed64  f_fixed64  = 7;
+  uint32   f_uint32   = 8;
+  uint64   f_uint64   = 9;
+  // float scalar: covers AppendFloat/IsZeroFloat/SizeFloat paths distinct from double.
+  float    f_float    = 10;
+  // bytes scalar: covers bytes two-phase generation path (bytes in update/create proto).
+  bytes    f_bytes    = 11 [(gcode.field).gorm.column = "f_bytes_col"];
+
+  option (gcode.update_message) = {
+    name: "AllScalarsUpdate"
+    condition_fields: ["f_sint32"]
+  };
+
+  option (gcode.create_message) = {
+    name: "AllScalarsCreate"
+    ignore_fields: ["f_double"]
+  };
+}
+
+// AllRepeated covers repeated field wire types not present in person.proto.
+message AllRepeated {
+  repeated sint32  r_sint32   = 1;
+  repeated sfixed32 r_sfixed32 = 2;
+  repeated double  r_double   = 3;
+  repeated bytes   r_bytes    = 4;
+  repeated Address r_message  = 5;
+  repeated Status  r_enum     = 6;
+}
+
+// AllValidate covers validate constraint types not present in person.proto.
+message AllValidate {
+  uint32 u_gte   = 1 [(buf.validate.field).uint32.gte = 1];
+  uint64 u_lte   = 2 [(buf.validate.field).uint64.lte = 1000];
+  uint32 u_in    = 3 [
+    (buf.validate.field).uint32.in = 1,
+    (buf.validate.field).uint32.in = 2,
+    (buf.validate.field).uint32.in = 3
+  ];
+  uint32 u_not_in = 4 [(buf.validate.field).uint32.not_in = 0];
+
+  float  f_gt    = 5 [(buf.validate.field).float.gt = 0.0];
+  double d_lte   = 6 [(buf.validate.field).double.lte = 1.0];
+
+  string s_in    = 7 [
+    (buf.validate.field).string.in = "a",
+    (buf.validate.field).string.in = "b",
+    (buf.validate.field).string.in = "c"
+  ];
+  string s_not_in = 8 [
+    (buf.validate.field).string.not_in = "x",
+    (buf.validate.field).string.not_in = "y"
+  ];
+
+  int32  i_in    = 9 [
+    (buf.validate.field).int32.in = 1,
+    (buf.validate.field).int32.in = 2,
+    (buf.validate.field).int32.in = -1
+  ];
+
+  string s_uri   = 10 [(buf.validate.field).string.uri = true];
+
+  optional Status o_status = 11 [(buf.validate.field).enum.defined_only = true];
+
+  bytes  b_minmax = 12 [
+    (buf.validate.field).bytes.min_len = 1,
+    (buf.validate.field).bytes.max_len = 100
+  ];
+
+  repeated int32 r_items = 13 [
+    (buf.validate.field).repeated.items.int32.gte = 0
+  ];
+}
