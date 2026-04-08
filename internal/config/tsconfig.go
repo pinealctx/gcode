@@ -15,15 +15,15 @@ type GenTSConfig struct {
 func ParseGenTS(args []string) (GenTSConfig, error) {
 	var cfg GenTSConfig
 
-	fs := flag.NewFlagSet("gcode gen-ts", flag.ContinueOnError)
-	fs.StringVar(&cfg.InputDir, "in", "", "input proto directory")
-	fs.StringVar(&cfg.OutputDir, "out", "", "output TypeScript directory")
+	fset := flag.NewFlagSet("gcode gen-ts", flag.ContinueOnError)
+	fset.StringVar(&cfg.InputDir, "in", "", "input proto directory")
+	fset.StringVar(&cfg.OutputDir, "out", "", "output TypeScript directory")
 
-	if err := fs.Parse(args); err != nil {
+	if err := fset.Parse(args); err != nil {
 		return GenTSConfig{}, fmt.Errorf("parse gen-ts flags: %w", err)
 	}
 
-	if remainingArgs := fs.Args(); len(remainingArgs) > 0 {
+	if remainingArgs := fset.Args(); len(remainingArgs) > 0 {
 		return GenTSConfig{}, fmt.Errorf("parse gen-ts flags: unexpected positional arguments %q", remainingArgs)
 	}
 

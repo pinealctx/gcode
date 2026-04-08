@@ -45,6 +45,11 @@ func RunGenTS(ctx context.Context, args []string) error {
 		return fmt.Errorf("create output directory %q: %w", cfg.OutputDir, err)
 	}
 
+	// Check for output filename collisions before writing anything.
+	if err := checkOutputCollisions(files, tsOutputFileName); err != nil {
+		return err
+	}
+
 	// First pass: flatten all files.
 	goFiles := make([]transform.GoFile, len(files))
 	for i, f := range files {

@@ -149,7 +149,7 @@ func writeFieldValidationExpr(b *strings.Builder, fieldExpr string, f transform.
 
 	switch {
 	case f.Cardinality == model.CardinalityRepeated:
-		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo, f, enumByGoName)
+		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo, f)
 	case f.Type.Kind == model.FieldKindMessage:
 		writeMessageFieldValidation(b, fieldExpr, fieldName, vm, vo)
 	case f.Type.Kind == model.FieldKindEnum:
@@ -170,7 +170,7 @@ func writeFieldValidation(b *strings.Builder, recv string, f transform.GoField, 
 
 	switch {
 	case f.Cardinality == model.CardinalityRepeated:
-		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo, f, enumByGoName)
+		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo, f)
 
 	case f.Type.Kind == model.FieldKindMessage:
 		writeMessageFieldValidation(b, fieldExpr, fieldName, vm, vo)
@@ -504,7 +504,9 @@ func writeMessageFieldValidation(b *strings.Builder, fieldExpr, fieldName, vm st
 }
 
 // writeRepeatedValidation writes repeated field constraints.
-func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions, f transform.GoField, _ map[string]transform.GoEnum) {
+// Note: defined_only for repeated enum fields is not currently supported
+// and is silently skipped.
+func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions, f transform.GoField) {
 	if vo == nil {
 		return
 	}

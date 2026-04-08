@@ -171,8 +171,8 @@ func TestCreatePersonHandlerSvcError(t *testing.T) {
 	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500, got %d", resp.Code)
 	}
-	if resp.Error == nil || resp.Error.Msg != "db unavailable" {
-		t.Errorf("expected error msg 'db unavailable', got %+v", resp.Error)
+	if resp.Error == nil || resp.Error.Msg != "internal error" {
+		t.Errorf("expected error msg 'internal error', got %+v", resp.Error)
 	}
 }
 
@@ -335,8 +335,8 @@ func TestUpdatePersonHandlerSvcError(t *testing.T) {
 	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500, got %d", resp.Code)
 	}
-	if resp.Error == nil || resp.Error.Msg != "update failed" {
-		t.Errorf("expected error msg 'update failed', got %+v", resp.Error)
+	if resp.Error == nil || resp.Error.Msg != "internal error" {
+		t.Errorf("expected error msg 'internal error', got %+v", resp.Error)
 	}
 }
 
@@ -396,8 +396,8 @@ func TestGetPersonHandlerSvcError(t *testing.T) {
 	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500, got %d", resp.Code)
 	}
-	if resp.Error == nil || resp.Error.Msg != "not found" {
-		t.Errorf("expected error msg 'not found', got %+v", resp.Error)
+	if resp.Error == nil || resp.Error.Msg != "internal error" {
+		t.Errorf("expected error msg 'internal error', got %+v", resp.Error)
 	}
 }
 
@@ -490,8 +490,8 @@ func TestDeletePersonHandlerSvcError(t *testing.T) {
 	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("expected code 500, got %d", resp.Code)
 	}
-	if resp.Error == nil || resp.Error.Msg != "delete failed" {
-		t.Errorf("expected error msg 'delete failed', got %+v", resp.Error)
+	if resp.Error == nil || resp.Error.Msg != "internal error" {
+		t.Errorf("expected error msg 'internal error', got %+v", resp.Error)
 	}
 }
 

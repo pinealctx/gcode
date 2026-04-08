@@ -178,6 +178,10 @@ var ErrPackedLen = errorString("protobuf: packed field length mismatch")
 // ErrDuplicateField is returned when a non-repeated field appears more than once.
 var ErrDuplicateField = errorString("protobuf: duplicate non-repeated field")
 
+// ErrUnknownWireType is returned when SkipField encounters an unrecognized wire type.
+// Wire types 0-5 are defined by the protobuf spec; any other value is invalid.
+var ErrUnknownWireType = errorString("protobuf: unknown wire type")
+
 // errorString is a simple error type to avoid importing errors package.
 type errorString string
 
@@ -194,7 +198,8 @@ func ConsumeTag(b []byte) (int, int, int) {
 }
 
 // SkipField skips a field value given its wire type.
-// Returns the number of bytes consumed, or a negative error code.
+// Returns the number of bytes consumed, or a negative error code:
+// -1 for truncated input, -3 for an unrecognized wire type.
 func SkipField(b []byte, wireType int) int {
 	switch wireType {
 	case WireVarint:
@@ -214,6 +219,6 @@ func SkipField(b []byte, wireType int) int {
 		}
 		return 4
 	default:
-		return -1 // unsupported wire type
+		return -3 // unrecognized wire type
 	}
 }

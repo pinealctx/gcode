@@ -295,8 +295,8 @@ func TestSkipField(t *testing.T) {
 
 	// Unknown wire type.
 	n = SkipField([]byte{0x01}, 7)
-	if n != -1 {
-		t.Errorf("SkipField unknown = %d, want -1", n)
+	if n != -3 {
+		t.Errorf("SkipField unknown = %d, want -3", n)
 	}
 }
 

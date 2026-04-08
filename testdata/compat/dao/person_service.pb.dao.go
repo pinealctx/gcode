@@ -225,6 +225,9 @@ func (c *CreatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			c.Id = string(payload)
@@ -232,7 +235,10 @@ func (c *CreatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -283,6 +289,9 @@ func (g *GetPersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			g.Id = string(payload)
@@ -290,7 +299,10 @@ func (g *GetPersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error) {
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -341,6 +353,9 @@ func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			g.Name = string(payload)
@@ -357,6 +372,9 @@ func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 2: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
 			}
 			g.Age = int32(v)
@@ -364,7 +382,10 @@ func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error) {
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -415,6 +436,9 @@ func (u *UpdatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			u.Ok = v != 0
@@ -422,7 +446,10 @@ func (u *UpdatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -473,6 +500,9 @@ func (d *DeletePersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error)
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			d.Id = string(payload)
@@ -480,7 +510,10 @@ func (d *DeletePersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error)
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -531,6 +564,9 @@ func (d *DeletePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			d.Ok = v != 0
@@ -538,7 +574,10 @@ func (d *DeletePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}

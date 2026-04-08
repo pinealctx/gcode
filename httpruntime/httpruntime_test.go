@@ -71,8 +71,8 @@ func TestErrResponse_DefaultCode(t *testing.T) {
 	if resp.Error == nil {
 		t.Fatal("Error is nil, want non-nil")
 	}
-	if resp.Error.Msg != "something went wrong" {
-		t.Errorf("Error.Msg = %q, want %q", resp.Error.Msg, "something went wrong")
+	if resp.Error.Msg != "internal error" {
+		t.Errorf("Error.Msg = %q, want %q", resp.Error.Msg, "internal error")
 	}
 }
 
@@ -191,8 +191,8 @@ func TestDefaultErrorHandler_PlainError(t *testing.T) {
 	if resp.Code != httpruntime.CodeDefaultErr {
 		t.Errorf("Code = %d, want CodeDefaultErr (500)", resp.Code)
 	}
-	if resp.Error == nil || resp.Error.Msg != "something failed" {
-		t.Errorf("Error = %+v, want msg 'something failed'", resp.Error)
+	if resp.Error == nil || resp.Error.Msg != "internal error" {
+		t.Errorf("Error = %+v, want msg 'internal error'", resp.Error)
 	}
 }
 
@@ -256,8 +256,8 @@ func TestDefaultErrorHandler_MultipleErrors_UsesLast(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	resp := decodeResponse(t, w)
-	if resp.Error == nil || resp.Error.Msg != "last error" {
-		t.Errorf("Error.Msg = %q, want 'last error'", resp.Error)
+	if resp.Error == nil || resp.Error.Msg != "internal error" {
+		t.Errorf("Error.Msg = %q, want 'internal error'", resp.Error)
 	}
 }
 

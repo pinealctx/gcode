@@ -66,7 +66,16 @@ func OKResponse(data any) Response {
 // Code resolution order:
 //  1. If err (or any error in its chain) is *errorx.Error[BizCode], its Code field is used.
 //  2. If err implements CodedError, its Code() value is used.
-//  3. Otherwise the response code defaults to CodeDefaultErr (500).
+//  3. Otherwise the response code defaults to CodeDefaultErr (500) and the message
+//     is "internal error" — the original error is NOT exposed to the client.
+//
+// Error visibility contract:
+//   - Business errors (BizCode / CodedError): message is safe to expose to clients.
+//     Wrap internal errors with a business error to control the client-visible message:
+//     errorx.Wrap(dbErr, BizCode(503), "service unavailable")
+//   - System errors (plain errors.New / fmt.Errorf): message is hidden from clients.
+//     Log the full error chain before or after calling ErrResponse to preserve
+//     internal context for debugging.
 //
 // If err is nil, ErrResponse returns a generic CodeDefaultErr response.
 func ErrResponse(err error) Response {
@@ -74,19 +83,44 @@ func ErrResponse(err error) Response {
 		return Response{Code: CodeDefaultErr, Error: &Error{Msg: "internal error"}}
 	}
 	code := CodeDefaultErr
+	msg := "internal error"
 	if he, ok := errors.AsType[*errorx.Error[BizCode]](err); ok {
 		code = int(he.Code)
+		msg = err.Error()
 	} else if ce, ok := errors.AsType[CodedError](err); ok {
 		code = ce.Code()
+		msg = err.Error()
 	}
-	return Response{Code: code, Error: &Error{Msg: err.Error()}}
+	return Response{Code: code, Error: &Error{Msg: msg}}
 }
 
 // DefaultErrorHandler returns a gin middleware that writes a JSON error response
 // for any errors accumulated via c.Error() during handler execution.
-// ValidationError maps to code 400; all other errors map to code 500 (or the
-// code returned by CodedError.Code() / errorx.Error[BizCode] if applicable).
+// ValidationError maps to code 400; all other errors use ErrResponse (see its
+// doc for the business vs system error visibility contract).
 // Only the last error (c.Errors.Last()) is used when multiple errors are present.
+//
+// Logging contract: this middleware does NOT log errors. System errors (plain
+// errors.New / fmt.Errorf) are hidden from the client response; to preserve the
+// full error chain for debugging, log the error in the handler before calling
+// c.Error(), or register a separate logging middleware that reads c.Errors:
+//
+//	// Option A: log in the handler
+//	if err := svc.Create(req); err != nil {
+//	    logger.Error("create failed", "error", err)
+//	    _ = c.Error(err)
+//	    return
+//	}
+//
+//	// Option B: separate logging middleware (registered before DefaultErrorHandler)
+//	func LogErrors(logger *slog.Logger) gin.HandlerFunc {
+//	    return func(c *gin.Context) {
+//	        c.Next()
+//	        for _, e := range c.Errors {
+//	            logger.Error("request error", "error", e.Err)
+//	        }
+//	    }
+//	}
 //
 // Note: when the error is (or wraps) a *validateruntime.ValidationError, the
 // response Msg is taken from the ValidationError itself, not from any outer wrapper.

@@ -17,6 +17,12 @@ import (
 	"github.com/pinealctx/gcode/internal/transform"
 )
 
+// modulePath is the Go module path of gcode itself. It is used to generate
+// import paths for the runtime packages (runtime, validateruntime, httpruntime)
+// in generated files. This is intentionally hardcoded: the runtime packages
+// are part of the gcode module and their import paths are stable public API.
+// If the module path ever changes (e.g. major version bump), generated files
+// must be regenerated.
 const modulePath = "github.com/pinealctx/gcode"
 
 // Run is the process entry used by the CLI main package.
@@ -59,14 +65,8 @@ func Run(ctx context.Context, args []string) error {
 
 	// Check for output filename collisions before writing anything.
 	// .pb.dao.go, .pb.rpc.go, and .pb.http.go names are checked to catch same-basename proto files.
-	seen := make(map[string]string, len(files)*3)
-	for _, f := range files {
-		for _, name := range []string{outputFileName(f.Path), rpcOutputFileName(f.Path), httpOutputFileName(f.Path)} {
-			if prev, ok := seen[name]; ok {
-				return errorx.NewSentinelf[appTag]("output filename collision: %q and %q both produce %q", prev, f.Path, name)
-			}
-			seen[name] = f.Path
-		}
+	if err := checkOutputCollisions(files, outputFileName, rpcOutputFileName, httpOutputFileName); err != nil {
+		return err
 	}
 
 	// Flatten all files and build global message and enum indexes for cross-file lookups.
@@ -185,4 +185,20 @@ func httpOutputFileName(protoPath string) string {
 	base := filepath.Base(protoPath)
 	name := strings.TrimSuffix(base, ".proto")
 	return name + ".pb.http.go"
+}
+
+// checkOutputCollisions checks that no two proto files produce the same output filename.
+// nameFuncs is a list of functions that derive output filenames from a proto file path.
+func checkOutputCollisions(files []model.File, nameFuncs ...func(string) string) error {
+	seen := make(map[string]string, len(files)*len(nameFuncs))
+	for _, f := range files {
+		for _, fn := range nameFuncs {
+			name := fn(f.Path)
+			if prev, ok := seen[name]; ok {
+				return errorx.NewSentinelf[appTag]("output filename collision: %q and %q both produce %q", prev, f.Path, name)
+			}
+			seen[name] = f.Path
+		}
+	}
+	return nil
 }

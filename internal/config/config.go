@@ -14,14 +14,14 @@ type GenProtoConfig struct {
 func ParseGenProto(args []string) (GenProtoConfig, error) {
 	var cfg GenProtoConfig
 
-	fs := flag.NewFlagSet("gcode gen-proto", flag.ContinueOnError)
-	fs.StringVar(&cfg.InputDir, "in", "", "input proto directory (generated files are written to the same directory)")
+	fset := flag.NewFlagSet("gcode gen-proto", flag.ContinueOnError)
+	fset.StringVar(&cfg.InputDir, "in", "", "input proto directory (generated files are written to the same directory)")
 
-	if err := fs.Parse(args); err != nil {
+	if err := fset.Parse(args); err != nil {
 		return GenProtoConfig{}, fmt.Errorf("parse gen-proto flags: %w", err)
 	}
 
-	if remainingArgs := fs.Args(); len(remainingArgs) > 0 {
+	if remainingArgs := fset.Args(); len(remainingArgs) > 0 {
 		return GenProtoConfig{}, fmt.Errorf("parse gen-proto flags: unexpected positional arguments %q", remainingArgs)
 	}
 
@@ -40,6 +40,8 @@ func (c GenProtoConfig) Validate() error {
 	return nil
 }
 
+// Config holds the parsed and validated CLI configuration for the main gcode command
+// (gen-dao subcommand). It is populated by Parse() and validated by Validate().
 type Config struct {
 	InputDir  string
 	OutputDir string
@@ -49,15 +51,15 @@ type Config struct {
 func Parse(args []string) (Config, error) {
 	var cfg Config
 
-	fs := flag.NewFlagSet("gcode", flag.ContinueOnError)
-	fs.StringVar(&cfg.InputDir, "in", "", "input proto directory")
-	fs.StringVar(&cfg.OutputDir, "out", "", "output directory")
+	fset := flag.NewFlagSet("gcode", flag.ContinueOnError)
+	fset.StringVar(&cfg.InputDir, "in", "", "input proto directory")
+	fset.StringVar(&cfg.OutputDir, "out", "", "output directory")
 
-	if err := fs.Parse(args); err != nil {
+	if err := fset.Parse(args); err != nil {
 		return Config{}, fmt.Errorf("parse cli flags: %w", err)
 	}
 
-	if remainingArgs := fs.Args(); len(remainingArgs) > 0 {
+	if remainingArgs := fset.Args(); len(remainingArgs) > 0 {
 		return Config{}, fmt.Errorf("parse cli flags: unexpected positional arguments %q", remainingArgs)
 	}
 

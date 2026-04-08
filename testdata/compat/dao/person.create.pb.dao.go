@@ -174,6 +174,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			tmp := string(payload)
@@ -191,6 +194,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 2: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
 			}
 			tmp := int32(v)
@@ -208,6 +214,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 3: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 3: %w", runtime.ErrTruncated)
 			}
 			tmp := v != 0
@@ -262,6 +271,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 6: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 6: %w", runtime.ErrTruncated)
 			}
 			p.Nickname = string(payload)
@@ -278,6 +290,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 7: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 7: %w", runtime.ErrTruncated)
 			}
 			tmp := int32(v)
@@ -295,6 +310,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 8: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 8: %w", runtime.ErrTruncated)
 			}
 			tmp := v != 0
@@ -329,6 +347,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 10: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 10: %w", runtime.ErrTruncated)
 			}
 			tmp := int64(v)
@@ -366,6 +387,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 12: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 12: %w", runtime.ErrTruncated)
 			}
 			tmp := string(payload)
@@ -383,6 +407,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 13: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 13: %w", runtime.ErrTruncated)
 			}
 			tmp := string(payload)
@@ -400,6 +427,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 14: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 14: %w", runtime.ErrTruncated)
 			}
 			tmp := int32(v)
@@ -408,7 +438,10 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}

@@ -195,6 +195,10 @@ func flattenMessages(msgs []model.Message, pkgName string, outMsgs *[]GoMessage,
 // derived update message — gen-proto generates condition_fields as non-optional
 // and all other fields as optional, so this is the authoritative way to identify them.
 // Returns nil for non-update messages (UpdateSource == "").
+//
+// If a user hand-writes an update message, they must follow this convention:
+// condition fields (WHERE clause) must be non-optional, other fields must be optional.
+// Violating this convention will cause condition fields to appear in ToMap() output.
 func conditionFieldsFor(msg model.Message) []string {
 	if msg.UpdateSource == "" {
 		return nil
