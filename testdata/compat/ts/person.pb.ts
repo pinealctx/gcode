@@ -47,7 +47,7 @@ export const PersonRules = {
   status: { required: false, type: "enum", definedOnly: true },
   address: { required: true, type: "object" },
   scores: { required: false, type: "array", minItems: 1, maxItems: 100 },
-  tags: { required: false, type: "array", minItems: 1, items: { minLength: 1 } },
+  tags: { required: false, type: "array", minItems: 1, items: { type: "string", minLength: 1 } },
   avatar: { required: true, type: "string", minLength: 1 },
   nickname: { required: false, type: "string", minLength: 1, maxLength: 10 },
   email: { required: false, type: "string", format: "email" },
