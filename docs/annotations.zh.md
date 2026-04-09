@@ -162,7 +162,34 @@ db.Model(&dao.Person{}).Where("name = ?", req.Name).Updates(req.ToMap())
 >
 > 例如，若 `created_at` 字段配置了 `gorm.column = "created_ts"`，则 `ToMap()` 中该字段的 key 为 `"created_ts"` 而非 `"created_at"`。
 
-#### validate 继承行为 {#validate-继承行为}
+#### 条件字段约定
+
+`condition_fields` 在代码生成时通过以下规则识别：**派生 message 中非 optional 且非 repeated 的字段被视为条件字段**。这是一个隐式约定，不是显式的 proto 注解。
+
+如果你手动编写 `*.update.proto`（而非使用 `gcode gen-proto` 生成），必须遵守这个约定：条件字段必须是非 optional（非指针）且非 repeated 的。optional 或 repeated 字段会被视为更新字段并写入 `ToMap()`，这通常不是预期行为。
+
+> **建议**：始终使用 `gcode gen-proto` 生成 `*.update.proto` 文件，不要手动编写。
+
+#### 跨包枚举限制
+
+`gcode gen-proto` 不支持派生 proto 文件中的跨包枚举引用。如果字段的枚举类型定义在另一个 proto 文件（不同包）中，生成的 `*.update.proto` 或 `*.create.proto` 会缺少必要的 `import` 语句，导致编译失败。
+
+**解决方案**：将枚举定义在与使用它的 message 相同的 proto 文件中，或同一包内的 proto 文件中。
+
+```proto
+// ✅ 可以：枚举和 message 在同一文件
+enum Status { ... }
+message User {
+  Status status = 1;
+  option (gcode.update_message) = { name: "UserUpdate" ... };
+}
+
+// ❌ 不支持：枚举定义在另一个包
+// import "other_package/types.proto";
+// message User {
+//   other_package.Status status = 1;  // gen-proto 无法解析此 import
+// }
+```
 
 update 派生 message 的 `Validate()` 自动继承源 message 的 validate 规则，但行为有以下差异：
 

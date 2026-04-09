@@ -46,6 +46,8 @@ go get github.com/pinealctx/gcode/httpruntime
 
 If you only generate structs and serialization code (no validate or HTTP), only `runtime` is needed.
 
+> **Runtime import path is fixed**: Generated code always imports `github.com/pinealctx/gcode/runtime`, `github.com/pinealctx/gcode/validateruntime`, and `github.com/pinealctx/gcode/httpruntime`. These paths are hardcoded in the generator and cannot be customized. If you fork or rename the module, you will need to update the generated import paths accordingly — this is a major-version-level change.
+
 ---
 
 ## Minimal Example

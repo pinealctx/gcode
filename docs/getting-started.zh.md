@@ -46,6 +46,8 @@ go get github.com/pinealctx/gcode/httpruntime
 
 如果只生成 struct 和序列化代码（不使用 validate 和 HTTP），只需安装 `runtime`。
 
+> **运行时 import 路径固定**：生成的代码始终 import `github.com/pinealctx/gcode/runtime`、`github.com/pinealctx/gcode/validateruntime` 和 `github.com/pinealctx/gcode/httpruntime`，这些路径在生成器中硬编码，无法自定义。如果你 fork 或重命名了模块，需要同步修改生成代码中的 import 路径——这属于大版本升级级别的变更。
+
 ---
 
 ## 快速开始

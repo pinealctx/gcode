@@ -308,3 +308,24 @@ Two-layer error code mechanism:
 - No runtime serialization — frontend consumes data via JSON fetch, which is the dominant pattern
 - Validation metadata can drive form validation, UI constraints, or be converted to zod/yup schemas
 - `gen-ts` is a separate subcommand, cleanly decoupled from Go generation
+
+---
+
+## D16: Runtime import paths are hardcoded
+
+**Problem**: Should the import paths for `runtime`, `validateruntime`, and `httpruntime` be configurable?
+
+**Constraints**:
+- Generated code must import the runtime packages to compile
+- Making import paths configurable adds CLI flags, configuration complexity, and documentation burden
+- The module path `github.com/pinealctx/gcode` is stable; changing it is a major-version-level event
+
+**Decision**: Hardcode the runtime import paths in the generator. Generated code always imports:
+- `github.com/pinealctx/gcode/runtime`
+- `github.com/pinealctx/gcode/validateruntime`
+- `github.com/pinealctx/gcode/httpruntime`
+
+**Consequences**:
+- No configuration needed for the common case
+- If the module is forked or renamed, the generated import paths must be updated manually — this is intentional: a module rename is a breaking change and warrants explicit action
+- Customizable import paths are deferred to a future major version if the need arises

@@ -308,3 +308,24 @@
 - 无运行时序列化——前端通过 JSON fetch 消费数据（这是主流模式）
 - 验证元数据可驱动表单校验、UI 约束，或转换为 zod/yup schema
 - `gen-ts` 作为独立子命令，与 Go 生成完全解耦
+
+---
+
+## D16：运行时 import 路径硬编码
+
+**问题**：`runtime`、`validateruntime`、`httpruntime` 的 import 路径是否应该可配置？
+
+**约束**：
+- 生成的代码必须 import 运行时包才能编译
+- 让 import 路径可配置会增加 CLI 参数、配置复杂度和文档负担
+- 模块路径 `github.com/pinealctx/gcode` 是稳定的；修改它属于大版本级别的变更
+
+**决策**：在生成器中硬编码运行时 import 路径。生成的代码始终 import：
+- `github.com/pinealctx/gcode/runtime`
+- `github.com/pinealctx/gcode/validateruntime`
+- `github.com/pinealctx/gcode/httpruntime`
+
+**影响**：
+- 常见场景无需任何配置
+- 如果模块被 fork 或重命名，必须手动更新生成代码中的 import 路径——这是有意为之：模块重命名是破坏性变更，应该有明确的操作
+- 可配置 import 路径的需求推迟到未来大版本中处理
