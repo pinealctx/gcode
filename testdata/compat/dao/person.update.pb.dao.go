@@ -154,7 +154,11 @@ func (p *PersonUpdateByName) MarshalAppend(b []byte) ([]byte, error) {
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (p *PersonUpdateByName) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (p *PersonUpdateByName) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -478,14 +482,14 @@ func (p *PersonUpdateByName) unmarshalFrom(b []byte, lenient bool) (int, error) 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (p *PersonUpdateByName) UnmarshalBinary(data []byte) error {
-	_, err := p.unmarshalFrom(data, false)
+	_, err := p.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (p *PersonUpdateByName) UnmarshalBinaryLenient(data []byte) error {
-	_, err := p.unmarshalFrom(data, true)
+	_, err := p.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 

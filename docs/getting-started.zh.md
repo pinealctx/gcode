@@ -502,6 +502,23 @@ curl http://localhost:8080/persons/some-id
 # → {"code": 0, "data": {"name": "Alice", "age": 30}}
 ```
 
+#### 请求体大小限制
+
+生成的 handler 使用 `c.ShouldBindJSON` 解码请求体。gin 默认不限制请求体大小。生产环境中应通过 middleware 设置上限，防止超大请求体：
+
+```go
+import "net/http"
+
+func MaxBodyBytes(n int64) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, n)
+        c.Next()
+    }
+}
+
+r.Use(MaxBodyBytes(1 << 20)) // 1 MiB
+```
+
 #### 给请求配置超时
 
 生成的 handler 将 `c.Request.Context()` 传递给 service 层。gin 默认不为请求注入 deadline，如需超时控制，通过 middleware 注入：

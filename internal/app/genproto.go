@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/pinealctx/gcode/internal/config"
@@ -162,10 +163,11 @@ func buildCreateProto(f model.File, relPath string, msgs []model.Message) (strin
 
 // buildUpdateMessage generates a single update message block.
 func buildUpdateMessage(msg model.Message, opt model.UpdateMessageOptions) (string, error) {
-	// parser does not validate that Name is non-empty; guard here to avoid
-	// generating invalid proto syntax ("message  {").
 	if opt.Name == "" {
 		return "", fmt.Errorf("update_message annotation on %q: name must not be empty", msg.FullName)
+	}
+	if !isProtoIdentifier(opt.Name) {
+		return "", fmt.Errorf("update_message annotation on %q: name %q is not a valid proto identifier", msg.FullName, opt.Name)
 	}
 	ignoreSet := stringSet(opt.IgnoreFields)
 	conditionSet := stringSet(opt.ConditionFields)
@@ -192,10 +194,11 @@ func buildUpdateMessage(msg model.Message, opt model.UpdateMessageOptions) (stri
 
 // buildCreateMessage generates a single create message block.
 func buildCreateMessage(msg model.Message, opt model.CreateMessageOptions) (string, error) {
-	// parser does not validate that Name is non-empty; guard here to avoid
-	// generating invalid proto syntax ("message  {").
 	if opt.Name == "" {
 		return "", fmt.Errorf("create_message annotation on %q: name must not be empty", msg.FullName)
+	}
+	if !isProtoIdentifier(opt.Name) {
+		return "", fmt.Errorf("create_message annotation on %q: name %q is not a valid proto identifier", msg.FullName, opt.Name)
 	}
 	ignoreSet := stringSet(opt.IgnoreFields)
 	requiredSet := stringSet(opt.RequiredFields)
@@ -290,4 +293,15 @@ func stringSet(ss []string) map[string]bool {
 func protoBaseName(relPath string) string {
 	base := filepath.Base(relPath)
 	return strings.TrimSuffix(base, ".proto")
+}
+
+// protoIdentifierRe matches a valid proto identifier: a letter or underscore
+// followed by zero or more letters, digits, or underscores.
+var protoIdentifierRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// isProtoIdentifier reports whether s is a valid proto identifier.
+// Used to validate annotation-supplied message names before writing them
+// into generated proto source.
+func isProtoIdentifier(s string) bool {
+	return protoIdentifierRe.MatchString(s)
 }

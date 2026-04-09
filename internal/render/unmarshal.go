@@ -26,7 +26,7 @@ func writeUnmarshalBinary(b *strings.Builder, msg transform.GoMessage) {
 	fmt.Fprintf(b, "// UnmarshalBinary implements encoding.BinaryUnmarshaler.\n")
 	fmt.Fprintf(b, "// Duplicate non-repeated fields return an error.\n")
 	fmt.Fprintf(b, "func (%s *%s) UnmarshalBinary(data []byte) error {\n", recv, msg.GoName)
-	fmt.Fprintf(b, "\t_, err := %s.unmarshalFrom(data, false)\n", recv)
+	fmt.Fprintf(b, "\t_, err := %s.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)\n", recv)
 	fmt.Fprintf(b, "\treturn err\n}\n\n")
 }
 
@@ -36,7 +36,7 @@ func writeUnmarshalBinaryLenient(b *strings.Builder, msg transform.GoMessage) {
 	fmt.Fprintf(b, "// UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows\n")
 	fmt.Fprintf(b, "// duplicate non-repeated fields, keeping the last value.\n")
 	fmt.Fprintf(b, "func (%s *%s) UnmarshalBinaryLenient(data []byte) error {\n", recv, msg.GoName)
-	fmt.Fprintf(b, "\t_, err := %s.unmarshalFrom(data, true)\n", recv)
+	fmt.Fprintf(b, "\t_, err := %s.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)\n", recv)
 	fmt.Fprintf(b, "\treturn err\n}\n\n")
 }
 
@@ -49,7 +49,9 @@ func writeUnmarshalCore(b *strings.Builder, msg transform.GoMessage) error {
 	fmt.Fprintf(b, "// unmarshalFrom decodes a protobuf wire-format message from b.\n")
 	fmt.Fprintf(b, "// Returns the number of bytes consumed.\n")
 	fmt.Fprintf(b, "// If lenient is true, duplicate non-repeated fields use last-one-wins.\n")
-	fmt.Fprintf(b, "func (%s *%s) unmarshalFrom(b []byte, lenient bool) (int, error) {\n", recv, msg.GoName)
+	fmt.Fprintf(b, "// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.\n")
+	fmt.Fprintf(b, "func (%s *%s) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {\n", recv, msg.GoName)
+	fmt.Fprintf(b, "\tif depth <= 0 { return 0, runtime.ErrNestingDepth }\n")
 
 	// Track seen non-repeated fields for duplicate detection.
 	// We use a [2]uint64 bitmask (128 bits) and assign each non-repeated field
@@ -162,7 +164,7 @@ func writeUnmarshalSingularField(b *strings.Builder, accessor string, f transfor
 		// GoType is "*TypeName" — strip the leading "*" for new().
 		goTypeName := strings.TrimPrefix(f.GoType, "*")
 		fmt.Fprintf(b, "\t\t\tif %s == nil { %s = new(%s) }\n", accessor, accessor, goTypeName)
-		fmt.Fprintf(b, "\t\t\tif _, err := %s.unmarshalFrom(payload, lenient); err != nil {\n", accessor)
+		fmt.Fprintf(b, "\t\t\tif _, err := %s.unmarshalFrom(payload, lenient, depth-1); err != nil {\n", accessor)
 		fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", err)\n", f.Number)
 		fmt.Fprintf(b, "\t\t\t}\n")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
@@ -439,7 +441,7 @@ func writeUnmarshalRepeatedMessage(b *strings.Builder, accessor string, f transf
 	// GoType is "[]*TypeName" — strip "[]" and "*" to get the base type name.
 	goTypeName := strings.TrimPrefix(strings.TrimPrefix(f.GoType, "[]"), "*")
 	fmt.Fprintf(b, "\t\t\telem := new(%s)\n", goTypeName)
-	fmt.Fprintf(b, "\t\t\tif _, err := elem.unmarshalFrom(payload, lenient); err != nil {\n")
+	fmt.Fprintf(b, "\t\t\tif _, err := elem.unmarshalFrom(payload, lenient, depth-1); err != nil {\n")
 	fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", err)\n", f.Number)
 	fmt.Fprintf(b, "\t\t\t}\n")
 	fmt.Fprintf(b, "\t\t\t%s = append(%s, elem)\n", accessor, accessor)

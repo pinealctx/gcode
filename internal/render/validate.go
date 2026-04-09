@@ -618,12 +618,6 @@ func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, i
 		fmt.Fprintf(b, "if v > %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %g\")}\n}\n",
 			*items.LTEFloat, elemField, vm, *items.LTEFloat)
 	}
-	// required for string/bytes items
-	if items.Required {
-		// string required: v == ""
-		fmt.Fprintf(b, "if v == \"\" {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"required\", Message: validateruntime.MsgOr(%q, \"is required\")}\n}\n",
-			elemField, vm)
-	}
 	b.WriteString("}\n")
 }
 

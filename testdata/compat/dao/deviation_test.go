@@ -148,3 +148,85 @@ func TestDuplicateAddressLenientLastWins(t *testing.T) {
 		t.Errorf("last-one-wins: got %q, want %q", p.Address.Street, "Second St")
 	}
 }
+
+// buildNestedTreeNodeWire constructs wire bytes for a TreeNode whose child field
+// (field 2) is itself a TreeNode, nested n levels deep.
+// Each layer wraps the previous payload as field 2 (WireBytes).
+func buildNestedTreeNodeWire(n int) []byte {
+	payload := []byte{} // empty innermost TreeNode
+	for i := 0; i < n; i++ {
+		var layer []byte
+		layer = runtime.AppendTag(layer, 2, runtime.WireBytes)
+		layer = runtime.AppendVarint(layer, uint64(len(payload)))
+		layer = append(layer, payload...)
+		payload = layer
+	}
+	return payload
+}
+
+// TestNestingDepthExceeded verifies that UnmarshalBinary returns ErrNestingDepth
+// when message nesting exceeds runtime.DefaultRecursionLimit (100).
+// Depth semantics: UnmarshalBinary starts at depth=DefaultRecursionLimit; each
+// nested call receives depth-1. The check is depth<=0, so:
+//   - n = DefaultRecursionLimit     → innermost call receives depth=0 → rejected (exact boundary)
+//   - n = DefaultRecursionLimit + 1 → innermost call receives depth=-1 → rejected (one past boundary)
+func TestNestingDepthExceeded(t *testing.T) {
+	t.Parallel()
+
+	t.Run("exact_boundary", func(t *testing.T) {
+		t.Parallel()
+		wire := buildNestedTreeNodeWire(runtime.DefaultRecursionLimit)
+		var node dao.TreeNode
+		err := node.UnmarshalBinary(wire)
+		if err == nil {
+			t.Fatal("expected ErrNestingDepth at exact limit, got nil")
+		}
+		if !errors.Is(err, runtime.ErrNestingDepth) {
+			t.Errorf("expected ErrNestingDepth at exact limit, got: %v", err)
+		}
+	})
+
+	t.Run("one_past_boundary", func(t *testing.T) {
+		t.Parallel()
+		wire := buildNestedTreeNodeWire(runtime.DefaultRecursionLimit + 1)
+		var node dao.TreeNode
+		err := node.UnmarshalBinary(wire)
+		if err == nil {
+			t.Fatal("expected ErrNestingDepth one past limit, got nil")
+		}
+		if !errors.Is(err, runtime.ErrNestingDepth) {
+			t.Errorf("expected ErrNestingDepth one past limit, got: %v", err)
+		}
+	})
+}
+
+// TestNestingDepthAtLimit verifies that nesting one level below the limit is accepted.
+// With DefaultRecursionLimit=100, the outermost UnmarshalBinary starts at depth=100.
+// Each nested call decrements depth by 1, so depth=1 at the 99th nested level (still > 0).
+// The 100th nested call would receive depth=0 and be rejected, so 99 is the maximum
+// accepted nesting depth.
+func TestNestingDepthAtLimit(t *testing.T) {
+	t.Parallel()
+
+	wire := buildNestedTreeNodeWire(runtime.DefaultRecursionLimit - 1)
+	var node dao.TreeNode
+	if err := node.UnmarshalBinary(wire); err != nil {
+		t.Errorf("expected success at DefaultRecursionLimit-1 nesting, got: %v", err)
+	}
+}
+
+// TestNestingDepthExceededLenient verifies that lenient mode also enforces the
+// nesting depth limit (depth checking is independent of duplicate-field leniency).
+func TestNestingDepthExceededLenient(t *testing.T) {
+	t.Parallel()
+
+	wire := buildNestedTreeNodeWire(runtime.DefaultRecursionLimit)
+	var node dao.TreeNode
+	err := node.UnmarshalBinaryLenient(wire)
+	if err == nil {
+		t.Fatal("expected ErrNestingDepth in lenient mode, got nil")
+	}
+	if !errors.Is(err, runtime.ErrNestingDepth) {
+		t.Errorf("expected ErrNestingDepth in lenient mode, got: %v", err)
+	}
+}

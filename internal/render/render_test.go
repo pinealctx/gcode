@@ -386,7 +386,7 @@ func TestFileUnmarshalMethods(t *testing.T) {
 	src := string(got)
 
 	containsAll(t, src, map[string]string{
-		"unmarshalFrom":          "func (p *Person) unmarshalFrom(b []byte, lenient bool) (int, error)",
+		"unmarshalFrom":          "func (p *Person) unmarshalFrom(b []byte, lenient bool, depth int) (int, error)",
 		"UnmarshalBinary":        "func (p *Person) UnmarshalBinary(data []byte) error",
 		"UnmarshalBinaryLenient": "func (p *Person) UnmarshalBinaryLenient(data []byte) error",
 		"ConsumeTag":             "runtime.ConsumeTag",

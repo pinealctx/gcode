@@ -92,3 +92,9 @@ message AllValidate {
     (buf.validate.field).repeated.items.int32.gte = 0
   ];
 }
+
+// TreeNode is a self-referencing message used to test recursion depth limits.
+message TreeNode {
+  string value = 1;
+  TreeNode child = 2;
+}

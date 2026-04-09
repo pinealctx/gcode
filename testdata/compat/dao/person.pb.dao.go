@@ -255,7 +255,11 @@ func (p *Person) MarshalAppend(b []byte) ([]byte, error) {
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (a *Address) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (a *Address) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -324,21 +328,25 @@ func (a *Address) unmarshalFrom(b []byte, lenient bool) (int, error) {
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (a *Address) UnmarshalBinary(data []byte) error {
-	_, err := a.unmarshalFrom(data, false)
+	_, err := a.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (a *Address) UnmarshalBinaryLenient(data []byte) error {
-	_, err := a.unmarshalFrom(data, true)
+	_, err := a.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (p *Person) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (p *Person) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -448,7 +456,7 @@ func (p *Person) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			if p.Address == nil {
 				p.Address = new(Address)
 			}
-			if _, err := p.Address.unmarshalFrom(payload, lenient); err != nil {
+			if _, err := p.Address.unmarshalFrom(payload, lenient, depth-1); err != nil {
 				return 0, fmt.Errorf("field 5: %w", err)
 			}
 			off += n
@@ -756,17 +764,19 @@ func (p *Person) unmarshalFrom(b []byte, lenient bool) (int, error) {
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (p *Person) UnmarshalBinary(data []byte) error {
-	_, err := p.unmarshalFrom(data, false)
+	_, err := p.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (p *Person) UnmarshalBinaryLenient(data []byte) error {
-	_, err := p.unmarshalFrom(data, true)
+	_, err := p.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
+// Status represents the lifecycle state of a person record.
+// See also: https://example.com/docs/status */ for details.
 type Status int32
 
 const (

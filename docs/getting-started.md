@@ -501,6 +501,23 @@ curl http://localhost:8080/persons/some-id
 # → {"code": 0, "data": {"name": "Alice", "age": 30}}
 ```
 
+#### Request body size limit
+
+Generated handlers use `c.ShouldBindJSON` to decode the request body. gin does not impose a default body size limit. For production deployments, set a limit via middleware to prevent oversized payloads:
+
+```go
+import "net/http"
+
+func MaxBodyBytes(n int64) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, n)
+        c.Next()
+    }
+}
+
+r.Use(MaxBodyBytes(1 << 20)) // 1 MiB
+```
+
 #### Configuring request timeouts
 
 Generated handlers pass `c.Request.Context()` to the service layer. gin does not inject a deadline by default. To add a timeout, inject it via middleware:

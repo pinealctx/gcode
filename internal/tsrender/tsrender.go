@@ -105,7 +105,7 @@ func writeHeader(b *strings.Builder, source string) {
 // use the .js extension for maximum moduleResolution compatibility.
 func writeImports(b *strings.Builder, gf transform.GoFile, protoPkg string, registry TypeRegistry) {
 	// Collect GoNames of types defined in this file.
-	localTypes := make(map[string]bool)
+	localTypes := make(map[string]bool, len(gf.Enums)+len(gf.Messages))
 	for _, enum := range gf.Enums {
 		localTypes[enum.GoName] = true
 	}
@@ -160,19 +160,28 @@ func writeImports(b *strings.Builder, gf transform.GoFile, protoPkg string, regi
 	b.WriteString("\n")
 }
 
+// sanitizeTSComment replaces "*/" with "* /" to prevent premature JSDoc block
+// termination. Proto comment content is developer-controlled, but a literal
+// "*/" would break the generated /** ... */ block and produce invalid TS.
+func sanitizeTSComment(s string) string {
+	return strings.ReplaceAll(s, "*/", "* /")
+}
+
 // writeTSComment writes a JSDoc-style comment block. Single-line comments
 // use the `/** ... */` form; multi-line comments use the indented form.
+// "*/" sequences in comment text are escaped to "* /" to prevent premature
+// block termination.
 func writeTSComment(b *strings.Builder, comment model.Comment) {
 	if len(comment.Lines) == 0 {
 		return
 	}
 	if len(comment.Lines) == 1 {
-		fmt.Fprintf(b, "/** %s */\n", comment.Lines[0])
+		fmt.Fprintf(b, "/** %s */\n", sanitizeTSComment(comment.Lines[0]))
 		return
 	}
 	b.WriteString("/**\n")
 	for _, line := range comment.Lines {
-		fmt.Fprintf(b, " * %s\n", line)
+		fmt.Fprintf(b, " * %s\n", sanitizeTSComment(line))
 	}
 	b.WriteString(" */\n")
 }

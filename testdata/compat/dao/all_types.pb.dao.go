@@ -55,6 +55,12 @@ type AllValidate struct {
 	RItems  []int32 `json:"rItems"`
 }
 
+// TreeNode is a self-referencing message used to test recursion depth limits.
+type TreeNode struct {
+	Value string    `json:"value"`
+	Child *TreeNode `json:"child"`
+}
+
 // Size returns the protobuf wire size of AllScalars.
 func (a *AllScalars) Size() int {
 	if a == nil {
@@ -377,10 +383,53 @@ func (a *AllValidate) MarshalAppend(b []byte) ([]byte, error) {
 	return b, nil
 }
 
+// Size returns the protobuf wire size of TreeNode.
+func (t *TreeNode) Size() int {
+	if t == nil {
+		return 0
+	}
+	var n int
+	if len(t.Value) > 0 {
+		n += 1 + runtime.SizeString(t.Value)
+	}
+	if t.Child != nil {
+		s := t.Child.Size()
+		n += 1 + runtime.SizeVarint(uint64(s)) + s
+	}
+	return n
+}
+
+// MarshalBinary implements encoding.BinaryMarshaler.
+func (t *TreeNode) MarshalBinary() ([]byte, error) {
+	return t.MarshalAppend(make([]byte, 0, t.Size()))
+}
+
+// MarshalAppend appends the protobuf wire encoding of TreeNode to b.
+func (t *TreeNode) MarshalAppend(b []byte) ([]byte, error) {
+	if len(t.Value) > 0 {
+		b = runtime.AppendTag(b, 1, runtime.WireBytes)
+		b = runtime.AppendString(b, t.Value)
+	}
+	if t.Child != nil {
+		b = runtime.AppendTag(b, 2, runtime.WireBytes)
+		b = runtime.AppendVarint(b, uint64(t.Child.Size()))
+		var err error
+		b, err = t.Child.MarshalAppend(b)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return b, nil
+}
+
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (a *AllScalars) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -604,21 +653,25 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool) (int, error) {
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (a *AllScalars) UnmarshalBinary(data []byte) error {
-	_, err := a.unmarshalFrom(data, false)
+	_, err := a.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (a *AllScalars) UnmarshalBinaryLenient(data []byte) error {
-	_, err := a.unmarshalFrom(data, true)
+	_, err := a.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	off := 0
 	for off < len(b) {
 		fieldNum, wireType, n := runtime.ConsumeTag(b[off:])
@@ -719,7 +772,7 @@ func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool) (int, error) {
 				return 0, fmt.Errorf("field 5: %w", runtime.ErrTruncated)
 			}
 			elem := new(Address)
-			if _, err := elem.unmarshalFrom(payload, lenient); err != nil {
+			if _, err := elem.unmarshalFrom(payload, lenient, depth-1); err != nil {
 				return 0, fmt.Errorf("field 5: %w", err)
 			}
 			a.RMessage = append(a.RMessage, elem)
@@ -764,21 +817,25 @@ func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool) (int, error) {
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (a *AllRepeated) UnmarshalBinary(data []byte) error {
-	_, err := a.unmarshalFrom(data, false)
+	_, err := a.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (a *AllRepeated) UnmarshalBinaryLenient(data []byte) error {
-	_, err := a.unmarshalFrom(data, true)
+	_, err := a.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (a *AllValidate) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -1057,13 +1114,105 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (a *AllValidate) UnmarshalBinary(data []byte) error {
-	_, err := a.unmarshalFrom(data, false)
+	_, err := a.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (a *AllValidate) UnmarshalBinaryLenient(data []byte) error {
-	_, err := a.unmarshalFrom(data, true)
+	_, err := a.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+	return err
+}
+
+// unmarshalFrom decodes a protobuf wire-format message from b.
+// Returns the number of bytes consumed.
+// If lenient is true, duplicate non-repeated fields use last-one-wins.
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (t *TreeNode) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
+	var seen [2]uint64
+	off := 0
+	for off < len(b) {
+		fieldNum, wireType, n := runtime.ConsumeTag(b[off:])
+		if n < 0 {
+			if n == -2 {
+				return 0, fmt.Errorf("field tag: %w", runtime.ErrOverflow)
+			}
+			return 0, fmt.Errorf("field tag: %w", runtime.ErrTruncated)
+		}
+		off += n
+
+		switch fieldNum {
+		case 1:
+			if seen[0]&1 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 1
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 1: %w", runtime.ErrWireType)
+			}
+			payload, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
+			}
+			t.Value = string(payload)
+			off += n
+		case 2:
+			if seen[0]&2 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 2: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 2
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 2: %w", runtime.ErrWireType)
+			}
+			payload, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 2: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
+			}
+			if t.Child == nil {
+				t.Child = new(TreeNode)
+			}
+			if _, err := t.Child.unmarshalFrom(payload, lenient, depth-1); err != nil {
+				return 0, fmt.Errorf("field 2: %w", err)
+			}
+			off += n
+		default:
+			n = runtime.SkipField(b[off:], wireType)
+			if n < 0 {
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
+			}
+			off += n
+		}
+	}
+	return off, nil
+}
+
+// UnmarshalBinary implements encoding.BinaryUnmarshaler.
+// Duplicate non-repeated fields return an error.
+func (t *TreeNode) UnmarshalBinary(data []byte) error {
+	_, err := t.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+	return err
+}
+
+// UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
+// duplicate non-repeated fields, keeping the last value.
+func (t *TreeNode) UnmarshalBinaryLenient(data []byte) error {
+	_, err := t.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }

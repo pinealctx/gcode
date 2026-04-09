@@ -602,6 +602,9 @@ func TestErrorString(t *testing.T) {
 	if ErrUnknownWireType.Error() != "protobuf: unknown wire type" {
 		t.Errorf("ErrUnknownWireType.Error() = %q", ErrUnknownWireType.Error())
 	}
+	if ErrNestingDepth.Error() != "protobuf: message nesting depth exceeded" {
+		t.Errorf("ErrNestingDepth.Error() = %q", ErrNestingDepth.Error())
+	}
 }
 
 func TestSizeTag(t *testing.T) {

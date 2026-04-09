@@ -160,6 +160,9 @@ func ConsumeBytes(b []byte) ([]byte, int) {
 	if uint64(len(b)-n) < l {
 		return nil, -1
 	}
+	// Safe to convert l to int: the check above guarantees l <= len(b)-n,
+	// and len(b)-n fits in int by definition, so int(l) cannot overflow
+	// on any platform where this code can run.
 	return b[n : n+int(l)], n + int(l)
 }
 
@@ -181,6 +184,16 @@ var ErrDuplicateField = errorString("protobuf: duplicate non-repeated field")
 // ErrUnknownWireType is returned when SkipField encounters an unrecognized wire type.
 // Wire types 0-5 are defined by the protobuf spec; any other value is invalid.
 var ErrUnknownWireType = errorString("protobuf: unknown wire type")
+
+// ErrNestingDepth is returned when message nesting exceeds DefaultRecursionLimit.
+var ErrNestingDepth = errorString("protobuf: message nesting depth exceeded")
+
+// DefaultRecursionLimit is the maximum message nesting depth allowed during
+// unmarshal. Generated UnmarshalBinary / UnmarshalBinaryLenient start with
+// this budget and decrement it on each nested message call.
+// 100 is sufficient for any realistic business schema; deeply nested messages
+// indicate a design problem and are rejected early to prevent stack exhaustion.
+const DefaultRecursionLimit = 100
 
 // errorString is a simple error type to avoid importing errors package.
 type errorString string

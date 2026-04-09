@@ -65,6 +65,12 @@ func Scan(inputDir string) (ScanResult, error) {
 		if err != nil {
 			return fmt.Errorf("compute relative path for %q: %w", path, err)
 		}
+		// Reject paths containing newline or carriage return characters.
+		// Such names are valid on Linux but would break the generated "// source:"
+		// header comment by injecting arbitrary lines into the output file.
+		if strings.ContainsAny(rel, "\n\r") {
+			return fmt.Errorf("proto file path %q contains invalid characters (newline/carriage return)", rel)
+		}
 		// protocompile expects forward-slash paths.
 		files = append(files, filepath.ToSlash(rel))
 		return nil

@@ -107,3 +107,12 @@ func (a *AllValidate) Validate() error {
 	}
 	return nil
 }
+
+func (t *TreeNode) Validate() error {
+	if t.Child != nil {
+		if err := t.Child.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}

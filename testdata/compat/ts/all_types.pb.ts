@@ -45,6 +45,12 @@ export interface AllValidate {
   rItems: number[]
 }
 
+/** TreeNode is a self-referencing message used to test recursion depth limits. */
+export interface TreeNode {
+  value: string
+  child: TreeNode
+}
+
 export const AllValidateRules = {
   uGte: { required: false, type: "integer", minimum: 1 },
   uLte: { required: false, type: "integer", maximum: 1000 },

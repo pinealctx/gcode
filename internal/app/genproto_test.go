@@ -709,3 +709,64 @@ func TestBuildCreateMessage_EmptyName(t *testing.T) {
 		t.Errorf("error = %q, want to contain 'name must not be empty'", err.Error())
 	}
 }
+
+func TestIsProtoIdentifier(t *testing.T) {
+	t.Parallel()
+
+	valid := []string{
+		"Foo", "FooBar", "_Foo", "Foo123", "A", "_", "foo_bar",
+	}
+	for _, s := range valid {
+		if !isProtoIdentifier(s) {
+			t.Errorf("isProtoIdentifier(%q) = false, want true", s)
+		}
+	}
+
+	invalid := []string{
+		"", "123Foo", "foo-bar", "foo bar", "foo{bar}", "foo;bar",
+		"foo\nbar", "foo.bar", "foo/bar",
+	}
+	for _, s := range invalid {
+		if isProtoIdentifier(s) {
+			t.Errorf("isProtoIdentifier(%q) = true, want false", s)
+		}
+	}
+}
+
+// TestBuildUpdateMessage_InvalidName verifies that buildUpdateMessage returns
+// an error containing "not a valid proto identifier" for syntactically invalid names.
+func TestBuildUpdateMessage_InvalidName(t *testing.T) {
+	t.Parallel()
+
+	msg := model.Message{FullName: "pkg.Person", Fields: []model.Field{}}
+	for _, name := range []string{"123invalid", "has space", "foo{bar}", "foo;bar"} {
+		opt := model.UpdateMessageOptions{Name: name}
+		_, err := buildUpdateMessage(msg, opt)
+		if err == nil {
+			t.Errorf("buildUpdateMessage with name %q: expected error, got nil", name)
+			continue
+		}
+		if !strings.Contains(err.Error(), "not a valid proto identifier") {
+			t.Errorf("buildUpdateMessage with name %q: error = %q, want 'not a valid proto identifier'", name, err.Error())
+		}
+	}
+}
+
+// TestBuildCreateMessage_InvalidName verifies that buildCreateMessage returns
+// an error containing "not a valid proto identifier" for syntactically invalid names.
+func TestBuildCreateMessage_InvalidName(t *testing.T) {
+	t.Parallel()
+
+	msg := model.Message{FullName: "pkg.Person", Fields: []model.Field{}}
+	for _, name := range []string{"123invalid", "has space", "foo{bar}", "foo;bar"} {
+		opt := model.CreateMessageOptions{Name: name}
+		_, err := buildCreateMessage(msg, opt)
+		if err == nil {
+			t.Errorf("buildCreateMessage with name %q: expected error, got nil", name)
+			continue
+		}
+		if !strings.Contains(err.Error(), "not a valid proto identifier") {
+			t.Errorf("buildCreateMessage with name %q: error = %q, want 'not a valid proto identifier'", name, err.Error())
+		}
+	}
+}
