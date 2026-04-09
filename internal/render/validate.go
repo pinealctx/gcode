@@ -256,8 +256,8 @@ func writeStringValidation(b *strings.Builder, fieldExpr, fieldName, vm string, 
 			fieldExpr, *vo.MaxLen, fieldName, vm, *vo.MaxLen)
 	}
 	if vo.Pattern != "" {
-		fmt.Fprintf(b, "if !validateruntime.MatchPattern(%s, %q) {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"pattern\", Message: validateruntime.MsgOr(%q, \"must match pattern %s\")}\n}\n",
-			fieldExpr, vo.Pattern, fieldName, vm, vo.Pattern)
+		fmt.Fprintf(b, "if !validateruntime.MatchPattern(%s, %q) {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"pattern\", Message: validateruntime.MsgOr(%q, %q)}\n}\n",
+			fieldExpr, vo.Pattern, fieldName, vm, "must match pattern "+vo.Pattern)
 	}
 	if vo.Email {
 		fmt.Fprintf(b, "if !validateruntime.IsEmail(%s) {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"email\", Message: validateruntime.MsgOr(%q, \"must be a valid email address\")}\n}\n",
@@ -304,8 +304,8 @@ func writeStringSetCheck(b *strings.Builder, fieldExpr, fieldName, vm string, va
 		}
 		b.WriteString("} {\n")
 		fmt.Fprintf(b, "if %s == v {\nfound = true\nbreak\n}\n}\n", fieldExpr)
-		fmt.Fprintf(b, "if !found {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"in\", Message: validateruntime.MsgOr(%q, \"must be one of %s\")}\n}\n}\n",
-			fieldName, vm, display)
+		fmt.Fprintf(b, "if !found {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"in\", Message: validateruntime.MsgOr(%q, %q)}\n}\n}\n",
+			fieldName, vm, "must be one of "+display)
 	} else {
 		b.WriteString("for _, v := range []string{")
 		for i, s := range vals {
@@ -315,8 +315,8 @@ func writeStringSetCheck(b *strings.Builder, fieldExpr, fieldName, vm string, va
 			fmt.Fprintf(b, "%q", s)
 		}
 		b.WriteString("} {\n")
-		fmt.Fprintf(b, "if %s == v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"not_in\", Message: validateruntime.MsgOr(%q, \"must not be one of %s\")}\n}\n}\n",
-			fieldExpr, fieldName, vm, display)
+		fmt.Fprintf(b, "if %s == v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"not_in\", Message: validateruntime.MsgOr(%q, %q)}\n}\n}\n",
+			fieldExpr, fieldName, vm, "must not be one of "+display)
 	}
 }
 
@@ -556,8 +556,8 @@ func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, i
 			*items.MaxLen, elemField, vm, *items.MaxLen)
 	}
 	if items.Pattern != "" {
-		fmt.Fprintf(b, "if !validateruntime.MatchPattern(v, %q) {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"pattern\", Message: validateruntime.MsgOr(%q, \"must match pattern %s\")}\n}\n",
-			items.Pattern, elemField, vm, items.Pattern)
+		fmt.Fprintf(b, "if !validateruntime.MatchPattern(v, %q) {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"pattern\", Message: validateruntime.MsgOr(%q, %q)}\n}\n",
+			items.Pattern, elemField, vm, "must match pattern "+items.Pattern)
 	}
 	if items.Email {
 		fmt.Fprintf(b, "if !validateruntime.IsEmail(v) {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"email\", Message: validateruntime.MsgOr(%q, \"must be a valid email address\")}\n}\n",
