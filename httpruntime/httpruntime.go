@@ -4,11 +4,13 @@
 package httpruntime
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pinealctx/x/errorx"
+	"github.com/pinealctx/x/handlerx"
 
 	"github.com/pinealctx/gcode/validateruntime"
 )
@@ -92,6 +94,39 @@ func ErrResponse(err error) Response {
 		msg = err.Error()
 	}
 	return Response{Code: code, Error: &Error{Msg: msg}}
+}
+
+// NewHandler creates a gin.HandlerFunc that binds JSON, validates, and calls
+// the service method through a handlerx interceptor chain.
+// WithRecovery is always applied as the outermost interceptor.
+// Additional interceptors are applied inside recovery, before the service method.
+func NewHandler[Req any, Resp any](
+	method func(ctx context.Context, req *Req) (*Resp, error),
+	interceptors ...handlerx.Interceptor[*Req, *Resp],
+) gin.HandlerFunc {
+	all := make([]handlerx.Interceptor[*Req, *Resp], 0, 1+len(interceptors))
+	all = append(all, handlerx.WithRecovery[*Req, *Resp]())
+	all = append(all, interceptors...)
+	h := handlerx.Chain(handlerx.Handler[*Req, *Resp](method), all...)
+	return func(c *gin.Context) {
+		var req Req
+		if err := c.ShouldBindJSON(&req); err != nil {
+			_ = c.Error(err)
+			return
+		}
+		if v, ok := any(&req).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				_ = c.Error(err)
+				return
+			}
+		}
+		resp, err := h(c.Request.Context(), &req)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+		c.JSON(http.StatusOK, OKResponse(resp))
+	}
 }
 
 // DefaultErrorHandler returns a gin middleware that writes a JSON error response

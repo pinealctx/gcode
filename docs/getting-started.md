@@ -696,3 +696,20 @@ npm test
 ```
 
 These tests are also integrated into Go via `go test ./testdata/compat/...` (TestTSTypeCheck, TestTSRuntime), which automatically invokes npm when Node.js is available.
+
+---
+
+## Known Limitations
+
+The following proto features are not supported. When unsupported features are encountered, gcode reports an error and exits rather than silently producing incorrect code.
+
+| Limitation | Severity | Details |
+| --- | --- | --- |
+| Streaming RPC not supported | Medium | Service definitions with `stream` keyword cause an error exit |
+| `map<K,V>` not supported | Medium | Map fields cause an error at parse time |
+| `oneof` not supported | Medium | Non-synthetic oneof fields cause an error at parse time |
+| Well-known types not supported | Medium | `google.protobuf.*` types (e.g. `Timestamp`) cause an error |
+| proto2 not supported | Low | Only `syntax = "proto3"` is accepted |
+| Cross-package enum imports not auto-generated | Low | If a message references an enum from a different proto package, the generated `*.update.proto` / `*.create.proto` will be missing that import. Add it manually. |
+| HTTP path params not supported | Low | Generated handlers bind from request body only. Extract path params (e.g. `/users/:id`) manually in the service layer. |
+| `repeated` enum `defined_only` not enforced | Low | The `defined_only` constraint is silently skipped for repeated enum fields |

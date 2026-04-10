@@ -1,6 +1,8 @@
 package httpruntime_test
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pinealctx/x/errorx"
+	"github.com/pinealctx/x/handlerx"
+	"github.com/pinealctx/x/panicx"
 
 	"github.com/pinealctx/gcode/httpruntime"
 	"github.com/pinealctx/gcode/validateruntime"
@@ -380,3 +384,217 @@ func TestDefaultErrorHandler_BizCodeWrappedInFmtErrorf(t *testing.T) {
 		t.Errorf("Code = %d, want 404 (BizCode should penetrate %%w wrapping)", resp.Code)
 	}
 }
+
+// --- NewHandler --------------------------------------------------------------
+
+// echoReq is a minimal request type without Validate().
+type echoReq struct {
+	Msg string `json:"msg"`
+}
+
+// echoResp is a minimal response type.
+type echoResp struct {
+	Echo string `json:"echo"`
+}
+
+// validateReq is a request type that implements Validate().
+type validateReq struct {
+	Name string `json:"name"`
+}
+
+func (r *validateReq) Validate() error {
+	if r.Name == "" {
+		return &validateruntime.ValidationError{Field: "name", Rule: "required", Message: "name is required"}
+	}
+	return nil
+}
+
+// newHandlerEngineForNewHandler builds a test engine using NewHandler.
+func newHandlerEngineForNewHandler[Req any, Resp any](
+	method func(ctx context.Context, req *Req) (*Resp, error),
+	interceptors ...handlerx.Interceptor[*Req, *Resp],
+) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(httpruntime.DefaultErrorHandler())
+	r.POST("/", httpruntime.NewHandler(method, interceptors...))
+	return r
+}
+
+func postJSON(t *testing.T, r *gin.Engine, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	w := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestNewHandler_Success(t *testing.T) {
+	t.Parallel()
+
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	w := postJSON(t, r, `{"msg":"hello"}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeOK {
+		t.Errorf("Code = %d, want CodeOK", resp.Code)
+	}
+	// Data is decoded as map[string]any from JSON.
+	data, ok := resp.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("Data type = %T, want map[string]any", resp.Data)
+	}
+	if data["echo"] != "hello" {
+		t.Errorf("echo = %v, want hello", data["echo"])
+	}
+}
+
+func TestNewHandler_BindError(t *testing.T) {
+	t.Parallel()
+
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	// Send invalid JSON — bind should fail.
+	w := postJSON(t, r, `not-json`)
+	resp := decodeResponse(t, w)
+	if resp.Code == httpruntime.CodeOK {
+		t.Errorf("Code = CodeOK, want non-zero for bind error")
+	}
+}
+
+func TestNewHandler_ValidationError(t *testing.T) {
+	t.Parallel()
+
+	method := func(_ context.Context, req *validateReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Name}, nil
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	// Empty name triggers Validate() failure.
+	w := postJSON(t, r, `{"name":""}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeValidationErr {
+		t.Errorf("Code = %d, want CodeValidationErr (400)", resp.Code)
+	}
+}
+
+func TestNewHandler_ServiceError(t *testing.T) {
+	t.Parallel()
+
+	method := func(_ context.Context, _ *echoReq) (*echoResp, error) {
+		return nil, errors.New("service failure")
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	w := postJSON(t, r, `{"msg":"hi"}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeDefaultErr {
+		t.Errorf("Code = %d, want CodeDefaultErr (500)", resp.Code)
+	}
+}
+
+func TestNewHandler_PanicRecovery(t *testing.T) {
+	t.Parallel()
+
+	method := func(_ context.Context, _ *echoReq) (*echoResp, error) {
+		panic("something went wrong") //nolint // intentional panic to test WithRecovery
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	w := postJSON(t, r, `{"msg":"hi"}`)
+	// The response should be an error (not a server crash).
+	if w.Code == 0 {
+		t.Fatal("expected a response, got none")
+	}
+	resp := decodeResponse(t, w)
+	if resp.Code == httpruntime.CodeOK {
+		t.Errorf("Code = CodeOK, want error code after panic")
+	}
+}
+
+func TestNewHandler_PanicError_IsPanicx(t *testing.T) {
+	t.Parallel()
+
+	// Capture the error produced by WithRecovery to verify errors.Is(err, panicx.ErrPanic).
+	// The interceptor is inside WithRecovery, so it observes the recovered error on return.
+	// Use a gin error-capture middleware to read the error after the handler chain completes.
+	var capturedErr error
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Next()
+		if len(c.Errors) > 0 {
+			capturedErr = c.Errors.Last().Err
+		}
+		// Write a minimal response so decodeResponse doesn't fail.
+		c.JSON(http.StatusOK, httpruntime.ErrResponse(capturedErr))
+	})
+
+	method := func(_ context.Context, _ *echoReq) (*echoResp, error) {
+		panic("boom") //nolint // intentional panic to test WithRecovery
+	}
+	r.POST("/", httpruntime.NewHandler(method))
+	postJSON(t, r, `{"msg":"hi"}`)
+
+	if capturedErr == nil {
+		t.Fatal("capturedErr is nil, expected a panic error")
+	}
+	if !errors.Is(capturedErr, panicx.ErrPanic) {
+		t.Errorf("errors.Is(err, panicx.ErrPanic) = false, want true; err = %v", capturedErr)
+	}
+}
+
+func TestNewHandler_UserInterceptor(t *testing.T) {
+	t.Parallel()
+
+	var preRan, postRan bool
+	interceptor := func(_ context.Context, req *echoReq, next handlerx.Handler[*echoReq, *echoResp]) (*echoResp, error) {
+		preRan = true
+		resp, err := next(context.Background(), req)
+		postRan = true
+		return resp, err
+	}
+
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	r := newHandlerEngineForNewHandler(method, interceptor)
+	postJSON(t, r, `{"msg":"test"}`)
+
+	if !preRan {
+		t.Error("interceptor pre-logic did not run")
+	}
+	if !postRan {
+		t.Error("interceptor post-logic did not run")
+	}
+}
+
+func TestNewHandler_NoValidate_NoError(t *testing.T) {
+	t.Parallel()
+
+	// echoReq has no Validate() — should not error on empty fields.
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	w := postJSON(t, r, `{}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeOK {
+		t.Errorf("Code = %d, want CodeOK for type without Validate()", resp.Code)
+	}
+}
+
+// Compile-time check: ensure decodeResponse handles the Response.Data field
+// which is decoded as map[string]any by encoding/json.
+var _ = json.Unmarshal

@@ -697,3 +697,20 @@ npm test
 ```
 
 这些测试也通过 `go test ./testdata/compat/...`（TestTSTypeCheck、TestTSRuntime）集成到 Go 测试中，当本地有 Node.js 时自动调用 npm。
+
+---
+
+## 已知限制
+
+以下 proto 特性尚未支持。遇到不支持的特性时，gcode 会报错退出，不会静默生成错误代码。
+
+| 限制 | 严重程度 | 说明 |
+| --- | --- | --- |
+| 不支持 streaming RPC | 中 | service 定义中使用 `stream` 关键字会报错退出 |
+| 不支持 `map<K,V>` | 中 | map 字段在解析阶段报错 |
+| 不支持 `oneof` | 中 | 非合成的 oneof 字段在解析阶段报错 |
+| 不支持 well-known types | 中 | `google.protobuf.*` 类型（如 `Timestamp`）会报错 |
+| 不支持 proto2 | 低 | 仅接受 `syntax = "proto3"` |
+| 跨 package enum import 不会自动生成 | 低 | 当 message 引用其他 proto package 的 enum 时，生成的 `*.update.proto` / `*.create.proto` 会缺少该 import，需手动补充 |
+| HTTP path param 不支持 | 低 | 生成的 handler 仅从请求体绑定数据，路径参数（如 `/users/:id`）需在 service 层手动提取 |
+| `repeated` enum 的 `defined_only` 不生效 | 低 | repeated enum 字段的 `defined_only` 约束会被静默跳过 |

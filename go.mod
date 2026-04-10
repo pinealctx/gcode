@@ -1,13 +1,13 @@
 module github.com/pinealctx/gcode
 
-go 1.26
+go 1.26.2
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260209202127-80ab13bee0bf.1
 	buf.build/go/protovalidate v1.1.3
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/gin-gonic/gin v1.12.0
-	github.com/pinealctx/x v0.1.0
+	github.com/pinealctx/x v0.2.0
 	google.golang.org/protobuf v1.36.11
 )
 
