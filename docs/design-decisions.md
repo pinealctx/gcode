@@ -191,10 +191,10 @@ This document records the key architectural decisions for gcode, using ADR (Arch
 
 **Decision**: HTTP status always returns 200; business results are conveyed via the `code` field in the response body:
 - Success: `{"code": 0, "data": {...}}`
-- Error: `{"code": 500, "error": {"msg": "..."}}`
+- Error: `{"code": 5000, "error": {"msg": "..."}}`
 
 Two-layer error code mechanism:
-1. `CodedError` interface: business errors implement `Code() int`; `ErrResponse` extracts it automatically; defaults to 500 otherwise
+1. `CodedError` interface: business errors implement `Code() int`; `ErrResponse` extracts it automatically; defaults to CodeDefaultErr (5000) otherwise
 2. gin middleware: can completely replace the error response format for cross-cutting concerns
 
 **Consequences**:
@@ -244,19 +244,19 @@ Two-layer error code mechanism:
 **Problem**: Should generated HTTP handlers write error responses directly, or propagate errors through the gin context?
 
 **Constraints**:
-- When handlers write responses directly (`c.JSON`), middleware cannot intercept errors, making it impossible to handle ValidationError (400) and business errors (500) uniformly
+- When handlers write responses directly (`c.JSON`), middleware cannot intercept errors, making it impossible to handle ValidationError (CodeValidationErr) and business errors (CodeDefaultErr) uniformly
 - Users may need to customize error response format (e.g. adding request_id, trace_id, internationalized messages)
-- ValidationError should map to code 400; other errors should map to code 500 or CodedError.Code()
+- ValidationError should map to CodeValidationErr (1001); other errors should map to CodeDefaultErr (5000) or CodedError.Code()
 - When no error-handling middleware is registered, behavior must be clearly documented — errors must not be silently lost
 
 **Decision**:
 - All error paths in handlers use `_ = c.Error(err); return` — no direct response writing
-- `httpruntime.DefaultErrorHandler()` serves as a gin middleware fallback: ValidationError → code 400, others → code 500 or CodedError.Code()
+- `httpruntime.DefaultErrorHandler()` serves as a gin middleware fallback: ValidationError → CodeValidationErr (1001), others → CodeDefaultErr (5000) or CodedError.Code()
 - The function's doc comment explicitly warns: without this middleware, error paths return HTTP 200 with an empty body
 
 **Consequences**:
 - Users can replace DefaultErrorHandler with a custom implementation without modifying generated code
-- ValidationError automatically maps to code 400 — no per-handler repetition needed
+- ValidationError automatically maps to CodeValidationErr (1001) — no per-handler repetition needed
 - Error handling logic is centralized in middleware; handlers remain clean
 - The risk of not registering DefaultErrorHandler is clearly communicated via documentation and code comments
 

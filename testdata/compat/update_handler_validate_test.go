@@ -16,7 +16,7 @@ import (
 )
 
 // TestUpdatePersonHandlerValidationError verifies that UpdatePersonHandler
-// returns code 400 when req.Validate() fails.
+// returns CodeValidationErr when req.Validate() fails.
 // PersonUpdateByName.name has min_len=1; an empty name triggers the constraint.
 func TestUpdatePersonHandlerValidationError(t *testing.T) {
 	t.Parallel()
@@ -46,6 +46,6 @@ func TestUpdatePersonHandlerValidationError(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Code != httpruntime.CodeValidationErr {
-		t.Errorf("expected code 400 for validation failure, got %d (body: %s)", resp.Code, w.Body.String())
+		t.Errorf("expected code %d (CodeValidationErr) for validation failure, got %d (body: %s)", httpruntime.CodeValidationErr, resp.Code, w.Body.String())
 	}
 }

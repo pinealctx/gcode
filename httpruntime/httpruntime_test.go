@@ -67,7 +67,7 @@ func TestErrResponse_DefaultCode(t *testing.T) {
 	resp := httpruntime.ErrResponse(errors.New("something went wrong"))
 
 	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("Code = %d, want CodeDefaultErr (500)", resp.Code)
+		t.Errorf("Code = %d, want CodeDefaultErr (%d)", resp.Code, httpruntime.CodeDefaultErr)
 	}
 	if resp.Data != nil {
 		t.Errorf("Data = %v, want nil", resp.Data)
@@ -100,7 +100,7 @@ func TestErrResponse_CodedError(t *testing.T) {
 func TestErrResponse_CodedError_Zero(t *testing.T) {
 	t.Parallel()
 
-	// code 0 from CodedError should be respected (not overridden to 500)
+	// code 0 from CodedError should be respected (not overridden to CodeDefaultErr)
 	err := &codedErr{code: 0, msg: "unusual"}
 	resp := httpruntime.ErrResponse(err)
 
@@ -124,11 +124,11 @@ func TestErrResponse_CodedError_Negative(t *testing.T) {
 func TestErrResponse_NilError(t *testing.T) {
 	t.Parallel()
 
-	// nil error should return a generic 500 response, not panic
+	// nil error should return a generic CodeDefaultErr response, not panic
 	resp := httpruntime.ErrResponse(nil)
 
 	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("Code = %d, want CodeDefaultErr (500)", resp.Code)
+		t.Errorf("Code = %d, want CodeDefaultErr (%d)", resp.Code, httpruntime.CodeDefaultErr)
 	}
 	if resp.Error == nil {
 		t.Fatal("Error is nil, want non-nil")
@@ -193,7 +193,7 @@ func TestDefaultErrorHandler_PlainError(t *testing.T) {
 
 	resp := decodeResponse(t, w)
 	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("Code = %d, want CodeDefaultErr (500)", resp.Code)
+		t.Errorf("Code = %d, want CodeDefaultErr (%d)", resp.Code, httpruntime.CodeDefaultErr)
 	}
 	if resp.Error == nil || resp.Error.Msg != "internal error" {
 		t.Errorf("Error = %+v, want msg 'internal error'", resp.Error)
@@ -214,7 +214,7 @@ func TestDefaultErrorHandler_ValidationError(t *testing.T) {
 
 	resp := decodeResponse(t, w)
 	if resp.Code != httpruntime.CodeValidationErr {
-		t.Errorf("Code = %d, want CodeValidationErr (400)", resp.Code)
+		t.Errorf("Code = %d, want CodeValidationErr (%d)", resp.Code, httpruntime.CodeValidationErr)
 	}
 	if resp.Error == nil {
 		t.Fatal("Error is nil, want non-nil")
@@ -239,7 +239,7 @@ func TestDefaultErrorHandler_WrappedValidationError(t *testing.T) {
 
 	resp := decodeResponse(t, w)
 	if resp.Code != httpruntime.CodeValidationErr {
-		t.Errorf("Code = %d, want CodeValidationErr (400) for wrapped ValidationError", resp.Code)
+		t.Errorf("Code = %d, want CodeValidationErr (%d) for wrapped ValidationError", resp.Code, httpruntime.CodeValidationErr)
 	}
 	// Msg must be ve.Error(), not the outer wrapper message.
 	if resp.Error == nil || resp.Error.Msg != ve.Error() {
@@ -267,7 +267,7 @@ func TestDefaultErrorHandler_MultipleErrors_UsesLast(t *testing.T) {
 
 // TestDefaultErrorHandler_MultipleErrors_ValidationErrorFirst verifies that when
 // the first error is a ValidationError but the last is a plain error, the response
-// code is 500 (not 400) — only the last error determines the response.
+// code is CodeDefaultErr (not CodeValidationErr) — only the last error determines the response.
 func TestDefaultErrorHandler_MultipleErrors_ValidationErrorFirst(t *testing.T) {
 	t.Parallel()
 
@@ -282,9 +282,9 @@ func TestDefaultErrorHandler_MultipleErrors_ValidationErrorFirst(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	resp := decodeResponse(t, w)
-	// Last error is a plain error, so code must be 500, not 400.
+	// Last error is a plain error, so code must be CodeDefaultErr, not CodeValidationErr.
 	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("Code = %d, want 500 (last error is plain, not ValidationError)", resp.Code)
+		t.Errorf("Code = %d, want CodeDefaultErr (%d) (last error is plain, not ValidationError)", resp.Code, httpruntime.CodeDefaultErr)
 	}
 }
 
@@ -490,7 +490,7 @@ func TestNewHandler_ValidationError(t *testing.T) {
 	w := postJSON(t, r, `{"name":""}`)
 	resp := decodeResponse(t, w)
 	if resp.Code != httpruntime.CodeValidationErr {
-		t.Errorf("Code = %d, want CodeValidationErr (400)", resp.Code)
+		t.Errorf("Code = %d, want CodeValidationErr (%d)", resp.Code, httpruntime.CodeValidationErr)
 	}
 }
 
@@ -505,7 +505,7 @@ func TestNewHandler_ServiceError(t *testing.T) {
 	w := postJSON(t, r, `{"msg":"hi"}`)
 	resp := decodeResponse(t, w)
 	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("Code = %d, want CodeDefaultErr (500)", resp.Code)
+		t.Errorf("Code = %d, want CodeDefaultErr (%d)", resp.Code, httpruntime.CodeDefaultErr)
 	}
 }
 

@@ -147,8 +147,8 @@ HTTP adapter runtime helpers. Provides:
 - `Error` (`Msg string`, `Fields map[string]any`)
 - `CodedError` interface — application errors implement this to carry a custom code
 - `OKResponse(data any) Response` — constructs a success response (code 0)
-- `ErrResponse(err error) Response` — constructs an error response (extracts CodedError.Code(), defaults to 500)
-- `DefaultErrorHandler() gin.HandlerFunc` — gin middleware that converts `c.Error()` errors to JSON responses (ValidationError → code 400, others → code 500 or CodedError.Code())
+- `ErrResponse(err error) Response` — constructs an error response (extracts CodedError.Code(), defaults to CodeDefaultErr (5000))
+- `DefaultErrorHandler() gin.HandlerFunc` — gin middleware that converts `c.Error()` errors to JSON responses (ValidationError → CodeValidationErr (1001), others → CodeDefaultErr (5000) or CodedError.Code())
 
 Public package, importable by user projects.
 

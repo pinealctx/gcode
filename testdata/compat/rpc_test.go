@@ -169,7 +169,7 @@ func TestCreatePersonHandlerSvcError(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("expected code 500, got %d", resp.Code)
+		t.Errorf("expected code %d (CodeDefaultErr), got %d", httpruntime.CodeDefaultErr, resp.Code)
 	}
 	if resp.Error == nil || resp.Error.Msg != "internal error" {
 		t.Errorf("expected error msg 'internal error', got %+v", resp.Error)
@@ -205,8 +205,8 @@ func TestCreatePersonHandlerBindError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("expected code 500 for bind failure, got %d", resp.Code)
+	if resp.Code != httpruntime.CodeBadRequest {
+		t.Errorf("expected code %d (CodeBadRequest) for bind failure, got %d", httpruntime.CodeBadRequest, resp.Code)
 	}
 }
 
@@ -267,14 +267,14 @@ func TestUpdatePersonHandlerBindError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("expected code 500 for bind failure, got %d", resp.Code)
+	if resp.Code != httpruntime.CodeBadRequest {
+		t.Errorf("expected code %d (CodeBadRequest) for bind failure, got %d", httpruntime.CodeBadRequest, resp.Code)
 	}
 }
 
 // TestCreatePersonHandlerValidationError verifies that CreatePersonHandler
 // forwards a ValidationError via c.Error, and DefaultErrorHandler maps it to
-// code 400 — end-to-end validation of the bind → validate → svc pipeline.
+// CodeValidationErr — end-to-end validation of the bind → validate → svc pipeline.
 func TestCreatePersonHandlerValidationError(t *testing.T) {
 	t.Parallel()
 
@@ -305,7 +305,7 @@ func TestCreatePersonHandlerValidationError(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Code != httpruntime.CodeValidationErr {
-		t.Errorf("expected code 400 for validation failure, got %d (body: %s)", resp.Code, w.Body.String())
+		t.Errorf("expected code %d (CodeValidationErr) for validation failure, got %d (body: %s)", httpruntime.CodeValidationErr, resp.Code, w.Body.String())
 	}
 }
 
@@ -333,7 +333,7 @@ func TestUpdatePersonHandlerSvcError(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("expected code 500, got %d", resp.Code)
+		t.Errorf("expected code %d (CodeDefaultErr), got %d", httpruntime.CodeDefaultErr, resp.Code)
 	}
 	if resp.Error == nil || resp.Error.Msg != "internal error" {
 		t.Errorf("expected error msg 'internal error', got %+v", resp.Error)
@@ -394,7 +394,7 @@ func TestGetPersonHandlerSvcError(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("expected code 500, got %d", resp.Code)
+		t.Errorf("expected code %d (CodeDefaultErr), got %d", httpruntime.CodeDefaultErr, resp.Code)
 	}
 	if resp.Error == nil || resp.Error.Msg != "internal error" {
 		t.Errorf("expected error msg 'internal error', got %+v", resp.Error)
@@ -429,8 +429,8 @@ func TestGetPersonHandlerBindError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("expected code 500 for bind failure, got %d", resp.Code)
+	if resp.Code != httpruntime.CodeBadRequest {
+		t.Errorf("expected code %d (CodeBadRequest) for bind failure, got %d", httpruntime.CodeBadRequest, resp.Code)
 	}
 }
 
@@ -488,7 +488,7 @@ func TestDeletePersonHandlerSvcError(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("expected code 500, got %d", resp.Code)
+		t.Errorf("expected code %d (CodeDefaultErr), got %d", httpruntime.CodeDefaultErr, resp.Code)
 	}
 	if resp.Error == nil || resp.Error.Msg != "internal error" {
 		t.Errorf("expected error msg 'internal error', got %+v", resp.Error)
@@ -523,13 +523,13 @@ func TestDeletePersonHandlerBindError(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Code != httpruntime.CodeDefaultErr {
-		t.Errorf("expected code 500 for bind failure, got %d", resp.Code)
+	if resp.Code != httpruntime.CodeBadRequest {
+		t.Errorf("expected code %d (CodeBadRequest) for bind failure, got %d", httpruntime.CodeBadRequest, resp.Code)
 	}
 }
 
 // TestGetPersonHandlerValidationError verifies GetPersonHandler end-to-end:
-// bind succeeds → req.Validate() returns ValidationError → svc not called → code 400.
+// bind succeeds → req.Validate() returns ValidationError → svc not called → CodeValidationErr.
 // GetPersonRequest.id has max_len=64; a 65-char id triggers the constraint.
 func TestGetPersonHandlerValidationError(t *testing.T) {
 	t.Parallel()
@@ -559,12 +559,12 @@ func TestGetPersonHandlerValidationError(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Code != httpruntime.CodeValidationErr {
-		t.Errorf("expected code 400 for validation failure, got %d (body: %s)", resp.Code, w.Body.String())
+		t.Errorf("expected code %d (CodeValidationErr) for validation failure, got %d (body: %s)", httpruntime.CodeValidationErr, resp.Code, w.Body.String())
 	}
 }
 
 // TestDeletePersonHandlerValidationError verifies DeletePersonHandler end-to-end:
-// bind succeeds → req.Validate() returns ValidationError → svc not called → code 400.
+// bind succeeds → req.Validate() returns ValidationError → svc not called → CodeValidationErr.
 // DeletePersonRequest.id has max_len=64; a 65-char id triggers the constraint.
 func TestDeletePersonHandlerValidationError(t *testing.T) {
 	t.Parallel()
@@ -594,6 +594,6 @@ func TestDeletePersonHandlerValidationError(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp.Code != httpruntime.CodeValidationErr {
-		t.Errorf("expected code 400 for validation failure, got %d (body: %s)", resp.Code, w.Body.String())
+		t.Errorf("expected code %d (CodeValidationErr) for validation failure, got %d (body: %s)", httpruntime.CodeValidationErr, resp.Code, w.Body.String())
 	}
 }

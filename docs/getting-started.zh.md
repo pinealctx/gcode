@@ -462,11 +462,11 @@ func main() {
 // 成功
 {"code": 0, "data": {"id": "new-id"}}
 
-// validate 错误（code 400）
-{"code": 400, "error": {"msg": "length must be >= 1"}}
+// validate 错误（CodeValidationErr）
+{"code": 1001, "error": {"msg": "length must be >= 1"}}
 
-// 业务错误（code 500，或 CodedError.Code()）
-{"code": 500, "error": {"msg": "internal error"}}
+// 业务错误（CodeDefaultErr，或 CodedError.Code()）
+{"code": 5000, "error": {"msg": "internal error"}}
 ```
 
 业务层可通过实现 `httpruntime.CodedError` 接口自定义错误 code：
@@ -480,7 +480,7 @@ type AppError struct {
 func (e *AppError) Error() string { return e.msg }
 func (e *AppError) Code() int     { return e.code }
 
-// 返回此 error 时，响应 code 为 404 而非默认 500
+// 返回此 error 时，响应 code 为 404 而非默认 CodeDefaultErr (5000)
 return nil, &AppError{code: 404, msg: "person not found"}
 ```
 
@@ -497,7 +497,7 @@ curl -X POST http://localhost:8080/persons \
 curl -X POST http://localhost:8080/persons \
   -H "Content-Type: application/json" \
   -d '{"nickname": "this-name-is-way-too-long"}'
-# → {"code": 400, "error": {"msg": "length must be <= 10"}}
+# → {"code": 1001, "error": {"msg": "length must be <= 10"}}
 
 # 查询 person
 curl http://localhost:8080/persons/some-id

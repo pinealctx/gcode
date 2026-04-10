@@ -461,11 +461,11 @@ func main() {
 // Success
 {"code": 0, "data": {"id": "new-id"}}
 
-// Validation error (code 400)
-{"code": 400, "error": {"msg": "length must be >= 1"}}
+// Validation error (CodeValidationErr)
+{"code": 1001, "error": {"msg": "length must be >= 1"}}
 
-// Business error (code 500, or CodedError.Code())
-{"code": 500, "error": {"msg": "internal error"}}
+// Business error (CodeDefaultErr, or CodedError.Code())
+{"code": 5000, "error": {"msg": "internal error"}}
 ```
 
 Implement `httpruntime.CodedError` to return a custom error code:
@@ -479,7 +479,7 @@ type AppError struct {
 func (e *AppError) Error() string { return e.msg }
 func (e *AppError) Code() int     { return e.code }
 
-// This error produces code 404 instead of the default 500
+// This error produces code 404 instead of the default CodeDefaultErr (5000)
 return nil, &AppError{code: 404, msg: "person not found"}
 ```
 
@@ -496,7 +496,7 @@ curl -X POST http://localhost:8080/persons \
 curl -X POST http://localhost:8080/persons \
   -H "Content-Type: application/json" \
   -d '{"nickname": "this-name-is-way-too-long"}'
-# → {"code": 400, "error": {"msg": "length must be <= 10"}}
+# → {"code": 1001, "error": {"msg": "length must be <= 10"}}
 
 # Get a person
 curl http://localhost:8080/persons/some-id

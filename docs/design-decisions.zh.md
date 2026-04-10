@@ -191,10 +191,10 @@
 
 **决策**：HTTP status 永远返回 200，业务结果通过响应体的 `code` 字段传递：
 - 成功：`{"code": 0, "data": {...}}`
-- 错误：`{"code": 500, "error": {"msg": "..."}}`
+- 错误：`{"code": 5000, "error": {"msg": "..."}}`
 
 错误 code 两层机制：
-1. `CodedError` interface：业务 error 实现 `Code() int`，`ErrResponse` 自动提取；否则缺省 500
+1. `CodedError` interface：业务 error 实现 `Code() int`，`ErrResponse` 自动提取；否则缺省 CodeDefaultErr (5000)
 2. gin middleware：可完全替换错误响应格式，处理跨切面逻辑
 
 **影响**：
@@ -244,19 +244,19 @@
 **问题**：生成的 HTTP handler 应该直接写错误响应，还是通过 gin context 传递错误？
 
 **约束**：
-- handler 直接写响应（`c.JSON`）时，middleware 无法拦截错误，无法统一处理 ValidationError（400）和业务错误（500）
+- handler 直接写响应（`c.JSON`）时，middleware 无法拦截错误，无法统一处理 ValidationError（CodeValidationErr）和业务错误（CodeDefaultErr）
 - 用户可能需要自定义错误响应格式（如添加 request_id、trace_id、国际化消息）
-- ValidationError 需要映射到 code 400，其他错误映射到 code 500 或 CodedError.Code()
+- ValidationError 需要映射到 CodeValidationErr (1001)，其他错误映射到 CodeDefaultErr (5000) 或 CodedError.Code()
 - 未注册错误处理 middleware 时，应有明确的行为说明，不能静默丢失错误
 
 **决策**：
 - handler 内所有错误路径改为 `_ = c.Error(err); return`，不直接写响应
-- `httpruntime.DefaultErrorHandler()` 作为 gin middleware 兜底：ValidationError → code 400，其他 → code 500 或 CodedError.Code()
+- `httpruntime.DefaultErrorHandler()` 作为 gin middleware 兜底：ValidationError → CodeValidationErr (1001)，其他 → CodeDefaultErr (5000) 或 CodedError.Code()
 - 函数注释中明确警告：未注册 middleware 时错误路径返回 HTTP 200 空 body
 
 **影响**：
 - 用户可替换 DefaultErrorHandler 实现自定义错误格式，无需修改生成代码
-- ValidationError 自动映射 code 400，无需在每个 handler 中重复处理
+- ValidationError 自动映射 CodeValidationErr (1001)，无需在每个 handler 中重复处理
 - 错误处理逻辑集中在 middleware，handler 保持简洁
 - 未注册 DefaultErrorHandler 的风险已通过文档和注释明确告知
 

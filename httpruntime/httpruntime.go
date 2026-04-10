@@ -34,7 +34,7 @@ type Error struct {
 // CodedError may be implemented by application errors to supply a custom
 // business error code (not an HTTP status code). If an error passed to
 // ErrResponse implements this interface, its Code() value is used; otherwise
-// the default code 500 applies.
+// the default code CodeDefaultErr applies.
 type CodedError interface {
 	error
 	Code() int
@@ -44,28 +44,34 @@ type CodedError interface {
 // Use errorx.Error[BizCode] to define typed business errors that integrate
 // with ErrResponse without implementing CodedError manually:
 //
-//	var ErrUnprocessable = errorx.New(httpruntime.BizCode(422), "unprocessable entity")
+//	var ErrUnprocessable = errorx.New(httpruntime.BizCode(1002), "invalid parameter combination")
 //
-// BizCode values are application-defined and have no inherent relation to HTTP
-// status codes. The numeric value is carried as-is in the response Code field.
+// BizCode values are application-defined 4-digit codes with no relation to
+// HTTP status codes. The numeric value is carried as-is in the response Code field.
+//
+// Reserved ranges:
+//
+//	0        success (CodeOK)
+//	1000-1999 input errors — client data problems, message safe to expose
+//	5000-5999 server errors — internal failures, message hidden from client
 type BizCode int
 
 const (
 	// CodeOK is the response code for successful requests.
 	CodeOK = 0
-	// CodeDefaultErr is the response code used when no specific business code is available.
-	CodeDefaultErr = 500
-	// CodeValidationErr is the response code for validation failures (ValidationError).
-	CodeValidationErr = 400
 	// CodeBadRequest is the response code for malformed request bodies (JSON parse errors).
-	// Distinct from CodeValidationErr (field-level constraint failures): CodeBadRequest means
-	// the request body could not be decoded at all, while CodeValidationErr means the decoded
-	// value failed business validation rules.
-	CodeBadRequest = 400
+	// The request body could not be decoded; the client should fix its serialization.
+	CodeBadRequest = 1000
+	// CodeValidationErr is the response code for field-level constraint validation failures.
+	// The request body was decoded successfully but one or more fields failed business rules.
+	CodeValidationErr = 1001
+	// CodeDefaultErr is the response code used when no specific business code is available.
+	// Message is always "internal error" — the original error is never exposed to the client.
+	CodeDefaultErr = 5000
 )
 
 // errBadRequest is returned when ShouldBindJSON fails to decode the request body.
-// It uses BizCode(CodeBadRequest) so ErrResponse maps it to code 400 with a safe,
+// It uses BizCode(CodeBadRequest) so ErrResponse maps it to CodeBadRequest with a safe,
 // client-visible message that does not expose internal Go type or field details.
 var errBadRequest = errorx.New(BizCode(CodeBadRequest), "malformed request body")
 
@@ -78,13 +84,13 @@ func OKResponse(data any) Response {
 // Code resolution order:
 //  1. If err (or any error in its chain) is *errorx.Error[BizCode], its Code field is used.
 //  2. If err implements CodedError, its Code() value is used.
-//  3. Otherwise the response code defaults to CodeDefaultErr (500) and the message
+//  3. Otherwise the response code defaults to CodeDefaultErr and the message
 //     is "internal error" — the original error is NOT exposed to the client.
 //
 // Error visibility contract:
 //   - Business errors (BizCode / CodedError): message is safe to expose to clients.
 //     Wrap internal errors with a business error to control the client-visible message:
-//     errorx.Wrap(dbErr, BizCode(503), "service unavailable")
+//     errorx.Wrap(dbErr, BizCode(5001), "service unavailable")
 //   - System errors (plain errors.New / fmt.Errorf): message is hidden from clients.
 //     Log the full error chain before or after calling ErrResponse to preserve
 //     internal context for debugging.
@@ -141,7 +147,7 @@ func NewHandler[Req any, Resp any](
 
 // DefaultErrorHandler returns a gin middleware that writes a JSON error response
 // for any errors accumulated via c.Error() during handler execution.
-// ValidationError maps to code 400; all other errors use ErrResponse (see its
+// ValidationError maps to CodeValidationErr; all other errors use ErrResponse (see its
 // doc for the business vs system error visibility contract).
 // Only the last error (c.Errors.Last()) is used when multiple errors are present.
 //

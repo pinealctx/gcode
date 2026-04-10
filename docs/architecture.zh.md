@@ -147,8 +147,8 @@ HTTP adapter 运行时辅助包。提供：
 - `Error`（`Msg string`、`Fields map[string]any`）
 - `CodedError` interface — 业务 error 实现此接口可携带自定义 code
 - `OKResponse(data any) Response` — 构造成功响应（code 0）
-- `ErrResponse(err error) Response` — 构造错误响应（自动提取 CodedError.Code()，缺省 500）
-- `DefaultErrorHandler() gin.HandlerFunc` — gin middleware，将 `c.Error()` 中的错误转换为 JSON 响应（ValidationError → code 400，其他 → code 500 或 CodedError.Code()）
+- `ErrResponse(err error) Response` — 构造错误响应（自动提取 CodedError.Code()，缺省 CodeDefaultErr (5000)）
+- `DefaultErrorHandler() gin.HandlerFunc` — gin middleware，将 `c.Error()` 中的错误转换为 JSON 响应（ValidationError → CodeValidationErr (1001)，其他 → CodeDefaultErr (5000) 或 CodedError.Code()）
 
 公开包，用户项目可直接引用。
 
