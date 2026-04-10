@@ -169,7 +169,7 @@ This document records the key architectural decisions for gcode, using ADR (Arch
 - `Validate()` is a public method usable in any context; built-in handler invocation ensures uniform interception at the transport layer
 
 **Decision**:
-- Generate handler factory functions `XxxHandler(svc XxxService) gin.HandlerFunc` accepting an interface, not a concrete type
+- Generate handler factory functions `XxxHandler(svc XxxService, interceptors ...handlerx.Interceptor[*Req, *Resp]) gin.HandlerFunc` accepting an interface, not a concrete type; delegate to `httpruntime.NewHandler` which applies the interceptor chain with built-in panic recovery
 - Use `c.ShouldBindJSON` uniformly (enforces JSON body; no path param support)
 - Handlers call `req.Validate()` built-in (after bind, before svc call); `Validate()` remains a public method for reuse in other contexts
 - Use `c.Request.Context()` to propagate request context, preserving deadline/cancel/trace information

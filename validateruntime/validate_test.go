@@ -5,6 +5,7 @@ import (
 )
 
 func TestValidationError(t *testing.T) {
+	t.Parallel()
 	e := &ValidationError{Field: "email", Rule: "email", Message: "must be a valid email address"}
 	if got := e.Error(); got != "email: must be a valid email address" {
 		t.Errorf("Error() = %q, want %q", got, "email: must be a valid email address")
@@ -12,6 +13,7 @@ func TestValidationError(t *testing.T) {
 }
 
 func TestIsEmail(t *testing.T) {
+	t.Parallel()
 	valid := []string{
 		"user@example.com",
 		"user+tag@example.co.uk",
@@ -40,6 +42,7 @@ func TestIsEmail(t *testing.T) {
 }
 
 func TestIsURI(t *testing.T) {
+	t.Parallel()
 	valid := []string{
 		// common HTTP(S)
 		"https://example.com",
@@ -77,6 +80,7 @@ func TestIsURI(t *testing.T) {
 }
 
 func TestMatchPattern(t *testing.T) {
+	t.Parallel()
 	if !MatchPattern("abc123", `^[a-z]+\d+$`) {
 		t.Error("MatchPattern(abc123, ^[a-z]+\\d+$) = false, want true")
 	}
@@ -90,6 +94,7 @@ func TestMatchPattern(t *testing.T) {
 }
 
 func TestMatchPatternCaching(t *testing.T) {
+	t.Parallel()
 	pattern := `^\d{4}-\d{2}-\d{2}$`
 	// call twice to exercise cache path
 	if !MatchPattern("2024-01-15", pattern) {
@@ -106,6 +111,7 @@ func TestMatchPatternCaching(t *testing.T) {
 // TestMsgOr verifies that MsgOr returns the override when non-empty and the
 // default message when the override is empty.
 func TestMsgOr(t *testing.T) {
+	t.Parallel()
 	// override non-empty: returns override.
 	if got := MsgOr("custom message", "default"); got != "custom message" {
 		t.Errorf("MsgOr(non-empty, default) = %q, want %q", got, "custom message")
@@ -118,6 +124,7 @@ func TestMsgOr(t *testing.T) {
 
 // TestURIValidatorReplacement verifies that replacing URIValidator changes the
 // behavior of IsURI, mirroring the pattern used by TestEmailValidatorReplacement.
+// Not parallel: modifies package-level URIValidator variable.
 func TestURIValidatorReplacement(t *testing.T) {
 	orig := URIValidator
 	defer func() { URIValidator = orig }()
@@ -131,6 +138,9 @@ func TestURIValidatorReplacement(t *testing.T) {
 	}
 }
 
+// TestEmailValidatorReplacement verifies that replacing EmailValidator changes
+// the behavior of IsEmail.
+// Not parallel: modifies package-level EmailValidator variable.
 func TestEmailValidatorReplacement(t *testing.T) {
 	orig := EmailValidator
 	defer func() { EmailValidator = orig }()

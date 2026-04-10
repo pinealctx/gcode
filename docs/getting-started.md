@@ -419,15 +419,17 @@ func (s *personServiceImpl) CreatePerson(ctx context.Context, req *dao.PersonCre
 > go get github.com/gin-gonic/gin
 > ```
 
-Generated handler factory functions accept a service interface and return `gin.HandlerFunc`:
+Generated handler factory functions accept a service interface and an optional list of interceptors, returning `gin.HandlerFunc`:
 
 ```go
 // dao/person_service.pb.http.go (generated, do not edit)
-func CreatePersonHandler(svc PersonService) gin.HandlerFunc
-func GetPersonHandler(svc PersonService) gin.HandlerFunc
-func UpdatePersonHandler(svc PersonService) gin.HandlerFunc
-func DeletePersonHandler(svc PersonService) gin.HandlerFunc
+func CreatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*PersonCreate, *CreatePersonResponse]) gin.HandlerFunc
+func GetPersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*GetPersonRequest, *GetPersonResponse]) gin.HandlerFunc
+func UpdatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*PersonUpdateByName, *UpdatePersonResponse]) gin.HandlerFunc
+func DeletePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*DeletePersonRequest, *DeletePersonResponse]) gin.HandlerFunc
 ```
+
+The `interceptors` parameter is variadic — existing calls like `dao.CreatePersonHandler(svc)` continue to work without any changes.
 
 Register routes:
 
@@ -503,7 +505,7 @@ curl http://localhost:8080/persons/some-id
 
 #### Request body size limit
 
-Generated handlers use `c.ShouldBindJSON` to decode the request body. gin does not impose a default body size limit. For production deployments, set a limit via middleware to prevent oversized payloads:
+Each handler delegates to `httpruntime.NewHandler`, which calls `c.ShouldBindJSON` internally. gin does not impose a default body size limit. For production deployments, set a limit via middleware to prevent oversized payloads:
 
 ```go
 import "net/http"
@@ -534,6 +536,54 @@ func TimeoutMiddleware(d time.Duration) gin.HandlerFunc {
 
 r.Use(TimeoutMiddleware(5 * time.Second))
 ```
+
+#### Adding interceptors (optional)
+
+Every generated handler has panic recovery built in — a panic in the service method is caught and converted to an error, so the server never crashes. On top of that, you can inject custom interceptors per route for logging, metrics, tracing, or any cross-cutting concern.
+
+An interceptor has the signature:
+
+```go
+func(ctx context.Context, req *Req, next handlerx.Handler[*Req, *Resp]) (*Resp, error)
+```
+
+**Example: request logging interceptor**
+
+```go
+import (
+    "context"
+    "log/slog"
+
+    "github.com/pinealctx/x/handlerx"
+)
+
+func LoggingInterceptor[Req, Resp any](logger *slog.Logger) handlerx.Interceptor[*Req, *Resp] {
+    return func(ctx context.Context, req *Req, next handlerx.Handler[*Req, *Resp]) (*Resp, error) {
+        logger.Info("request", "type", fmt.Sprintf("%T", req))
+        resp, err := next(ctx, req)
+        if err != nil {
+            logger.Error("request failed", "error", err)
+        }
+        return resp, err
+    }
+}
+```
+
+**Registering routes with interceptors**
+
+```go
+logger := slog.Default()
+
+// No interceptors — works exactly as before
+r.POST("/persons", dao.CreatePersonHandler(svc))
+
+// With a logging interceptor on a specific route
+r.DELETE("/persons/:id", dao.DeletePersonHandler(svc,
+    LoggingInterceptor[DeletePersonRequest, DeletePersonResponse](logger),
+))
+```
+
+Interceptors are applied in the order they are passed, inside the built-in panic recovery layer. The service method is always the innermost call.
 
 ---
 

@@ -161,7 +161,7 @@ Public package, importable by user projects.
 | `*.pb.dao.go`          | All proto files                        | struct definitions, json/gorm tags, MarshalBinary, UnmarshalBinary, UnmarshalBinaryLenient, ToMap (update derived messages), TableName() (when gorm.table annotation is present) |
 | `*.pb.dao.validate.go` | All proto files                        | `Validate() error` methods covering all buf/validate constraint types                                                                                                            |
 | `*.pb.rpc.go`          | Proto files with `service` definitions | Go interface, method signature: `Method(ctx context.Context, req *XxxRequest) (*XxxResponse, error)`                                                                             |
-| `*.pb.http.go`         | Proto files with `service` definitions | gin handler factory functions `XxxHandler(svc XxxService) gin.HandlerFunc`, with built-in bind → validate → svc call flow                                                        |
+| `*.pb.http.go`         | Proto files with `service` definitions | gin handler factory functions `XxxHandler(svc XxxService, interceptors ...handlerx.Interceptor[*Req, *Resp]) gin.HandlerFunc`; delegates to `httpruntime.NewHandler` (bind → validate → interceptor chain → svc call, with built-in panic recovery) |
 | `*.pb.ts`              | `gcode gen-ts` subcommand              | TypeScript interfaces, enums, enum name mapping, validation metadata, cross-file ES module imports                                                                               |
 
 ---

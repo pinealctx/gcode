@@ -57,7 +57,17 @@ const (
 	CodeDefaultErr = 500
 	// CodeValidationErr is the response code for validation failures (ValidationError).
 	CodeValidationErr = 400
+	// CodeBadRequest is the response code for malformed request bodies (JSON parse errors).
+	// Distinct from CodeValidationErr (field-level constraint failures): CodeBadRequest means
+	// the request body could not be decoded at all, while CodeValidationErr means the decoded
+	// value failed business validation rules.
+	CodeBadRequest = 400
 )
+
+// errBadRequest is returned when ShouldBindJSON fails to decode the request body.
+// It uses BizCode(CodeBadRequest) so ErrResponse maps it to code 400 with a safe,
+// client-visible message that does not expose internal Go type or field details.
+var errBadRequest = errorx.New(BizCode(CodeBadRequest), "malformed request body")
 
 // OKResponse constructs a success Response with code CodeOK (0) and the given data.
 func OKResponse(data any) Response {
@@ -111,7 +121,7 @@ func NewHandler[Req any, Resp any](
 	return func(c *gin.Context) {
 		var req Req
 		if err := c.ShouldBindJSON(&req); err != nil {
-			_ = c.Error(err)
+			_ = c.Error(errBadRequest)
 			return
 		}
 		if v, ok := any(&req).(interface{ Validate() error }); ok {

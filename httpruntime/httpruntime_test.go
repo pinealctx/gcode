@@ -464,11 +464,17 @@ func TestNewHandler_BindError(t *testing.T) {
 	}
 	r := newHandlerEngineForNewHandler(method)
 
-	// Send invalid JSON — bind should fail.
+	// Send invalid JSON — bind should fail with CodeBadRequest and a safe message.
 	w := postJSON(t, r, `not-json`)
 	resp := decodeResponse(t, w)
-	if resp.Code == httpruntime.CodeOK {
-		t.Errorf("Code = CodeOK, want non-zero for bind error")
+	if resp.Code != httpruntime.CodeBadRequest {
+		t.Errorf("Code = %d, want CodeBadRequest (%d)", resp.Code, httpruntime.CodeBadRequest)
+	}
+	if resp.Error == nil {
+		t.Fatal("Error is nil, want non-nil")
+	}
+	if resp.Error.Msg != "malformed request body" {
+		t.Errorf("Error.Msg = %q, want %q", resp.Error.Msg, "malformed request body")
 	}
 }
 

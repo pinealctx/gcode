@@ -421,15 +421,17 @@ func (s *personServiceImpl) CreatePerson(ctx context.Context, req *dao.PersonCre
 > go get github.com/gin-gonic/gin
 > ```
 
-生成的 handler 工厂函数接收 service interface，返回 `gin.HandlerFunc`：
+生成的 handler 工厂函数接收 service interface 和可选的 interceptor 列表，返回 `gin.HandlerFunc`：
 
 ```go
 // dao/person_service.pb.http.go（生成，勿手动修改）
-func CreatePersonHandler(svc PersonService) gin.HandlerFunc
-func GetPersonHandler(svc PersonService) gin.HandlerFunc
-func UpdatePersonHandler(svc PersonService) gin.HandlerFunc
-func DeletePersonHandler(svc PersonService) gin.HandlerFunc
+func CreatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*PersonCreate, *CreatePersonResponse]) gin.HandlerFunc
+func GetPersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*GetPersonRequest, *GetPersonResponse]) gin.HandlerFunc
+func UpdatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*PersonUpdateByName, *UpdatePersonResponse]) gin.HandlerFunc
+func DeletePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*DeletePersonRequest, *DeletePersonResponse]) gin.HandlerFunc
 ```
+
+`interceptors` 是可变参数——现有调用 `dao.CreatePersonHandler(svc)` 无需任何修改，继续有效。
 
 注册路由：
 
@@ -504,7 +506,7 @@ curl http://localhost:8080/persons/some-id
 
 #### 请求体大小限制
 
-生成的 handler 使用 `c.ShouldBindJSON` 解码请求体。gin 默认不限制请求体大小。生产环境中应通过 middleware 设置上限，防止超大请求体：
+每个 handler 委托给 `httpruntime.NewHandler`，由其内部调用 `c.ShouldBindJSON`。gin 默认不限制请求体大小。生产环境中应通过 middleware 设置上限，防止超大请求体：
 
 ```go
 import "net/http"
@@ -535,6 +537,54 @@ func TimeoutMiddleware(d time.Duration) gin.HandlerFunc {
 
 r.Use(TimeoutMiddleware(5 * time.Second))
 ```
+
+#### 添加 interceptor（可选）
+
+每个生成的 handler 内置 panic 恢复——service 方法发生 panic 时会被自动捕获并转为错误，服务不会崩溃。在此基础上，可以为每个路由注入自定义 interceptor，用于日志、metrics、tracing 等横切关注点。
+
+interceptor 的签名为：
+
+```go
+func(ctx context.Context, req *Req, next handlerx.Handler[*Req, *Resp]) (*Resp, error)
+```
+
+**示例：请求日志 interceptor**
+
+```go
+import (
+    "context"
+    "log/slog"
+
+    "github.com/pinealctx/x/handlerx"
+)
+
+func LoggingInterceptor[Req, Resp any](logger *slog.Logger) handlerx.Interceptor[*Req, *Resp] {
+    return func(ctx context.Context, req *Req, next handlerx.Handler[*Req, *Resp]) (*Resp, error) {
+        logger.Info("request", "type", fmt.Sprintf("%T", req))
+        resp, err := next(ctx, req)
+        if err != nil {
+            logger.Error("request failed", "error", err)
+        }
+        return resp, err
+    }
+}
+```
+
+**注册路由时传入 interceptor**
+
+```go
+logger := slog.Default()
+
+// 不传 interceptor——与之前完全一致
+r.POST("/persons", dao.CreatePersonHandler(svc))
+
+// 为特定路由注入日志 interceptor
+r.DELETE("/persons/:id", dao.DeletePersonHandler(svc,
+    LoggingInterceptor[DeletePersonRequest, DeletePersonResponse](logger),
+))
+```
+
+interceptor 按传入顺序执行，位于内置 panic 恢复层的内侧。service 方法始终是最内层调用。
 
 ---
 

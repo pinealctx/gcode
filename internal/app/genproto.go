@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -65,7 +67,7 @@ func generateIntermediateProtos(f model.File, outputDir string) error {
 	updatePath := filepath.Join(outputDir, baseName+".update.proto")
 	createPath := filepath.Join(outputDir, baseName+".create.proto")
 	for _, stale := range []string{updatePath, createPath} {
-		if err := os.Remove(stale); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(stale); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("remove stale %q: %w", stale, err)
 		}
 	}

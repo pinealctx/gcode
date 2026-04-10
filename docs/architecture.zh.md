@@ -161,7 +161,7 @@ HTTP adapter 运行时辅助包。提供：
 | `*.pb.dao.go`          | 所有 proto 文件             | struct 定义、json/gorm tag、MarshalBinary、UnmarshalBinary、UnmarshalBinaryLenient、ToMap（update 派生 message）、TableName()（有 gorm.table 注解时） |
 | `*.pb.dao.validate.go` | 所有 proto 文件             | `Validate() error` 方法，覆盖全部 buf/validate 约束类型                                                                                               |
 | `*.pb.rpc.go`          | proto 文件含 `service` 定义 | Go interface，方法签名 `Method(ctx context.Context, req *XxxRequest) (*XxxResponse, error)`                                                           |
-| `*.pb.http.go`         | proto 文件含 `service` 定义 | gin handler 工厂函数 `XxxHandler(svc XxxService) gin.HandlerFunc`，内置 bind → validate → svc 调用流程                                                |
+| `*.pb.http.go`         | proto 文件含 `service` 定义 | gin handler 工厂函数 `XxxHandler(svc XxxService, interceptors ...handlerx.Interceptor[*Req, *Resp]) gin.HandlerFunc`；委托给 `httpruntime.NewHandler`（bind → validate → interceptor chain → svc 调用，内置 panic 恢复） |
 | `*.pb.ts`              | `gcode gen-ts` 子命令       | TypeScript interface、enum、enum 名称映射、验证元数据、跨文件 ES module import                                                                        |
 
 ---
