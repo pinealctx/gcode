@@ -166,10 +166,10 @@ func buildCreateProto(f model.File, relPath string, msgs []model.Message) (strin
 // buildUpdateMessage generates a single update message block.
 func buildUpdateMessage(msg model.Message, opt model.UpdateMessageOptions) (string, error) {
 	if opt.Name == "" {
-		return "", fmt.Errorf("update_message annotation on %q: name must not be empty", msg.FullName)
+		return "", fmt.Errorf("update_message annotation on %q: %w", msg.FullName, ErrNameEmpty)
 	}
 	if !isProtoIdentifier(opt.Name) {
-		return "", fmt.Errorf("update_message annotation on %q: name %q is not a valid proto identifier", msg.FullName, opt.Name)
+		return "", fmt.Errorf("update_message annotation on %q: name %q: %w", msg.FullName, opt.Name, ErrInvalidName)
 	}
 	ignoreSet := stringSet(opt.IgnoreFields)
 	conditionSet := stringSet(opt.ConditionFields)
@@ -197,10 +197,10 @@ func buildUpdateMessage(msg model.Message, opt model.UpdateMessageOptions) (stri
 // buildCreateMessage generates a single create message block.
 func buildCreateMessage(msg model.Message, opt model.CreateMessageOptions) (string, error) {
 	if opt.Name == "" {
-		return "", fmt.Errorf("create_message annotation on %q: name must not be empty", msg.FullName)
+		return "", fmt.Errorf("create_message annotation on %q: %w", msg.FullName, ErrNameEmpty)
 	}
 	if !isProtoIdentifier(opt.Name) {
-		return "", fmt.Errorf("create_message annotation on %q: name %q is not a valid proto identifier", msg.FullName, opt.Name)
+		return "", fmt.Errorf("create_message annotation on %q: name %q: %w", msg.FullName, opt.Name, ErrInvalidName)
 	}
 	ignoreSet := stringSet(opt.IgnoreFields)
 	requiredSet := stringSet(opt.RequiredFields)
@@ -233,7 +233,7 @@ func buildCreateMessage(msg model.Message, opt model.CreateMessageOptions) (stri
 // Field-level gcode annotations (gorm.column) are preserved in the output.
 func protoFieldLine(f model.Field, makeOptional bool, fieldNum int) (string, error) {
 	if f.Type.Kind == model.FieldKindMessage {
-		return "", fmt.Errorf("field %q: message-type fields are not allowed in update/create messages", f.Name)
+		return "", fmt.Errorf("field %q: %w", f.Name, ErrMessageTypeField)
 	}
 
 	typeStr := protoTypeName(f)

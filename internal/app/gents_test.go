@@ -160,12 +160,8 @@ message UserB { int32 id = 1; }
 	if err == nil {
 		t.Fatal("expected error for output filename collision, got nil")
 	}
-	var ae AppError
-	if !errors.As(err, &ae) {
-		t.Errorf("expected AppError domain type, got %T: %v", err, err)
-	}
-	if !strings.Contains(err.Error(), "output filename collision") {
-		t.Errorf("expected 'output filename collision' in error, got: %v", err)
+	if !errors.Is(err, ErrOutputFilenameCollision) {
+		t.Errorf("expected ErrOutputFilenameCollision, got: %v", err)
 	}
 	entries, readErr := os.ReadDir(outputDir)
 	if readErr != nil {

@@ -278,8 +278,8 @@ message Order {
 	if err == nil {
 		t.Fatal("expected error for message-type field, got nil")
 	}
-	if !strings.Contains(err.Error(), "message-type fields are not allowed") {
-		t.Errorf("error = %q, want to contain 'message-type fields are not allowed'", err.Error())
+	if !errors.Is(err, ErrMessageTypeField) {
+		t.Errorf("error = %q, want ErrMessageTypeField", err.Error())
 	}
 }
 
@@ -430,8 +430,8 @@ func TestProtoFieldLine_MessageTypeRejected(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for message-type field")
 	}
-	if !strings.Contains(err.Error(), "message-type fields are not allowed") {
-		t.Errorf("error = %q", err.Error())
+	if !errors.Is(err, ErrMessageTypeField) {
+		t.Errorf("error = %q, want ErrMessageTypeField", err.Error())
 	}
 }
 
@@ -691,8 +691,8 @@ func TestBuildUpdateMessage_EmptyName(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty opt.Name, got nil")
 	}
-	if !strings.Contains(err.Error(), "name must not be empty") {
-		t.Errorf("error = %q, want to contain 'name must not be empty'", err.Error())
+	if !errors.Is(err, ErrNameEmpty) {
+		t.Errorf("error = %q, want ErrNameEmpty", err.Error())
 	}
 }
 
@@ -705,8 +705,8 @@ func TestBuildCreateMessage_EmptyName(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty opt.Name, got nil")
 	}
-	if !strings.Contains(err.Error(), "name must not be empty") {
-		t.Errorf("error = %q, want to contain 'name must not be empty'", err.Error())
+	if !errors.Is(err, ErrNameEmpty) {
+		t.Errorf("error = %q, want ErrNameEmpty", err.Error())
 	}
 }
 
@@ -746,8 +746,8 @@ func TestBuildUpdateMessage_InvalidName(t *testing.T) {
 			t.Errorf("buildUpdateMessage with name %q: expected error, got nil", name)
 			continue
 		}
-		if !strings.Contains(err.Error(), "not a valid proto identifier") {
-			t.Errorf("buildUpdateMessage with name %q: error = %q, want 'not a valid proto identifier'", name, err.Error())
+		if !errors.Is(err, ErrInvalidName) {
+			t.Errorf("buildUpdateMessage with name %q: error = %q, want ErrInvalidName", name, err.Error())
 		}
 	}
 }
@@ -765,8 +765,8 @@ func TestBuildCreateMessage_InvalidName(t *testing.T) {
 			t.Errorf("buildCreateMessage with name %q: expected error, got nil", name)
 			continue
 		}
-		if !strings.Contains(err.Error(), "not a valid proto identifier") {
-			t.Errorf("buildCreateMessage with name %q: error = %q, want 'not a valid proto identifier'", name, err.Error())
+		if !errors.Is(err, ErrInvalidName) {
+			t.Errorf("buildCreateMessage with name %q: error = %q, want ErrInvalidName", name, err.Error())
 		}
 	}
 }

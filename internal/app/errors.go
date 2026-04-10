@@ -11,3 +11,14 @@ type appTag struct{}
 //
 //nolint:revive // AppError intentionally includes the package name for clarity at call sites.
 type AppError = errorx.Sentinel[appTag]
+
+var (
+	// ErrOutputFilenameCollision indicates two proto files produce the same output filename.
+	ErrOutputFilenameCollision = AppError("output filename collision")
+	// ErrNameEmpty indicates an update_message or create_message annotation has an empty name.
+	ErrNameEmpty = AppError("name must not be empty")
+	// ErrInvalidName indicates an update_message or create_message annotation name is not a valid proto identifier.
+	ErrInvalidName = AppError("not a valid proto identifier")
+	// ErrMessageTypeField indicates a message-type field was found in an update/create message.
+	ErrMessageTypeField = AppError("message-type fields are not allowed in update/create messages")
+)

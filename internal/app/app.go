@@ -195,7 +195,7 @@ func checkOutputCollisions(files []model.File, nameFuncs ...func(string) string)
 		for _, fn := range nameFuncs {
 			name := fn(f.Path)
 			if prev, ok := seen[name]; ok {
-				return errorx.NewSentinelf[appTag]("output filename collision: %q and %q both produce %q", prev, f.Path, name)
+				return fmt.Errorf("%w: %q and %q both produce %q", ErrOutputFilenameCollision, prev, f.Path, name)
 			}
 			seen[name] = f.Path
 		}
