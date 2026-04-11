@@ -11,7 +11,7 @@ import (
 // writeToMapMethod generates the ToMap() map[string]any method for an update message.
 // Only non-nil optional fields are included; condition_fields are excluded since they
 // are used as WHERE conditions, not SET values.
-func writeToMapMethod(b *strings.Builder, msg transform.GoMessage, _ Context) {
+func writeToMapMethod(b *strings.Builder, msg transform.GoMessage) {
 	recv := receiverName(msg.GoName)
 	fmt.Fprintf(b, "// ToMap converts %s to map[string]any for partial update APIs (e.g. GORM Updates).\n", msg.GoName)
 	b.WriteString("// Only non-nil fields are included.\n")

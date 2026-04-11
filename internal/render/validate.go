@@ -155,7 +155,7 @@ func writeFieldValidationExpr(b *strings.Builder, fieldExpr string, f transform.
 
 	switch {
 	case f.Cardinality == model.CardinalityRepeated:
-		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo, f)
+		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo)
 	case f.Type.Kind == model.FieldKindMessage:
 		writeMessageFieldValidation(b, fieldExpr, fieldName, vm, vo)
 	case f.Type.Kind == model.FieldKindEnum:
@@ -176,7 +176,7 @@ func writeFieldValidation(b *strings.Builder, recv string, f transform.GoField, 
 
 	switch {
 	case f.Cardinality == model.CardinalityRepeated:
-		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo, f)
+		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo)
 
 	case f.Type.Kind == model.FieldKindMessage:
 		writeMessageFieldValidation(b, fieldExpr, fieldName, vm, vo)
@@ -218,7 +218,7 @@ func writeScalarValidation(b *strings.Builder, fieldExpr, fieldName, vm string, 
 	case model.ScalarBool:
 		// bool required not supported (parser rejects it)
 	case model.ScalarFloat, model.ScalarDouble:
-		writeFloatValidation(b, fieldExpr, fieldName, vm, vo, scalar)
+		writeFloatValidation(b, fieldExpr, fieldName, vm, vo)
 	default:
 		// signed or unsigned integer
 		writeIntValidation(b, fieldExpr, fieldName, vm, vo, scalar)
@@ -462,7 +462,7 @@ func writeUnsignedNotInCheck(b *strings.Builder, fieldExpr, fieldName, vm string
 }
 
 // writeFloatValidation writes float/double field constraints.
-func writeFloatValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions, _ model.ScalarKind) {
+func writeFloatValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions) {
 	if vo.GTFloat != nil {
 		fmt.Fprintf(b, "if %s <= %g {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %g\")}\n}\n",
 			fieldExpr, *vo.GTFloat, fieldName, vm, *vo.GTFloat)
@@ -522,7 +522,7 @@ func writeMessageFieldValidation(b *strings.Builder, fieldExpr, fieldName, vm st
 // writeRepeatedValidation writes repeated field constraints.
 // Note: defined_only for repeated enum fields is not currently supported
 // and is silently skipped.
-func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions, f transform.GoField) {
+func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions) {
 	if vo == nil {
 		return
 	}
@@ -535,12 +535,12 @@ func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string
 			fieldExpr, *vo.MaxItems, fieldName, vm, *vo.MaxItems)
 	}
 	if vo.Items != nil {
-		writeItemsValidation(b, fieldExpr, fieldName, vm, vo.Items, f)
+		writeItemsValidation(b, fieldExpr, fieldName, vm, vo.Items)
 	}
 }
 
 // writeItemsValidation writes element-level validation for repeated fields.
-func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, items *model.ValidateFieldOptions, _ transform.GoField) {
+func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, items *model.ValidateFieldOptions) {
 	// Determine element variable name and type based on field scalar.
 	// For repeated string → v is string; for repeated int32 → v is int32, etc.
 	fmt.Fprintf(b, "for i, v := range %s {\n", fieldExpr)

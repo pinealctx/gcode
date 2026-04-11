@@ -75,7 +75,7 @@ func File(gf transform.GoFile, modulePath string, ctx Context) ([]byte, error) {
 	}
 	for _, msg := range gf.Messages {
 		if msg.UpdateSource != "" {
-			writeToMapMethod(&body, msg, ctx)
+			writeToMapMethod(&body, msg)
 		}
 	}
 	for _, enum := range gf.Enums {
