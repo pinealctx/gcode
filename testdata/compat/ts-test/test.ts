@@ -29,6 +29,7 @@ import {
   type AllScalars,
   type AllRepeated,
   type AllValidate,
+  type TreeNode,
   AllValidateRules,
 } from "../ts/all_types.pb.ts";
 
@@ -313,9 +314,16 @@ assertEqual(av.uGte, 1, "AllValidate.uGte assigned correctly");
 assertEqual(av.sIn, "a", "AllValidate.sIn assigned correctly");
 assertEqual(av.oStatus, undefined, "AllValidate.oStatus optional — omitted === undefined");
 
+// --- TreeNode: self-referencing interface type safety ---
+
+const treeLeaf: TreeNode = { value: "leaf", child: { value: "deep", child: { value: "deepest" } } } as TreeNode;
+assertEqual(treeLeaf.value, "leaf", "TreeNode.value assigned correctly");
+assertEqual(treeLeaf.child.value, "deep", "TreeNode.child.value nested correctly");
+assertEqual(treeLeaf.child.child.value, "deepest", "TreeNode.child.child.value deeply nested correctly");
+
 // --- summary ---
 
-assertEqual(passed, 85, "expected exactly 85 assertions before count guard");
+assertEqual(passed, 88, "expected exactly 88 assertions before count guard");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
