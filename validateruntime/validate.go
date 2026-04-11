@@ -24,7 +24,9 @@ func (e *ValidationError) Error() string {
 
 // defaultEmailRegexp is the pre-compiled regex for defaultIsEmail.
 // Local part: word chars, supports - + . separators.
-// Domain: valid label format, TLD 2-63 letters.
+// Domain: supports underscores (e.g. internal_system.company.com) to accommodate
+// non-standard but widely-used internal/intranet domain naming conventions.
+// TLD: 2-63 letters.
 var defaultEmailRegexp = regexp.MustCompile(
 	`^[\w]+([-+.]\w+)*@([A-Za-z0-9]([-_A-Za-z0-9]*[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$`,
 )
@@ -40,10 +42,14 @@ func defaultIsURI(s string) bool {
 
 // EmailValidator is the function used by IsEmail. Replace it in init() to
 // swap the email validation implementation.
+// Replacement is only safe during program initialization (init functions run
+// single-threaded before main). Concurrent replacement at runtime is not supported.
 var EmailValidator = defaultIsEmail
 
 // URIValidator is the function used by IsURI. Replace it in init() to
 // swap the URI validation implementation.
+// Replacement is only safe during program initialization (init functions run
+// single-threaded before main). Concurrent replacement at runtime is not supported.
 var URIValidator = defaultIsURI
 
 // IsEmail reports whether s is a valid email address.
@@ -66,19 +72,26 @@ func MsgOr(override, defaultMsg string) string {
 	return defaultMsg
 }
 
+// MatchPattern reports whether s matches the given regular expression pattern.
 // Compiled regexps are cached in a package-level sync.Map; the pattern is
 // guaranteed to be valid because the parser validates it at code-generation time.
 func MatchPattern(s, pattern string) bool {
 	var re *regexp.Regexp
 	if v, ok := patternCache.Load(pattern); ok {
-		re, _ = v.(*regexp.Regexp)
+		re, ok = v.(*regexp.Regexp)
+		if !ok || re == nil {
+			return false
+		}
 	} else {
 		compiled, err := regexp.Compile(pattern)
 		if err != nil {
 			return false
 		}
 		actual, _ := patternCache.LoadOrStore(pattern, compiled)
-		re, _ = actual.(*regexp.Regexp)
+		re, ok = actual.(*regexp.Regexp)
+		if !ok || re == nil {
+			return false
+		}
 	}
 	return re.MatchString(s)
 }

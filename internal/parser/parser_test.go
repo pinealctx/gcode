@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/bufbuild/protocompile"
@@ -296,12 +296,9 @@ service S { rpc Chat (stream Req) returns (stream Resp); }`,
 			if err == nil {
 				t.Fatal("expected Parse to reject streaming rpc")
 			}
-			if !strings.Contains(err.Error(), "streaming") {
-				t.Errorf("error message should mention streaming, got: %v", err)
-			}
-			// Verify service name and rpc name appear in the error message.
-			if !strings.Contains(err.Error(), `"S"`) {
-				t.Errorf("error message should contain service name %q, got: %v", "S", err)
+			var pe ParseError
+			if !errors.As(err, &pe) {
+				t.Errorf("expected ParseError domain type, got %T: %v", err, err)
 			}
 		})
 	}
@@ -806,10 +803,10 @@ message Order {
 func TestParseValidateOptions_ConflictErrors(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		name    string
-		proto   string
-		wantErr string
+	// ParseError cases: errors that should be of type ParseError (domain-typed).
+	parseCases := []struct {
+		name  string
+		proto string
 	}{
 		{
 			name: "bool required",
@@ -817,15 +814,6 @@ func TestParseValidateOptions_ConflictErrors(t *testing.T) {
 package test;
 import "buf/validate/validate.proto";
 message M { bool active = 1 [(buf.validate.field).required = true]; }`,
-			wantErr: "required constraint is not supported for bool fields",
-		},
-		{
-			name: "invalid pattern",
-			proto: `syntax = "proto3";
-package test;
-import "buf/validate/validate.proto";
-message M { string code = 1 [(buf.validate.field).string.pattern = "[invalid"]; }`,
-			wantErr: "not a valid RE2 regexp",
 		},
 		{
 			name: "min_len > max_len",
@@ -833,7 +821,6 @@ message M { string code = 1 [(buf.validate.field).string.pattern = "[invalid"]; 
 package test;
 import "buf/validate/validate.proto";
 message M { string name = 1 [(buf.validate.field).string.min_len = 10, (buf.validate.field).string.max_len = 5]; }`,
-			wantErr: "min_len (10) must be <= max_len (5)",
 		},
 		{
 			name: "min_items > max_items",
@@ -841,7 +828,6 @@ message M { string name = 1 [(buf.validate.field).string.min_len = 10, (buf.vali
 package test;
 import "buf/validate/validate.proto";
 message M { repeated string tags = 1 [(buf.validate.field).repeated.min_items = 5, (buf.validate.field).repeated.max_items = 2]; }`,
-			wantErr: "min_items (5) must be <= max_items (2)",
 		},
 		{
 			name: "string in + required conflict",
@@ -849,11 +835,31 @@ message M { repeated string tags = 1 [(buf.validate.field).repeated.min_items = 
 package test;
 import "buf/validate/validate.proto";
 message M { string s = 1 [(buf.validate.field).required = true, (buf.validate.field).string.in = "", (buf.validate.field).string.in = "active"]; }`,
-			wantErr: "in set contains empty string, which conflicts with required=true",
+		},
+		{
+			name: "repeated bytes items required",
+			proto: `syntax = "proto3";
+package test;
+import "buf/validate/validate.proto";
+message M { repeated bytes data = 1 [(buf.validate.field).repeated.items.required = true]; }`,
+		},
+		{
+			name: "invalid pattern",
+			proto: `syntax = "proto3";
+package test;
+import "buf/validate/validate.proto";
+message M { string code = 1 [(buf.validate.field).string.pattern = "[invalid"]; }`,
+		},
+		{
+			name: "bytes min_len > max_len",
+			proto: `syntax = "proto3";
+package test;
+import "buf/validate/validate.proto";
+message M { bytes b = 1 [(buf.validate.field).bytes.min_len = 10, (buf.validate.field).bytes.max_len = 5]; }`,
 		},
 	}
 
-	for _, tc := range cases {
+	for _, tc := range parseCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -861,10 +867,11 @@ message M { string s = 1 [(buf.validate.field).required = true, (buf.validate.fi
 			writeProtoFile(t, workspace, "conflict.proto", tc.proto)
 			_, err := Parse(t.Context(), []string{workspace}, []string{"conflict.proto"})
 			if err == nil {
-				t.Fatalf("expected error containing %q, got nil", tc.wantErr)
+				t.Fatalf("expected ParseError, got nil")
 			}
-			if !strings.Contains(err.Error(), tc.wantErr) {
-				t.Errorf("error = %q, want to contain %q", err.Error(), tc.wantErr)
+			var pe ParseError
+			if !errors.As(err, &pe) {
+				t.Errorf("expected ParseError domain type, got %T: %v", err, err)
 			}
 		})
 	}

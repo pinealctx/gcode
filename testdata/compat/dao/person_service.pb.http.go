@@ -4,90 +4,26 @@
 package dao
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
+	"github.com/pinealctx/x/handlerx"
+
 	"github.com/pinealctx/gcode/httpruntime"
 )
 
 // CreatePerson creates a new person record.
-func CreatePersonHandler(svc PersonService) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req PersonCreate
-		if err := c.ShouldBind(&req); err != nil {
-			_ = c.Error(err)
-			return
-		}
-		if err := req.Validate(); err != nil {
-			_ = c.Error(err)
-			return
-		}
-		resp, err := svc.CreatePerson(c.Request.Context(), &req)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-		c.JSON(http.StatusOK, httpruntime.OKResponse(resp))
-	}
+func CreatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*PersonCreate, *CreatePersonResponse]) gin.HandlerFunc {
+	return httpruntime.NewHandler(svc.CreatePerson, interceptors...)
 }
 
-func GetPersonHandler(svc PersonService) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req GetPersonRequest
-		if err := c.ShouldBind(&req); err != nil {
-			_ = c.Error(err)
-			return
-		}
-		if err := req.Validate(); err != nil {
-			_ = c.Error(err)
-			return
-		}
-		resp, err := svc.GetPerson(c.Request.Context(), &req)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-		c.JSON(http.StatusOK, httpruntime.OKResponse(resp))
-	}
+func GetPersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*GetPersonRequest, *GetPersonResponse]) gin.HandlerFunc {
+	return httpruntime.NewHandler(svc.GetPerson, interceptors...)
 }
 
 // UpdatePerson updates an existing person record by name.
-func UpdatePersonHandler(svc PersonService) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req PersonUpdateByName
-		if err := c.ShouldBind(&req); err != nil {
-			_ = c.Error(err)
-			return
-		}
-		if err := req.Validate(); err != nil {
-			_ = c.Error(err)
-			return
-		}
-		resp, err := svc.UpdatePerson(c.Request.Context(), &req)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-		c.JSON(http.StatusOK, httpruntime.OKResponse(resp))
-	}
+func UpdatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*PersonUpdateByName, *UpdatePersonResponse]) gin.HandlerFunc {
+	return httpruntime.NewHandler(svc.UpdatePerson, interceptors...)
 }
 
-func DeletePersonHandler(svc PersonService) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req DeletePersonRequest
-		if err := c.ShouldBind(&req); err != nil {
-			_ = c.Error(err)
-			return
-		}
-		if err := req.Validate(); err != nil {
-			_ = c.Error(err)
-			return
-		}
-		resp, err := svc.DeletePerson(c.Request.Context(), &req)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-		c.JSON(http.StatusOK, httpruntime.OKResponse(resp))
-	}
+func DeletePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*DeletePersonRequest, *DeletePersonResponse]) gin.HandlerFunc {
+	return httpruntime.NewHandler(svc.DeletePerson, interceptors...)
 }

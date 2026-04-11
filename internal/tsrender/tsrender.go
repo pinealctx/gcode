@@ -105,7 +105,7 @@ func writeHeader(b *strings.Builder, source string) {
 // use the .js extension for maximum moduleResolution compatibility.
 func writeImports(b *strings.Builder, gf transform.GoFile, protoPkg string, registry TypeRegistry) {
 	// Collect GoNames of types defined in this file.
-	localTypes := make(map[string]bool)
+	localTypes := make(map[string]bool, len(gf.Enums)+len(gf.Messages))
 	for _, enum := range gf.Enums {
 		localTypes[enum.GoName] = true
 	}
@@ -160,19 +160,28 @@ func writeImports(b *strings.Builder, gf transform.GoFile, protoPkg string, regi
 	b.WriteString("\n")
 }
 
+// sanitizeTSComment replaces "*/" with "* /" to prevent premature JSDoc block
+// termination. Proto comment content is developer-controlled, but a literal
+// "*/" would break the generated /** ... */ block and produce invalid TS.
+func sanitizeTSComment(s string) string {
+	return strings.ReplaceAll(s, "*/", "* /")
+}
+
 // writeTSComment writes a JSDoc-style comment block. Single-line comments
 // use the `/** ... */` form; multi-line comments use the indented form.
+// "*/" sequences in comment text are escaped to "* /" to prevent premature
+// block termination.
 func writeTSComment(b *strings.Builder, comment model.Comment) {
 	if len(comment.Lines) == 0 {
 		return
 	}
 	if len(comment.Lines) == 1 {
-		fmt.Fprintf(b, "/** %s */\n", comment.Lines[0])
+		fmt.Fprintf(b, "/** %s */\n", sanitizeTSComment(comment.Lines[0]))
 		return
 	}
 	b.WriteString("/**\n")
 	for _, line := range comment.Lines {
-		fmt.Fprintf(b, " * %s\n", line)
+		fmt.Fprintf(b, " * %s\n", sanitizeTSComment(line))
 	}
 	b.WriteString(" */\n")
 }
@@ -237,6 +246,25 @@ func writeTSInterface(b *strings.Builder, msg transform.GoMessage, pkgName strin
 	b.WriteString("}\n\n")
 }
 
+// tsScalarValidationType maps a protobuf scalar kind to its TS validation "type" value.
+func tsScalarValidationType(scalar model.ScalarKind) string {
+	switch scalar {
+	case model.ScalarString, model.ScalarBytes:
+		return "string"
+	case model.ScalarInt32, model.ScalarSint32, model.ScalarSfixed32,
+		model.ScalarUint32, model.ScalarFixed32,
+		model.ScalarInt64, model.ScalarSint64, model.ScalarSfixed64,
+		model.ScalarUint64, model.ScalarFixed64:
+		return "integer"
+	case model.ScalarFloat, model.ScalarDouble:
+		return "number"
+	case model.ScalarBool:
+		return "boolean"
+	default:
+		return "unknown"
+	}
+}
+
 // tsValidationType returns the TS metadata "type" value for a GoField.
 // This differs from tsScalarType/tsFieldType which produce interface types.
 func tsValidationType(f transform.GoField) string {
@@ -245,21 +273,7 @@ func tsValidationType(f transform.GoField) string {
 	}
 	switch f.Type.Kind {
 	case model.FieldKindScalar:
-		switch f.Type.Scalar {
-		case model.ScalarString, model.ScalarBytes:
-			return "string"
-		case model.ScalarInt32, model.ScalarSint32, model.ScalarSfixed32,
-			model.ScalarUint32, model.ScalarFixed32,
-			model.ScalarInt64, model.ScalarSint64, model.ScalarSfixed64,
-			model.ScalarUint64, model.ScalarFixed64:
-			return "integer"
-		case model.ScalarFloat, model.ScalarDouble:
-			return "number"
-		case model.ScalarBool:
-			return "boolean"
-		default:
-			return "unknown"
-		}
+		return tsScalarValidationType(f.Type.Scalar)
 	case model.FieldKindEnum:
 		return "enum"
 	case model.FieldKindMessage:
@@ -308,342 +322,176 @@ func writeTSValidationRules(b *strings.Builder, msg transform.GoMessage) {
 // writeTSFieldRules writes all validation rules for a single field.
 func writeTSFieldRules(b *strings.Builder, jsonName string, f transform.GoField, indent string) {
 	vo := f.ValidateOptions
+	var parts []string
 
-	fmt.Fprintf(b, "%s%s: { ", indent, jsonName)
+	// required and type are always emitted
+	parts = append(parts, fmt.Sprintf("required: %t", vo.Required))
+	parts = append(parts, fmt.Sprintf("type: %q", tsValidationType(f)))
 
-	// required
-	fmt.Fprintf(b, "required: %t", vo.Required)
-
-	// type
-	fmt.Fprintf(b, ", type: %q", tsValidationType(f))
-
-	// String constraints
-	if vo.MinLen != nil {
-		fmt.Fprintf(b, ", minLength: %d", *vo.MinLen)
-	}
-	if vo.MaxLen != nil {
-		fmt.Fprintf(b, ", maxLength: %d", *vo.MaxLen)
-	}
-	if vo.Pattern != "" {
-		fmt.Fprintf(b, ", pattern: %q", vo.Pattern)
-	}
-	if vo.Email {
-		fmt.Fprintf(b, ", format: %q", "email")
-	}
-	if vo.URI {
-		fmt.Fprintf(b, ", format: %q", "uri")
-	}
-	if len(vo.InStr) > 0 {
-		b.WriteString(", enum: [")
-		for i, v := range vo.InStr {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(b, "%q", v)
-		}
-		b.WriteString("]")
-	}
-	if len(vo.NotInStr) > 0 {
-		b.WriteString(", notIn: [")
-		for i, v := range vo.NotInStr {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(b, "%q", v)
-		}
-		b.WriteString("]")
-	}
-
-	// Signed integer constraints
-	if vo.GTEInt != nil {
-		fmt.Fprintf(b, ", minimum: %d", *vo.GTEInt)
-	}
-	if vo.LTEInt != nil {
-		fmt.Fprintf(b, ", maximum: %d", *vo.LTEInt)
-	}
-	if vo.GTInt != nil {
-		fmt.Fprintf(b, ", exclusiveMinimum: %d", *vo.GTInt)
-	}
-	if vo.LTInt != nil {
-		fmt.Fprintf(b, ", exclusiveMaximum: %d", *vo.LTInt)
-	}
-	if len(vo.InInt) > 0 {
-		b.WriteString(", enum: [")
-		for i, v := range vo.InInt {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(b, "%d", v)
-		}
-		b.WriteString("]")
-	}
-	if len(vo.NotInInt) > 0 {
-		b.WriteString(", notIn: [")
-		for i, v := range vo.NotInInt {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(b, "%d", v)
-		}
-		b.WriteString("]")
-	}
-
-	// Unsigned integer constraints
-	if vo.GTEUint != nil {
-		fmt.Fprintf(b, ", minimum: %d", *vo.GTEUint)
-	}
-	if vo.LTEUint != nil {
-		fmt.Fprintf(b, ", maximum: %d", *vo.LTEUint)
-	}
-	if vo.GTUint != nil {
-		fmt.Fprintf(b, ", exclusiveMinimum: %d", *vo.GTUint)
-	}
-	if vo.LTUint != nil {
-		fmt.Fprintf(b, ", exclusiveMaximum: %d", *vo.LTUint)
-	}
-	if len(vo.InUint) > 0 {
-		b.WriteString(", enum: [")
-		for i, v := range vo.InUint {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(b, "%d", v)
-		}
-		b.WriteString("]")
-	}
-	if len(vo.NotInUint) > 0 {
-		b.WriteString(", notIn: [")
-		for i, v := range vo.NotInUint {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(b, "%d", v)
-		}
-		b.WriteString("]")
-	}
-
-	// Float constraints
-	if vo.GTEFloat != nil {
-		fmt.Fprintf(b, ", minimum: %g", *vo.GTEFloat)
-	}
-	if vo.LTEFloat != nil {
-		fmt.Fprintf(b, ", maximum: %g", *vo.LTEFloat)
-	}
-	if vo.GTFloat != nil {
-		fmt.Fprintf(b, ", exclusiveMinimum: %g", *vo.GTFloat)
-	}
-	if vo.LTFloat != nil {
-		fmt.Fprintf(b, ", exclusiveMaximum: %g", *vo.LTFloat)
-	}
+	parts = appendConstraintParts(parts, vo)
 
 	// Enum constraints
 	if vo.DefinedOnly {
-		b.WriteString(", definedOnly: true")
+		parts = append(parts, "definedOnly: true")
 	}
 
 	// Repeated constraints
 	if vo.MinItems != nil {
-		fmt.Fprintf(b, ", minItems: %d", *vo.MinItems)
+		parts = append(parts, fmt.Sprintf("minItems: %d", *vo.MinItems))
 	}
 	if vo.MaxItems != nil {
-		fmt.Fprintf(b, ", maxItems: %d", *vo.MaxItems)
+		parts = append(parts, fmt.Sprintf("maxItems: %d", *vo.MaxItems))
 	}
+
+	fmt.Fprintf(b, "%s%s: { %s", indent, jsonName, strings.Join(parts, ", "))
+
 	if vo.Items != nil {
 		b.WriteString(", items: { ")
-		writeItemRules(b, vo.Items)
+		writeItemRules(b, vo.Items, f)
 		b.WriteString(" }")
 	}
 
 	b.WriteString(" }")
 }
 
-// writeItemRules writes validation rules for repeated field items (inner constraints).
-// These are simpler than top-level field rules: no required/type prefix, no nested items.
-func writeItemRules(b *strings.Builder, vo *model.ValidateFieldOptions) {
-	// type is always emitted for items
-	// Items inherit the element scalar type, but we don't have the field here.
-	// The caller should handle type; for items we write constraints only.
+// tsItemValidationType returns the validation "type" value for items of a repeated field.
+// parentField must be a repeated field.
+func tsItemValidationType(parentField transform.GoField) string {
+	switch parentField.Type.Kind {
+	case model.FieldKindScalar:
+		return tsScalarValidationType(parentField.Type.Scalar)
+	case model.FieldKindEnum:
+		return "enum"
+	case model.FieldKindMessage:
+		return "object"
+	default:
+		return "unknown"
+	}
+}
 
+// appendConstraintParts appends TS validation rule key-value pairs for the
+// constraint fields of vo that are shared between field-level and item-level rules:
+// string, signed integer, unsigned integer, and float constraints.
+func appendConstraintParts(parts []string, vo *model.ValidateFieldOptions) []string {
+	// String constraints
 	if vo.MinLen != nil {
-		fmt.Fprintf(b, "minLength: %d", *vo.MinLen)
+		parts = append(parts, fmt.Sprintf("minLength: %d", *vo.MinLen))
 	}
 	if vo.MaxLen != nil {
-		if vo.MinLen != nil {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "maxLength: %d", *vo.MaxLen)
+		parts = append(parts, fmt.Sprintf("maxLength: %d", *vo.MaxLen))
 	}
 	if vo.Pattern != "" {
-		if vo.MinLen != nil || vo.MaxLen != nil {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "pattern: %q", vo.Pattern)
+		parts = append(parts, fmt.Sprintf("pattern: %q", vo.Pattern))
 	}
 	if vo.Email {
-		if vo.MinLen != nil || vo.MaxLen != nil || vo.Pattern != "" {
-			b.WriteString(", ")
-		}
-		b.WriteString("format: \"email\"")
+		parts = append(parts, "format: \"email\"")
 	}
 	if vo.URI {
-		if vo.MinLen != nil || vo.MaxLen != nil || vo.Pattern != "" || vo.Email {
-			b.WriteString(", ")
+		parts = append(parts, "format: \"uri\"")
+	}
+	if len(vo.InStr) > 0 {
+		elems := make([]string, len(vo.InStr))
+		for i, v := range vo.InStr {
+			elems[i] = fmt.Sprintf("%q", v)
 		}
-		b.WriteString("format: \"uri\"")
+		parts = append(parts, "enum: ["+strings.Join(elems, ", ")+"]")
+	}
+	if len(vo.NotInStr) > 0 {
+		elems := make([]string, len(vo.NotInStr))
+		for i, v := range vo.NotInStr {
+			elems[i] = fmt.Sprintf("%q", v)
+		}
+		parts = append(parts, "notIn: ["+strings.Join(elems, ", ")+"]")
 	}
 
-	// Integer constraints
-	needsComma := vo.MinLen != nil || vo.MaxLen != nil || vo.Pattern != "" || vo.Email || vo.URI
+	// Signed integer constraints
 	if vo.GTEInt != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "minimum: %d", *vo.GTEInt)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("minimum: %d", *vo.GTEInt))
 	}
 	if vo.LTEInt != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "maximum: %d", *vo.LTEInt)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("maximum: %d", *vo.LTEInt))
 	}
 	if vo.GTInt != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "exclusiveMinimum: %d", *vo.GTInt)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("exclusiveMinimum: %d", *vo.GTInt))
 	}
 	if vo.LTInt != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "exclusiveMaximum: %d", *vo.LTInt)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("exclusiveMaximum: %d", *vo.LTInt))
 	}
 	if len(vo.InInt) > 0 {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		b.WriteString("enum: [")
+		elems := make([]string, len(vo.InInt))
 		for i, v := range vo.InInt {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(b, "%d", v)
+			elems[i] = fmt.Sprintf("%d", v)
 		}
-		b.WriteString("]")
-		needsComma = true
+		parts = append(parts, "enum: ["+strings.Join(elems, ", ")+"]")
 	}
 	if len(vo.NotInInt) > 0 {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		b.WriteString("notIn: [")
+		elems := make([]string, len(vo.NotInInt))
 		for i, v := range vo.NotInInt {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(b, "%d", v)
+			elems[i] = fmt.Sprintf("%d", v)
 		}
-		b.WriteString("]")
-		needsComma = true
+		parts = append(parts, "notIn: ["+strings.Join(elems, ", ")+"]")
 	}
 
 	// Unsigned integer constraints
 	if vo.GTEUint != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "minimum: %d", *vo.GTEUint)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("minimum: %d", *vo.GTEUint))
 	}
 	if vo.LTEUint != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "maximum: %d", *vo.LTEUint)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("maximum: %d", *vo.LTEUint))
 	}
 	if vo.GTUint != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "exclusiveMinimum: %d", *vo.GTUint)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("exclusiveMinimum: %d", *vo.GTUint))
 	}
 	if vo.LTUint != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "exclusiveMaximum: %d", *vo.LTUint)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("exclusiveMaximum: %d", *vo.LTUint))
 	}
 	if len(vo.InUint) > 0 {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		b.WriteString("enum: [")
+		elems := make([]string, len(vo.InUint))
 		for i, v := range vo.InUint {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(b, "%d", v)
+			elems[i] = fmt.Sprintf("%d", v)
 		}
-		b.WriteString("]")
-		needsComma = true
+		parts = append(parts, "enum: ["+strings.Join(elems, ", ")+"]")
 	}
 	if len(vo.NotInUint) > 0 {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		b.WriteString("notIn: [")
+		elems := make([]string, len(vo.NotInUint))
 		for i, v := range vo.NotInUint {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(b, "%d", v)
+			elems[i] = fmt.Sprintf("%d", v)
 		}
-		b.WriteString("]")
-		needsComma = true
+		parts = append(parts, "notIn: ["+strings.Join(elems, ", ")+"]")
 	}
 
 	// Float constraints
 	if vo.GTEFloat != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "minimum: %g", *vo.GTEFloat)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("minimum: %g", *vo.GTEFloat))
 	}
 	if vo.LTEFloat != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "maximum: %g", *vo.LTEFloat)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("maximum: %g", *vo.LTEFloat))
 	}
 	if vo.GTFloat != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "exclusiveMinimum: %g", *vo.GTFloat)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("exclusiveMinimum: %g", *vo.GTFloat))
 	}
 	if vo.LTFloat != nil {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "exclusiveMaximum: %g", *vo.LTFloat)
-		needsComma = true
+		parts = append(parts, fmt.Sprintf("exclusiveMaximum: %g", *vo.LTFloat))
 	}
+
+	return parts
+}
+
+// writeItemRules writes validation rules for repeated field items (inner constraints).
+// parentField is the repeated field whose items are being described; it is used to
+// emit the "type" property that identifies the element kind.
+func writeItemRules(b *strings.Builder, vo *model.ValidateFieldOptions, parentField transform.GoField) {
+	var parts []string
+
+	// type is always emitted first for items
+	parts = append(parts, fmt.Sprintf("type: %q", tsItemValidationType(parentField)))
+
+	parts = appendConstraintParts(parts, vo)
 
 	// DefinedOnly for enum items
 	if vo.DefinedOnly {
-		if needsComma {
-			b.WriteString(", ")
-		}
-		b.WriteString("definedOnly: true")
+		parts = append(parts, "definedOnly: true")
 	}
+
+	b.WriteString(strings.Join(parts, ", "))
 }

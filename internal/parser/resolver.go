@@ -76,6 +76,11 @@ type gcodeExtensions struct {
 // protoc-generated Go code.
 // Results are cached after the first call; subsequent calls return the cached value.
 func buildGcodeExtensions() (*gcodeExtensions, error) {
+	// gcodeExtsOnce ensures extensions are compiled exactly once.
+	// If compilation fails, the error is cached and all subsequent calls
+	// return the same error — there is no retry mechanism. This is intentional:
+	// extension compilation failure indicates a corrupted embed or a programming
+	// error, not a transient condition.
 	gcodeExtsOnce.Do(func() {
 		cachedGcodeExts, gcodeExtsErr = compileGcodeExtensions()
 	})

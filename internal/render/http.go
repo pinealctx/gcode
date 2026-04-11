@@ -25,10 +25,8 @@ func HTTPFile(gf transform.GoFile, modulePath string) ([]byte, error) {
 
 	if bodyStr != "" {
 		fmt.Fprintf(&b, "import (\n")
-		if strings.Contains(bodyStr, "http.") {
-			fmt.Fprintf(&b, "\t\"net/http\"\n\n")
-		}
 		fmt.Fprintf(&b, "\t\"github.com/gin-gonic/gin\"\n")
+		fmt.Fprintf(&b, "\t\"github.com/pinealctx/x/handlerx\"\n\n")
 		fmt.Fprintf(&b, "\t\"%s/httpruntime\"\n", modulePath)
 		fmt.Fprintf(&b, ")\n\n")
 	}
@@ -45,24 +43,9 @@ func HTTPFile(gf transform.GoFile, modulePath string) ([]byte, error) {
 func writeServiceHandlers(b *strings.Builder, svc transform.GoService) {
 	for _, m := range svc.Methods {
 		writeComment(b, m.Comment.Lines)
-		fmt.Fprintf(b, "func %sHandler(svc %s) gin.HandlerFunc {\n", m.GoName, svc.GoName)
-		b.WriteString("\treturn func(c *gin.Context) {\n")
-		fmt.Fprintf(b, "\t\tvar req %s\n", m.RequestType)
-		b.WriteString("\t\tif err := c.ShouldBind(&req); err != nil {\n")
-		b.WriteString("\t\t\t_ = c.Error(err)\n")
-		b.WriteString("\t\t\treturn\n")
-		b.WriteString("\t\t}\n")
-		b.WriteString("\t\tif err := req.Validate(); err != nil {\n")
-		b.WriteString("\t\t\t_ = c.Error(err)\n")
-		b.WriteString("\t\t\treturn\n")
-		b.WriteString("\t\t}\n")
-		fmt.Fprintf(b, "\t\tresp, err := svc.%s(c.Request.Context(), &req)\n", m.GoName)
-		b.WriteString("\t\tif err != nil {\n")
-		b.WriteString("\t\t\t_ = c.Error(err)\n")
-		b.WriteString("\t\t\treturn\n")
-		b.WriteString("\t\t}\n")
-		b.WriteString("\t\tc.JSON(http.StatusOK, httpruntime.OKResponse(resp))\n")
-		b.WriteString("\t}\n")
+		fmt.Fprintf(b, "func %sHandler(svc %s, interceptors ...handlerx.Interceptor[*%s, *%s]) gin.HandlerFunc {\n",
+			m.GoName, svc.GoName, m.RequestType, m.ResponseType)
+		fmt.Fprintf(b, "\treturn httpruntime.NewHandler(svc.%s, interceptors...)\n", m.GoName)
 		b.WriteString("}\n\n")
 	}
 }

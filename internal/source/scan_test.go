@@ -140,3 +140,36 @@ func writeFile(t *testing.T, dir, name, content string) {
 		t.Fatalf("write file %q: %v", name, err)
 	}
 }
+
+// TestScanRejectsNewlineInPath verifies that Scan rejects proto files whose
+// relative path contains newline or carriage return characters. Such characters
+// would break the generated "// source:" header comment by injecting arbitrary
+// lines into the output file.
+// This test only runs on Linux because Windows and macOS disallow these
+// characters in file names at the filesystem level.
+func TestScanRejectsNewlineInPath(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("newline-in-filename test only runs on Linux")
+	}
+	t.Parallel()
+
+	t.Run("newline_LF", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		writeFile(t, dir, "bad\nfile.proto", "syntax = \"proto3\";")
+		_, err := Scan(dir)
+		if err == nil {
+			t.Fatal("expected error for path containing LF, got nil")
+		}
+	})
+
+	t.Run("newline_CR", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		writeFile(t, dir, "bad\rfile.proto", "syntax = \"proto3\";")
+		_, err := Scan(dir)
+		if err == nil {
+			t.Fatal("expected error for path containing CR, got nil")
+		}
+	})
+}

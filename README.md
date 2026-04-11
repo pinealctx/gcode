@@ -146,7 +146,7 @@ This generates `.pb.ts` files with TypeScript interfaces, enums, and validation 
 | Limitation                          | Details                                                                       |
 | ----------------------------------- | ----------------------------------------------------------------------------- |
 | No streaming RPC                    | Exits with error when `stream` keyword is encountered                         |
-| No path params                      | HTTP handlers use `c.ShouldBind` uniformly; URL path parameters not supported |
+| No path params                      | HTTP handlers use `c.ShouldBindJSON` uniformly; URL path parameters not supported |
 | No `map`, `oneof`, well-known types | Proto files using these features may produce incorrect code                   |
 | Cross-package references untested   | Same-package cross-file works; cross-package not fully tested                 |
 | proto3 only                         | proto2 syntax is not supported                                                |

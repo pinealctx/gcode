@@ -394,6 +394,52 @@ func TestTSFileEnumWithComment(t *testing.T) {
 	assertContains(t, s, "/**\n * An item.\n * With detail.\n */\nexport interface Item {")
 }
 
+// TestTSCommentJSDocEscape verifies that "*/" sequences in proto comments are
+// escaped to "* /" so they cannot prematurely close a JSDoc block.
+func TestTSCommentJSDocEscape(t *testing.T) {
+	t.Parallel()
+
+	gf := transform.GoFile{
+		Source:  "escape.proto",
+		Package: "test",
+		Enums: []transform.GoEnum{
+			{
+				GoName: "Status",
+				// "*/" at end of line, and consecutive "*/" sequences.
+				Comment: model.Comment{Lines: []string{"Ends with */ here.", "*/ at start, and a */ b */ c consecutive."}},
+				Values:  []transform.GoEnumValue{{GoName: "Status_OK", Number: 0}},
+			},
+		},
+		Messages: []transform.GoMessage{
+			{
+				GoName:  "Msg",
+				Comment: model.Comment{Lines: []string{"Line one.", "Contains */ mid-line.", "Line three."}},
+				Fields:  []transform.GoField{scalarField("id", "id", model.ScalarString)},
+			},
+		},
+	}
+
+	out, err := TSFile(gf, nil)
+	if err != nil {
+		t.Fatalf("TSFile returned error: %v", err)
+	}
+
+	s := string(out)
+	// Positive: escaped forms must be present.
+	assertContains(t, s, " * Ends with * / here.")
+	assertContains(t, s, " * * / at start, and a * / b * / c consecutive.")
+	assertContains(t, s, " * Contains * / mid-line.")
+
+	// Negative: no bare "*/" may appear anywhere in the output.
+	// The only legitimate "*/" in generated TS is the JSDoc closing tag " */",
+	// which always has a leading space. Strip all " */" occurrences and verify
+	// no bare "*/" remains.
+	stripped := strings.ReplaceAll(s, " */", "")
+	if strings.Contains(stripped, "*/") {
+		t.Errorf("unescaped */ found in generated output after removing closing tags:\n%s", s)
+	}
+}
+
 func TestTSFileEnumField(t *testing.T) {
 	t.Parallel()
 

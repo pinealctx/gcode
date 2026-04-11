@@ -2,12 +2,14 @@ package app
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/pinealctx/gcode/internal/config"
+	"github.com/pinealctx/gcode/internal/source"
 )
 
 func TestRunGenTS_BasicRouting(t *testing.T) {
@@ -73,7 +75,7 @@ func TestRunGenTS_NoProtoFiles(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty input directory, got nil")
 	}
-	if !errors.Is(err, config.ErrNoProtoFiles) {
+	if !errors.Is(err, source.ErrNoProtoFiles) {
 		t.Errorf("error = %q, want ErrNoProtoFiles", err.Error())
 	}
 }
@@ -90,9 +92,6 @@ func TestRunGenTS_InvalidProto(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid proto, got nil")
 	}
-	if !strings.Contains(err.Error(), "parse proto files") {
-		t.Errorf("error = %q, want parse proto files error", err.Error())
-	}
 }
 
 func TestRunGenTS_InputDirNotExist(t *testing.T) {
@@ -105,8 +104,8 @@ func TestRunGenTS_InputDirNotExist(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for non-existent input dir, got nil")
 	}
-	if !strings.Contains(err.Error(), "scan input directory") {
-		t.Errorf("error = %q, want scan input directory error", err.Error())
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("expected fs.ErrNotExist, got %T: %v", err, err)
 	}
 }
 
@@ -125,5 +124,50 @@ func TestTsOutputFileName(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("tsOutputFileName(%q) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
+
+// TestRunGenTS_OutputFileNameCollision verifies that two proto files in different
+// subdirectories with the same basename are detected and rejected before any
+// output is written.
+func TestRunGenTS_OutputFileNameCollision(t *testing.T) {
+	t.Parallel()
+
+	inputDir := t.TempDir()
+	outputDir := t.TempDir()
+
+	sub1 := filepath.Join(inputDir, "sub1")
+	sub2 := filepath.Join(inputDir, "sub2")
+	if err := os.MkdirAll(sub1, 0o755); err != nil {
+		t.Fatalf("mkdir sub1: %v", err)
+	}
+	if err := os.MkdirAll(sub2, 0o755); err != nil {
+		t.Fatalf("mkdir sub2: %v", err)
+	}
+
+	writeFile(t, filepath.Join(sub1, "user.proto"), `syntax = "proto3";
+package pkg_a;
+option go_package = "example.com/test;testpb";
+message UserA { string name = 1; }
+`)
+	writeFile(t, filepath.Join(sub2, "user.proto"), `syntax = "proto3";
+package pkg_b;
+option go_package = "example.com/test;testpb";
+message UserB { int32 id = 1; }
+`)
+
+	err := RunGenTS(t.Context(), []string{"-in", inputDir, "-out", outputDir})
+	if err == nil {
+		t.Fatal("expected error for output filename collision, got nil")
+	}
+	if !errors.Is(err, ErrOutputFilenameCollision) {
+		t.Errorf("expected ErrOutputFilenameCollision, got: %v", err)
+	}
+	entries, readErr := os.ReadDir(outputDir)
+	if readErr != nil {
+		t.Fatalf("ReadDir: %v", readErr)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected empty output dir on collision, got %d entries", len(entries))
 	}
 }

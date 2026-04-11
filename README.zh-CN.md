@@ -146,7 +146,7 @@ gcode gen-ts -in proto/ -out ts/
 | 限制                                    | 说明                                                      |
 | --------------------------------------- | --------------------------------------------------------- |
 | 不支持 streaming rpc                    | 遇到 `stream` 关键字报错退出                              |
-| 不支持 path param                       | HTTP handler 统一使用 `c.ShouldBind`，不支持 URL 路径参数 |
+| 不支持 path param                       | HTTP handler 统一使用 `c.ShouldBindJSON`，不支持 URL 路径参数 |
 | 不支持 `map`、`oneof`、well-known types | 使用这些特性的 proto 文件可能生成错误代码                 |
 | 不支持跨 package 引用                   | 同 package 跨文件已支持，跨 package 未充分测试            |
 | 仅支持 proto3                           | 不支持 proto2 语法                                        |

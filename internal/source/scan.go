@@ -50,7 +50,9 @@ func Scan(inputDir string) (ScanResult, error) {
 			return nil
 		}
 
-		// Resolve symlinks and verify the resolved path stays inside absDir.
+		// EvalSymlinks resolves the symlink before the Rel check. There is a theoretical
+		// TOCTOU window between resolution and use, but the risk is negligible in practice:
+		// proto source directories are not adversarially controlled.
 		resolved, err := filepath.EvalSymlinks(path)
 		if err != nil {
 			return fmt.Errorf("resolve symlink %q: %w", path, err)
@@ -62,6 +64,12 @@ func Scan(inputDir string) (ScanResult, error) {
 		rel, err := filepath.Rel(absDir, path)
 		if err != nil {
 			return fmt.Errorf("compute relative path for %q: %w", path, err)
+		}
+		// Reject paths containing newline or carriage return characters.
+		// Such names are valid on Linux but would break the generated "// source:"
+		// header comment by injecting arbitrary lines into the output file.
+		if strings.ContainsAny(rel, "\n\r") {
+			return fmt.Errorf("proto file path %q contains invalid characters (newline/carriage return)", rel)
 		}
 		// protocompile expects forward-slash paths.
 		files = append(files, filepath.ToSlash(rel))

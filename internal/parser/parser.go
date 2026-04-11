@@ -7,6 +7,7 @@ import (
 
 	"github.com/bufbuild/protocompile"
 	"github.com/bufbuild/protocompile/linker"
+	"github.com/pinealctx/x/errorx"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
@@ -131,7 +132,7 @@ func mapServices(file protoreflect.FileDescriptor) ([]model.Service, error) {
 		for j := 0; j < svc.Methods().Len(); j++ {
 			method := svc.Methods().Get(j)
 			if method.IsStreamingClient() || method.IsStreamingServer() {
-				return nil, fmt.Errorf("service %q: rpc %q uses streaming, which is not supported",
+				return nil, errorx.NewSentinelf[parserTag]("service %q: rpc %q uses streaming, which is not supported",
 					svc.Name(), method.Name())
 			}
 			rpcs = append(rpcs, model.RPC{

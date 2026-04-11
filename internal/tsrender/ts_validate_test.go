@@ -271,7 +271,7 @@ func TestValidationRepeatedRules(t *testing.T) {
 
 	s := renderRules(msg)
 	assertContains(t, s, `export const ListRules = {`)
-	assertContains(t, s, `scores: { required: false, type: "array", minItems: 1, maxItems: 100, items: { minimum: 0, maximum: 100 } }`)
+	assertContains(t, s, `scores: { required: false, type: "array", minItems: 1, maxItems: 100, items: { type: "integer", minimum: 0, maximum: 100 } }`)
 	assertContains(t, s, `} as const`)
 }
 
@@ -474,7 +474,7 @@ func TestValidationRepeatedWithEnumItems(t *testing.T) {
 	}
 
 	s := renderRules(msg)
-	assertContains(t, s, `statuses: { required: false, type: "array", minItems: 1, maxItems: 10, items: { definedOnly: true } }`)
+	assertContains(t, s, `statuses: { required: false, type: "array", minItems: 1, maxItems: 10, items: { type: "enum", definedOnly: true } }`)
 }
 
 func TestValidationTypeUnknown(t *testing.T) {
@@ -555,7 +555,7 @@ func TestValidationRepeatedItemsStringRules(t *testing.T) {
 	}
 
 	s := renderRules(msg)
-	assertContains(t, s, `items: { required: false, type: "array", minItems: 1, maxItems: 50, items: { minLength: 1, maxLength: 100, pattern: "^[a-z]+$", format: "email" } }`)
+	assertContains(t, s, `items: { required: false, type: "array", minItems: 1, maxItems: 50, items: { type: "string", minLength: 1, maxLength: 100, pattern: "^[a-z]+$", format: "email" } }`)
 }
 
 func TestValidationRepeatedItemsUintAndFloatRules(t *testing.T) {
@@ -597,8 +597,8 @@ func TestValidationRepeatedItemsUintAndFloatRules(t *testing.T) {
 	}
 
 	s := renderRules(msg)
-	assertContains(t, s, `uids: { required: false, type: "array", minItems: 1, items: { minimum: 1, maximum: 100, enum: [10, 20] } }`)
-	assertContains(t, s, `ratios: { required: false, type: "array", minItems: 1, items: { minimum: 0, maximum: 1 } }`)
+	assertContains(t, s, `uids: { required: false, type: "array", minItems: 1, items: { type: "integer", minimum: 1, maximum: 100, enum: [10, 20] } }`)
+	assertContains(t, s, `ratios: { required: false, type: "array", minItems: 1, items: { type: "number", minimum: 0, maximum: 1 } }`)
 }
 
 func TestValidationRepeatedItemsURIAndNotIn(t *testing.T) {
@@ -624,7 +624,7 @@ func TestValidationRepeatedItemsURIAndNotIn(t *testing.T) {
 	}
 
 	s := renderRules(msg)
-	assertContains(t, s, `links: { required: false, type: "array", items: { minLength: 1, format: "uri" } }`)
+	assertContains(t, s, `links: { required: false, type: "array", items: { type: "string", minLength: 1, format: "uri" } }`)
 }
 
 func TestValidationEmptyInStrSlice(t *testing.T) {
@@ -745,5 +745,298 @@ func TestValidationFullFile(t *testing.T) {
 	rulesSection := s[rulesStart : rulesStart+rulesEnd]
 	if strings.Contains(rulesSection, "note") {
 		t.Errorf("field 'note' without ValidateOptions should not appear in rules, got:\n%s", rulesSection)
+	}
+}
+
+// TestValidationRepeatedItemsTypeMapping verifies that tsItemValidationType
+// correctly maps every scalar kind, enum, message, and unknown kind to the
+// expected "type" string inside the items object.
+func TestValidationRepeatedItemsTypeMapping(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		fieldType model.FieldType
+		wantType  string
+	}{
+		{"bytes", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarBytes}, "string"},
+		{"float", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarFloat}, "number"},
+		{"bool", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarBool}, "boolean"},
+		{"sint32", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarSint32}, "integer"},
+		{"sfixed32", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarSfixed32}, "integer"},
+		{"fixed32", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarFixed32}, "integer"},
+		{"int64", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}, "integer"},
+		{"sint64", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarSint64}, "integer"},
+		{"sfixed64", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarSfixed64}, "integer"},
+		{"uint64", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarUint64}, "integer"},
+		{"fixed64", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarFixed64}, "integer"},
+		{"message", model.FieldType{Kind: model.FieldKindMessage, FullName: "test.Addr"}, "object"},
+		{"unknown scalar", model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarKind("ts")}, "unknown"},
+		{"unknown kind", model.FieldType{Kind: model.FieldKind("map")}, "unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			msg := transform.GoMessage{
+				GoName: "T",
+				Fields: []transform.GoField{
+					{
+						Field: model.Field{
+							JSONName:    "f",
+							Cardinality: model.CardinalityRepeated,
+							Type:        tt.fieldType,
+							ValidateOptions: &model.ValidateFieldOptions{
+								Items: &model.ValidateFieldOptions{},
+							},
+						},
+					},
+				},
+			}
+			s := renderRules(msg)
+			assertContains(t, s, `items: { type: "`+tt.wantType+`" }`)
+			// The items block itself must not contain "required:" — items have no required field.
+			// Extract the items substring to check only the inner block.
+			if idx := strings.Index(s, "items: {"); idx >= 0 {
+				itemsBlock := s[idx:]
+				if end := strings.Index(itemsBlock, "}"); end >= 0 {
+					itemsBlock = itemsBlock[:end+1]
+					if strings.Contains(itemsBlock, "required:") {
+						t.Errorf("items block should not contain required:, got items block:\n%s", itemsBlock)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestValidationRepeatedItemsNotInAndInInt verifies that InInt, NotInInt, and
+// NotInUint constraints are correctly rendered inside the items object.
+func TestValidationRepeatedItemsNotInAndInInt(t *testing.T) {
+	t.Parallel()
+
+	msg := transform.GoMessage{
+		GoName: "Nums",
+		Fields: []transform.GoField{
+			{
+				Field: model.Field{
+					JSONName:    "codes",
+					Cardinality: model.CardinalityRepeated,
+					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt32},
+					ValidateOptions: &model.ValidateFieldOptions{
+						Items: &model.ValidateFieldOptions{
+							InInt:    []int64{1, 2, 3},
+							NotInInt: []int64{0},
+						},
+					},
+				},
+			},
+			{
+				Field: model.Field{
+					JSONName:    "flags",
+					Cardinality: model.CardinalityRepeated,
+					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarUint32},
+					ValidateOptions: &model.ValidateFieldOptions{
+						Items: &model.ValidateFieldOptions{
+							NotInUint: []uint64{0},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	s := renderRules(msg)
+	assertContains(t, s, `codes: { required: false, type: "array", items: { type: "integer", enum: [1, 2, 3], notIn: [0] } }`)
+	assertContains(t, s, `flags: { required: false, type: "array", items: { type: "integer", notIn: [0] } }`)
+}
+
+// TestTSScalarValidationType verifies that tsScalarValidationType maps every
+// scalar kind to the correct TS validation type string. This documents the
+// intentional difference from tsScalarType: 64-bit integers map to "integer"
+// (not "string"), and all integer variants map to "integer" (not "number").
+func TestTSScalarValidationType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		scalar   model.ScalarKind
+		wantType string
+	}{
+		{model.ScalarString, "string"},
+		{model.ScalarBytes, "string"},
+		{model.ScalarInt32, "integer"},
+		{model.ScalarSint32, "integer"},
+		{model.ScalarSfixed32, "integer"},
+		{model.ScalarUint32, "integer"},
+		{model.ScalarFixed32, "integer"},
+		{model.ScalarInt64, "integer"},
+		{model.ScalarSint64, "integer"},
+		{model.ScalarSfixed64, "integer"},
+		{model.ScalarUint64, "integer"},
+		{model.ScalarFixed64, "integer"},
+		{model.ScalarFloat, "number"},
+		{model.ScalarDouble, "number"},
+		{model.ScalarBool, "boolean"},
+		{model.ScalarKind("unknown"), "unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.scalar), func(t *testing.T) {
+			t.Parallel()
+			got := tsScalarValidationType(tt.scalar)
+			if got != tt.wantType {
+				t.Errorf("tsScalarValidationType(%q) = %q, want %q", tt.scalar, got, tt.wantType)
+			}
+		})
+	}
+}
+
+// TestValidationRepeatedItemsExclusiveBounds verifies that exclusive integer
+// and float bounds (GTInt/LTInt, GTUint/LTUint, GTFloat/LTFloat) are correctly
+// rendered inside the items object.
+func TestValidationRepeatedItemsExclusiveBounds(t *testing.T) {
+	t.Parallel()
+
+	msg := transform.GoMessage{
+		GoName: "Bounds",
+		Fields: []transform.GoField{
+			{
+				Field: model.Field{
+					JSONName:    "ints",
+					Cardinality: model.CardinalityRepeated,
+					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt32},
+					ValidateOptions: &model.ValidateFieldOptions{
+						Items: &model.ValidateFieldOptions{
+							GTInt: intPtr(0),
+							LTInt: intPtr(100),
+						},
+					},
+				},
+			},
+			{
+				Field: model.Field{
+					JSONName:    "uints",
+					Cardinality: model.CardinalityRepeated,
+					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarUint32},
+					ValidateOptions: &model.ValidateFieldOptions{
+						Items: &model.ValidateFieldOptions{
+							GTUint: uintPtr(5),
+							LTUint: uintPtr(50),
+						},
+					},
+				},
+			},
+			{
+				Field: model.Field{
+					JSONName:    "floats",
+					Cardinality: model.CardinalityRepeated,
+					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarFloat},
+					ValidateOptions: &model.ValidateFieldOptions{
+						Items: &model.ValidateFieldOptions{
+							GTFloat: floatPtr(0),
+							LTFloat: floatPtr(1),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	s := renderRules(msg)
+	assertContains(t, s, `ints: { required: false, type: "array", items: { type: "integer", exclusiveMinimum: 0, exclusiveMaximum: 100 } }`)
+	assertContains(t, s, `uints: { required: false, type: "array", items: { type: "integer", exclusiveMinimum: 5, exclusiveMaximum: 50 } }`)
+	assertContains(t, s, `floats: { required: false, type: "array", items: { type: "number", exclusiveMinimum: 0, exclusiveMaximum: 1 } }`)
+}
+
+// TestValidationRepeatedItemsInStrAndNotInStr verifies that InStr and NotInStr
+// constraints are correctly rendered inside the items object.
+func TestValidationRepeatedItemsInStrAndNotInStr(t *testing.T) {
+	t.Parallel()
+
+	msg := transform.GoMessage{
+		GoName: "Strs",
+		Fields: []transform.GoField{
+			{
+				Field: model.Field{
+					JSONName:    "colors",
+					Cardinality: model.CardinalityRepeated,
+					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
+					ValidateOptions: &model.ValidateFieldOptions{
+						Items: &model.ValidateFieldOptions{
+							InStr:    []string{"red", "green", "blue"},
+							NotInStr: []string{"black"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	s := renderRules(msg)
+	assertContains(t, s, `colors: { required: false, type: "array", items: { type: "string", enum: ["red", "green", "blue"], notIn: ["black"] } }`)
+}
+
+// TestValidationRepeatedItemsEmptyInStr verifies that an empty InStr slice
+// inside items does not produce an "enum:" key (mirrors TestValidationEmptyInStrSlice
+// for the items context).
+func TestValidationRepeatedItemsEmptyInStr(t *testing.T) {
+	t.Parallel()
+
+	msg := transform.GoMessage{
+		GoName: "Edge",
+		Fields: []transform.GoField{
+			{
+				Field: model.Field{
+					JSONName:    "tags",
+					Cardinality: model.CardinalityRepeated,
+					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
+					ValidateOptions: &model.ValidateFieldOptions{
+						Items: &model.ValidateFieldOptions{
+							InStr: []string{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	s := renderRules(msg)
+	assertContains(t, s, `items: { type: "string" }`)
+	if strings.Contains(s, "enum:") {
+		t.Errorf("empty InStr slice in items should not produce enum key, got:\n%s", s)
+	}
+}
+
+// TestValidationRepeatedItemsFloatNoEnumKeys verifies that float items with
+// only min/max constraints do not accidentally produce enum or notIn keys.
+func TestValidationRepeatedItemsFloatNoEnumKeys(t *testing.T) {
+	t.Parallel()
+
+	msg := transform.GoMessage{
+		GoName: "Rates",
+		Fields: []transform.GoField{
+			{
+				Field: model.Field{
+					JSONName:    "scores",
+					Cardinality: model.CardinalityRepeated,
+					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarDouble},
+					ValidateOptions: &model.ValidateFieldOptions{
+						Items: &model.ValidateFieldOptions{
+							GTEFloat: floatPtr(0),
+							LTEFloat: floatPtr(1),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	s := renderRules(msg)
+	assertContains(t, s, `scores: { required: false, type: "array", items: { type: "number", minimum: 0, maximum: 1 } }`)
+	if strings.Contains(s, "enum:") {
+		t.Errorf("float items should not produce enum key, got:\n%s", s)
+	}
+	if strings.Contains(s, "notIn:") {
+		t.Errorf("float items should not produce notIn key, got:\n%s", s)
 	}
 }

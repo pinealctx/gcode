@@ -1,0 +1,352 @@
+// Package compat_test — validate constraint tests for AllValidate.
+// Covers every constraint type with at least one positive (pass) and one negative (fail) case.
+package compat_test
+
+import (
+	"testing"
+
+	"github.com/pinealctx/gcode/testdata/compat/dao"
+)
+
+// validAllValidate returns an AllValidate that satisfies all constraints.
+func validAllValidate() *dao.AllValidate {
+	status := dao.Status_STATUS_ACTIVE
+	return &dao.AllValidate{
+		UGte:    1,                     // gte=1: exactly at boundary
+		ULte:    1000,                  // lte=1000: exactly at boundary
+		UIn:     2,                     // in=[1,2,3]
+		UNotIn:  5,                     // not_in=[0]: any non-zero value
+		FGt:     0.1,                   // gt=0
+		DLte:    0.5,                   // lte=1.0
+		SIn:     "b",                   // in=[a,b,c]
+		SNotIn:  "z",                   // not_in=[x,y]
+		IIn:     1,                     // in=[1,2,-1]
+		SUri:    "https://example.com", // valid URI
+		OStatus: &status,               // defined_only
+		BMinmax: []byte{0x01},          // min_len=1, max_len=100
+		RItems:  []int32{0, 1, 2},      // items.gte=0
+	}
+}
+
+// TestAllValidate_Valid verifies that a fully valid AllValidate passes Validate().
+func TestAllValidate_Valid(t *testing.T) {
+	t.Parallel()
+	if err := validAllValidate().Validate(); err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+}
+
+// TestAllValidate_UGte verifies uint32 gte constraint.
+func TestAllValidate_UGte(t *testing.T) {
+	t.Parallel()
+
+	// fail: 0 < 1
+	a := validAllValidate()
+	a.UGte = 0
+	assertVE(t, a.Validate(), "u_gte", "gte")
+
+	// pass: exactly at boundary
+	a2 := validAllValidate()
+	a2.UGte = 1
+	if err := a2.Validate(); err != nil {
+		t.Errorf("u_gte=1 should pass, got: %v", err)
+	}
+}
+
+// TestAllValidate_ULte verifies uint64 lte constraint.
+func TestAllValidate_ULte(t *testing.T) {
+	t.Parallel()
+
+	// fail: 1001 > 1000
+	a := validAllValidate()
+	a.ULte = 1001
+	assertVE(t, a.Validate(), "u_lte", "lte")
+
+	// pass: exactly at boundary
+	a2 := validAllValidate()
+	a2.ULte = 1000
+	if err := a2.Validate(); err != nil {
+		t.Errorf("u_lte=1000 should pass, got: %v", err)
+	}
+}
+
+// TestAllValidate_UIn verifies uint32 in constraint.
+func TestAllValidate_UIn(t *testing.T) {
+	t.Parallel()
+
+	// fail: 4 not in [1,2,3]
+	a := validAllValidate()
+	a.UIn = 4
+	assertVE(t, a.Validate(), "u_in", "in")
+
+	// pass: all valid values
+	for _, v := range []uint32{1, 2, 3} {
+		a2 := validAllValidate()
+		a2.UIn = v
+		if err := a2.Validate(); err != nil {
+			t.Errorf("u_in=%d should pass, got: %v", v, err)
+		}
+	}
+}
+
+// TestAllValidate_UNotIn verifies uint32 not_in constraint.
+func TestAllValidate_UNotIn(t *testing.T) {
+	t.Parallel()
+
+	// fail: 0 is in not_in list
+	a := validAllValidate()
+	a.UNotIn = 0
+	assertVE(t, a.Validate(), "u_not_in", "not_in")
+
+	// pass: any non-zero value
+	a2 := validAllValidate()
+	a2.UNotIn = 1
+	if err := a2.Validate(); err != nil {
+		t.Errorf("u_not_in=1 should pass, got: %v", err)
+	}
+}
+
+// TestAllValidate_FGt verifies float32 gt constraint.
+func TestAllValidate_FGt(t *testing.T) {
+	t.Parallel()
+
+	// fail: 0 is not > 0
+	a := validAllValidate()
+	a.FGt = 0
+	assertVE(t, a.Validate(), "f_gt", "gt")
+
+	// fail: negative value
+	a2 := validAllValidate()
+	a2.FGt = -1.0
+	assertVE(t, a2.Validate(), "f_gt", "gt")
+
+	// pass: positive value
+	a3 := validAllValidate()
+	a3.FGt = 0.001
+	if err := a3.Validate(); err != nil {
+		t.Errorf("f_gt=0.001 should pass, got: %v", err)
+	}
+}
+
+// TestAllValidate_DLte verifies float64 lte constraint.
+func TestAllValidate_DLte(t *testing.T) {
+	t.Parallel()
+
+	// fail: 1.1 > 1.0
+	a := validAllValidate()
+	a.DLte = 1.1
+	assertVE(t, a.Validate(), "d_lte", "lte")
+
+	// pass: exactly at boundary
+	a2 := validAllValidate()
+	a2.DLte = 1.0
+	if err := a2.Validate(); err != nil {
+		t.Errorf("d_lte=1.0 should pass, got: %v", err)
+	}
+
+	// pass: zero value skips check (zero-value guard)
+	a3 := validAllValidate()
+	a3.DLte = 0
+	if err := a3.Validate(); err != nil {
+		t.Errorf("d_lte=0 (zero value) should pass, got: %v", err)
+	}
+}
+
+// TestAllValidate_SIn verifies string in constraint.
+func TestAllValidate_SIn(t *testing.T) {
+	t.Parallel()
+
+	// fail: "d" not in [a,b,c]
+	a := validAllValidate()
+	a.SIn = "d"
+	assertVE(t, a.Validate(), "s_in", "in")
+
+	// pass: all valid values
+	for _, v := range []string{"a", "b", "c"} {
+		a2 := validAllValidate()
+		a2.SIn = v
+		if err := a2.Validate(); err != nil {
+			t.Errorf("s_in=%q should pass, got: %v", v, err)
+		}
+	}
+
+	// pass: empty string skips check (zero-value guard)
+	a3 := validAllValidate()
+	a3.SIn = ""
+	if err := a3.Validate(); err != nil {
+		t.Errorf("s_in=\"\" (zero value) should skip check, got: %v", err)
+	}
+}
+
+// TestAllValidate_SNotIn verifies string not_in constraint.
+func TestAllValidate_SNotIn(t *testing.T) {
+	t.Parallel()
+
+	// fail: "x" is in not_in list
+	a := validAllValidate()
+	a.SNotIn = "x"
+	assertVE(t, a.Validate(), "s_not_in", "not_in")
+
+	// fail: "y" is in not_in list
+	a2 := validAllValidate()
+	a2.SNotIn = "y"
+	assertVE(t, a2.Validate(), "s_not_in", "not_in")
+
+	// pass: value not in forbidden list
+	a3 := validAllValidate()
+	a3.SNotIn = "z"
+	if err := a3.Validate(); err != nil {
+		t.Errorf("s_not_in=\"z\" should pass, got: %v", err)
+	}
+
+	// pass: empty string skips check (zero-value guard)
+	a4 := validAllValidate()
+	a4.SNotIn = ""
+	if err := a4.Validate(); err != nil {
+		t.Errorf("s_not_in=\"\" (zero value) should skip check, got: %v", err)
+	}
+}
+
+// TestAllValidate_IIn verifies int32 in constraint (signed).
+func TestAllValidate_IIn(t *testing.T) {
+	t.Parallel()
+
+	// fail: 0 not in [1,2,-1]
+	a := validAllValidate()
+	a.IIn = 0
+	assertVE(t, a.Validate(), "i_in", "in")
+
+	// fail: 3 not in [1,2,-1]
+	a2 := validAllValidate()
+	a2.IIn = 3
+	assertVE(t, a2.Validate(), "i_in", "in")
+
+	// pass: all valid values including negative
+	for _, v := range []int32{1, 2, -1} {
+		a3 := validAllValidate()
+		a3.IIn = v
+		if err := a3.Validate(); err != nil {
+			t.Errorf("i_in=%d should pass, got: %v", v, err)
+		}
+	}
+}
+
+// TestAllValidate_SUri verifies string uri constraint.
+func TestAllValidate_SUri(t *testing.T) {
+	t.Parallel()
+
+	// fail: not a valid URI
+	a := validAllValidate()
+	a.SUri = "not a uri"
+	assertVE(t, a.Validate(), "s_uri", "uri")
+
+	// pass: valid URI
+	a2 := validAllValidate()
+	a2.SUri = "https://example.com/path"
+	if err := a2.Validate(); err != nil {
+		t.Errorf("valid URI should pass, got: %v", err)
+	}
+
+	// pass: empty string skips check (zero-value guard)
+	a3 := validAllValidate()
+	a3.SUri = ""
+	if err := a3.Validate(); err != nil {
+		t.Errorf("s_uri=\"\" (zero value) should skip check, got: %v", err)
+	}
+}
+
+// TestAllValidate_OStatus verifies optional enum defined_only constraint.
+func TestAllValidate_OStatus(t *testing.T) {
+	t.Parallel()
+
+	// pass: nil skips check
+	a := validAllValidate()
+	a.OStatus = nil
+	if err := a.Validate(); err != nil {
+		t.Errorf("nil o_status should skip check, got: %v", err)
+	}
+
+	// pass: all defined values
+	for _, v := range []dao.Status{
+		dao.Status_STATUS_UNSPECIFIED,
+		dao.Status_STATUS_ACTIVE,
+		dao.Status_STATUS_INACTIVE,
+	} {
+		s := v
+		a2 := validAllValidate()
+		a2.OStatus = &s
+		if err := a2.Validate(); err != nil {
+			t.Errorf("o_status=%v should pass defined_only, got: %v", v, err)
+		}
+	}
+
+	// fail: undefined enum value triggers defined_only
+	invalid := dao.Status(999)
+	a3 := validAllValidate()
+	a3.OStatus = &invalid
+	assertVE(t, a3.Validate(), "o_status", "defined_only")
+}
+
+// TestAllValidate_BMinmax verifies bytes min_len/max_len constraints.
+func TestAllValidate_BMinmax(t *testing.T) {
+	t.Parallel()
+
+	// pass: nil skips check
+	a := validAllValidate()
+	a.BMinmax = nil
+	if err := a.Validate(); err != nil {
+		t.Errorf("nil b_minmax should skip check, got: %v", err)
+	}
+
+	// fail: empty slice violates min_len=1
+	a2 := validAllValidate()
+	a2.BMinmax = []byte{}
+	assertVE(t, a2.Validate(), "b_minmax", "min_len")
+
+	// fail: 101 bytes violates max_len=100
+	a3 := validAllValidate()
+	a3.BMinmax = make([]byte, 101)
+	assertVE(t, a3.Validate(), "b_minmax", "max_len")
+
+	// pass: exactly at boundaries
+	a4 := validAllValidate()
+	a4.BMinmax = []byte{0x01}
+	if err := a4.Validate(); err != nil {
+		t.Errorf("b_minmax len=1 should pass min_len=1, got: %v", err)
+	}
+
+	a5 := validAllValidate()
+	a5.BMinmax = make([]byte, 100)
+	if err := a5.Validate(); err != nil {
+		t.Errorf("b_minmax len=100 should pass max_len=100, got: %v", err)
+	}
+}
+
+// TestAllValidate_RItems verifies repeated items gte constraint.
+func TestAllValidate_RItems(t *testing.T) {
+	t.Parallel()
+
+	// fail: negative value in list
+	a := validAllValidate()
+	a.RItems = []int32{0, 1, -1}
+	assertVE(t, a.Validate(), "r_items[2]", "gte")
+
+	// fail: first element negative
+	a2 := validAllValidate()
+	a2.RItems = []int32{-5, 1, 2}
+	assertVE(t, a2.Validate(), "r_items[0]", "gte")
+
+	// pass: all non-negative
+	a3 := validAllValidate()
+	a3.RItems = []int32{0, 1, 100}
+	if err := a3.Validate(); err != nil {
+		t.Errorf("r_items with non-negative values should pass, got: %v", err)
+	}
+
+	// pass: empty list
+	a4 := validAllValidate()
+	a4.RItems = nil
+	if err := a4.Validate(); err != nil {
+		t.Errorf("nil r_items should pass, got: %v", err)
+	}
+}

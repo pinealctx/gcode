@@ -199,7 +199,11 @@ func (d *DeletePersonResponse) MarshalAppend(b []byte) ([]byte, error) {
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (c *CreatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (c *CreatePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -225,6 +229,9 @@ func (c *CreatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			c.Id = string(payload)
@@ -232,7 +239,10 @@ func (c *CreatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -243,21 +253,25 @@ func (c *CreatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (c *CreatePersonResponse) UnmarshalBinary(data []byte) error {
-	_, err := c.unmarshalFrom(data, false)
+	_, err := c.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (c *CreatePersonResponse) UnmarshalBinaryLenient(data []byte) error {
-	_, err := c.unmarshalFrom(data, true)
+	_, err := c.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (g *GetPersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (g *GetPersonRequest) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -283,6 +297,9 @@ func (g *GetPersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			g.Id = string(payload)
@@ -290,7 +307,10 @@ func (g *GetPersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error) {
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -301,21 +321,25 @@ func (g *GetPersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error) {
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (g *GetPersonRequest) UnmarshalBinary(data []byte) error {
-	_, err := g.unmarshalFrom(data, false)
+	_, err := g.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (g *GetPersonRequest) UnmarshalBinaryLenient(data []byte) error {
-	_, err := g.unmarshalFrom(data, true)
+	_, err := g.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -341,6 +365,9 @@ func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			g.Name = string(payload)
@@ -357,6 +384,9 @@ func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 2: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
 			}
 			g.Age = int32(v)
@@ -364,7 +394,10 @@ func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error) {
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -375,21 +408,25 @@ func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error) {
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (g *GetPersonResponse) UnmarshalBinary(data []byte) error {
-	_, err := g.unmarshalFrom(data, false)
+	_, err := g.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (g *GetPersonResponse) UnmarshalBinaryLenient(data []byte) error {
-	_, err := g.unmarshalFrom(data, true)
+	_, err := g.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (u *UpdatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (u *UpdatePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -415,6 +452,9 @@ func (u *UpdatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			u.Ok = v != 0
@@ -422,7 +462,10 @@ func (u *UpdatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -433,21 +476,25 @@ func (u *UpdatePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (u *UpdatePersonResponse) UnmarshalBinary(data []byte) error {
-	_, err := u.unmarshalFrom(data, false)
+	_, err := u.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (u *UpdatePersonResponse) UnmarshalBinaryLenient(data []byte) error {
-	_, err := u.unmarshalFrom(data, true)
+	_, err := u.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (d *DeletePersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (d *DeletePersonRequest) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -473,6 +520,9 @@ func (d *DeletePersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error)
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			d.Id = string(payload)
@@ -480,7 +530,10 @@ func (d *DeletePersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error)
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -491,21 +544,25 @@ func (d *DeletePersonRequest) unmarshalFrom(b []byte, lenient bool) (int, error)
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (d *DeletePersonRequest) UnmarshalBinary(data []byte) error {
-	_, err := d.unmarshalFrom(data, false)
+	_, err := d.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (d *DeletePersonRequest) UnmarshalBinaryLenient(data []byte) error {
-	_, err := d.unmarshalFrom(data, true)
+	_, err := d.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (d *DeletePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (d *DeletePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -531,6 +588,9 @@ func (d *DeletePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			d.Ok = v != 0
@@ -538,7 +598,10 @@ func (d *DeletePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -549,13 +612,13 @@ func (d *DeletePersonResponse) unmarshalFrom(b []byte, lenient bool) (int, error
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (d *DeletePersonResponse) UnmarshalBinary(data []byte) error {
-	_, err := d.unmarshalFrom(data, false)
+	_, err := d.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (d *DeletePersonResponse) UnmarshalBinaryLenient(data []byte) error {
-	_, err := d.unmarshalFrom(data, true)
+	_, err := d.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }

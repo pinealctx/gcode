@@ -148,7 +148,11 @@ func (p *PersonCreate) MarshalAppend(b []byte) ([]byte, error) {
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
-func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
 	var seen [2]uint64
 	off := 0
 	for off < len(b) {
@@ -174,6 +178,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			tmp := string(payload)
@@ -191,6 +198,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 2: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
 			}
 			tmp := int32(v)
@@ -208,6 +218,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 3: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 3: %w", runtime.ErrTruncated)
 			}
 			tmp := v != 0
@@ -262,6 +275,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 6: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 6: %w", runtime.ErrTruncated)
 			}
 			p.Nickname = string(payload)
@@ -278,6 +294,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 7: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 7: %w", runtime.ErrTruncated)
 			}
 			tmp := int32(v)
@@ -295,6 +314,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 8: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 8: %w", runtime.ErrTruncated)
 			}
 			tmp := v != 0
@@ -329,6 +351,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 10: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 10: %w", runtime.ErrTruncated)
 			}
 			tmp := int64(v)
@@ -366,6 +391,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 12: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 12: %w", runtime.ErrTruncated)
 			}
 			tmp := string(payload)
@@ -383,6 +411,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			payload, n := runtime.ConsumeBytes(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 13: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 13: %w", runtime.ErrTruncated)
 			}
 			tmp := string(payload)
@@ -400,6 +431,9 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 			}
 			v, n := runtime.ConsumeVarint(b[off:])
 			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 14: %w", runtime.ErrOverflow)
+				}
 				return 0, fmt.Errorf("field 14: %w", runtime.ErrTruncated)
 			}
 			tmp := int32(v)
@@ -408,7 +442,10 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {
-				return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrTruncated)
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
 			}
 			off += n
 		}
@@ -419,13 +456,13 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool) (int, error) {
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
 func (p *PersonCreate) UnmarshalBinary(data []byte) error {
-	_, err := p.unmarshalFrom(data, false)
+	_, err := p.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
 func (p *PersonCreate) UnmarshalBinaryLenient(data []byte) error {
-	_, err := p.unmarshalFrom(data, true)
+	_, err := p.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }

@@ -3,6 +3,8 @@
 package transform
 
 import (
+	"fmt"
+
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/naming"
 )
@@ -193,6 +195,10 @@ func flattenMessages(msgs []model.Message, pkgName string, outMsgs *[]GoMessage,
 // derived update message — gen-proto generates condition_fields as non-optional
 // and all other fields as optional, so this is the authoritative way to identify them.
 // Returns nil for non-update messages (UpdateSource == "").
+//
+// If a user hand-writes an update message, they must follow this convention:
+// condition fields (WHERE clause) must be non-optional, other fields must be optional.
+// Violating this convention will cause condition fields to appear in ToMap() output.
 func conditionFieldsFor(msg model.Message) []string {
 	if msg.UpdateSource == "" {
 		return nil
@@ -264,9 +270,17 @@ func resolveGoType(f model.Field, pkgName string) string {
 	case model.FieldKindEnum:
 		base = naming.GoTypeName(f.Type.FullName, pkgName)
 	case model.FieldKindMessage:
+		// Message fields are always pointers; the optional keyword has no additional
+		// effect on message types (nil already represents "not set"). We handle both
+		// cardinalities here and return early to skip the Optional branch below,
+		// avoiding **T for optional message fields.
 		base = "*" + naming.GoTypeName(f.Type.FullName, pkgName)
+		if f.Cardinality == model.CardinalityRepeated {
+			return "[]" + base
+		}
+		return base
 	default:
-		base = "UNKNOWN"
+		panic(fmt.Sprintf("resolveGoType: unexpected FieldKind %v for field %q", f.Type.Kind, f.Name))
 	}
 
 	if f.Cardinality == model.CardinalityRepeated {

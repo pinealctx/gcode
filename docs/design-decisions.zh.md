@@ -169,8 +169,8 @@
 - validate 是公共方法，可在任何场景调用；handler 内置调用保证传输层统一拦截
 
 **决策**：
-- 生成 handler 工厂函数 `XxxHandler(svc XxxService) gin.HandlerFunc`，接收 interface 而非具体类型
-- 统一使用 `c.ShouldBind`（根据 Content-Type 自动选择 JSON/form/query），不支持 path param
+- 生成 handler 工厂函数 `XxxHandler(svc XxxService, interceptors ...handlerx.Interceptor[*Req, *Resp]) gin.HandlerFunc`，接收 interface 而非具体类型；委托给 `httpruntime.NewHandler`，由其应用 interceptor chain 并内置 panic 恢复
+- 统一使用 `c.ShouldBindJSON`（强制 JSON body），不支持 path param
 - handler 内置 `req.Validate()` 调用（bind 后、svc 调用前），同时 `Validate()` 作为公共方法可在其他场景复用
 - 使用 `c.Request.Context()` 传递请求 context，保留 deadline/cancel/trace 信息
 
@@ -191,10 +191,10 @@
 
 **决策**：HTTP status 永远返回 200，业务结果通过响应体的 `code` 字段传递：
 - 成功：`{"code": 0, "data": {...}}`
-- 错误：`{"code": 500, "error": {"msg": "..."}}`
+- 错误：`{"code": 5000, "error": {"msg": "..."}}`
 
 错误 code 两层机制：
-1. `CodedError` interface：业务 error 实现 `Code() int`，`ErrResponse` 自动提取；否则缺省 500
+1. `CodedError` interface：业务 error 实现 `Code() int`，`ErrResponse` 自动提取；否则缺省 CodeDefaultErr (5000)
 2. gin middleware：可完全替换错误响应格式，处理跨切面逻辑
 
 **影响**：
@@ -244,19 +244,19 @@
 **问题**：生成的 HTTP handler 应该直接写错误响应，还是通过 gin context 传递错误？
 
 **约束**：
-- handler 直接写响应（`c.JSON`）时，middleware 无法拦截错误，无法统一处理 ValidationError（400）和业务错误（500）
+- handler 直接写响应（`c.JSON`）时，middleware 无法拦截错误，无法统一处理 ValidationError（CodeValidationErr）和业务错误（CodeDefaultErr）
 - 用户可能需要自定义错误响应格式（如添加 request_id、trace_id、国际化消息）
-- ValidationError 需要映射到 code 400，其他错误映射到 code 500 或 CodedError.Code()
+- ValidationError 需要映射到 CodeValidationErr (1001)，其他错误映射到 CodeDefaultErr (5000) 或 CodedError.Code()
 - 未注册错误处理 middleware 时，应有明确的行为说明，不能静默丢失错误
 
 **决策**：
 - handler 内所有错误路径改为 `_ = c.Error(err); return`，不直接写响应
-- `httpruntime.DefaultErrorHandler()` 作为 gin middleware 兜底：ValidationError → code 400，其他 → code 500 或 CodedError.Code()
+- `httpruntime.DefaultErrorHandler()` 作为 gin middleware 兜底：ValidationError → CodeValidationErr (1001)，其他 → CodeDefaultErr (5000) 或 CodedError.Code()
 - 函数注释中明确警告：未注册 middleware 时错误路径返回 HTTP 200 空 body
 
 **影响**：
 - 用户可替换 DefaultErrorHandler 实现自定义错误格式，无需修改生成代码
-- ValidationError 自动映射 code 400，无需在每个 handler 中重复处理
+- ValidationError 自动映射 CodeValidationErr (1001)，无需在每个 handler 中重复处理
 - 错误处理逻辑集中在 middleware，handler 保持简洁
 - 未注册 DefaultErrorHandler 的风险已通过文档和注释明确告知
 
@@ -308,3 +308,24 @@
 - 无运行时序列化——前端通过 JSON fetch 消费数据（这是主流模式）
 - 验证元数据可驱动表单校验、UI 约束，或转换为 zod/yup schema
 - `gen-ts` 作为独立子命令，与 Go 生成完全解耦
+
+---
+
+## D16：运行时 import 路径硬编码
+
+**问题**：`runtime`、`validateruntime`、`httpruntime` 的 import 路径是否应该可配置？
+
+**约束**：
+- 生成的代码必须 import 运行时包才能编译
+- 让 import 路径可配置会增加 CLI 参数、配置复杂度和文档负担
+- 模块路径 `github.com/pinealctx/gcode` 是稳定的；修改它属于大版本级别的变更
+
+**决策**：在生成器中硬编码运行时 import 路径。生成的代码始终 import：
+- `github.com/pinealctx/gcode/runtime`
+- `github.com/pinealctx/gcode/validateruntime`
+- `github.com/pinealctx/gcode/httpruntime`
+
+**影响**：
+- 常见场景无需任何配置
+- 如果模块被 fork 或重命名，必须手动更新生成代码中的 import 路径——这是有意为之：模块重命名是破坏性变更，应该有明确的操作
+- 可配置 import 路径的需求推迟到未来大版本中处理

@@ -7,6 +7,8 @@ import "gcode/options.proto";
 
 option go_package = "github.com/pinealctx/gcode/testdata/compat/dao;dao";
 
+// Status represents the lifecycle state of a person record.
+// See also: https://example.com/docs/status */ for details.
 enum Status {
   STATUS_UNSPECIFIED = 0;
   STATUS_ACTIVE = 1;

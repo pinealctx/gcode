@@ -1,6 +1,8 @@
 package httpruntime_test
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +11,9 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pinealctx/x/errorx"
+	"github.com/pinealctx/x/handlerx"
+	"github.com/pinealctx/x/panicx"
 
 	"github.com/pinealctx/gcode/httpruntime"
 	"github.com/pinealctx/gcode/validateruntime"
@@ -32,8 +37,8 @@ func TestOKResponse(t *testing.T) {
 	type payload struct{ ID string }
 	resp := httpruntime.OKResponse(payload{ID: "abc"})
 
-	if resp.Code != 0 {
-		t.Errorf("Code = %d, want 0", resp.Code)
+	if resp.Code != httpruntime.CodeOK {
+		t.Errorf("Code = %d, want CodeOK (0)", resp.Code)
 	}
 	if resp.Error != nil {
 		t.Errorf("Error = %v, want nil", resp.Error)
@@ -48,8 +53,8 @@ func TestOKResponse_NilData(t *testing.T) {
 	t.Parallel()
 
 	resp := httpruntime.OKResponse(nil)
-	if resp.Code != 0 {
-		t.Errorf("Code = %d, want 0", resp.Code)
+	if resp.Code != httpruntime.CodeOK {
+		t.Errorf("Code = %d, want CodeOK (0)", resp.Code)
 	}
 	if resp.Data != nil {
 		t.Errorf("Data = %v, want nil", resp.Data)
@@ -61,8 +66,8 @@ func TestErrResponse_DefaultCode(t *testing.T) {
 
 	resp := httpruntime.ErrResponse(errors.New("something went wrong"))
 
-	if resp.Code != 500 {
-		t.Errorf("Code = %d, want 500", resp.Code)
+	if resp.Code != httpruntime.CodeDefaultErr {
+		t.Errorf("Code = %d, want CodeDefaultErr (%d)", resp.Code, httpruntime.CodeDefaultErr)
 	}
 	if resp.Data != nil {
 		t.Errorf("Data = %v, want nil", resp.Data)
@@ -70,8 +75,8 @@ func TestErrResponse_DefaultCode(t *testing.T) {
 	if resp.Error == nil {
 		t.Fatal("Error is nil, want non-nil")
 	}
-	if resp.Error.Msg != "something went wrong" {
-		t.Errorf("Error.Msg = %q, want %q", resp.Error.Msg, "something went wrong")
+	if resp.Error.Msg != "internal error" {
+		t.Errorf("Error.Msg = %q, want %q", resp.Error.Msg, "internal error")
 	}
 }
 
@@ -95,12 +100,12 @@ func TestErrResponse_CodedError(t *testing.T) {
 func TestErrResponse_CodedError_Zero(t *testing.T) {
 	t.Parallel()
 
-	// code 0 from CodedError should be respected (not overridden to 500)
+	// code 0 from CodedError should be respected (not overridden to CodeDefaultErr)
 	err := &codedErr{code: 0, msg: "unusual"}
 	resp := httpruntime.ErrResponse(err)
 
-	if resp.Code != 0 {
-		t.Errorf("Code = %d, want 0", resp.Code)
+	if resp.Code != httpruntime.CodeOK {
+		t.Errorf("Code = %d, want CodeOK (0)", resp.Code)
 	}
 }
 
@@ -119,11 +124,11 @@ func TestErrResponse_CodedError_Negative(t *testing.T) {
 func TestErrResponse_NilError(t *testing.T) {
 	t.Parallel()
 
-	// nil error should return a generic 500 response, not panic
+	// nil error should return a generic CodeDefaultErr response, not panic
 	resp := httpruntime.ErrResponse(nil)
 
-	if resp.Code != 500 {
-		t.Errorf("Code = %d, want 500", resp.Code)
+	if resp.Code != httpruntime.CodeDefaultErr {
+		t.Errorf("Code = %d, want CodeDefaultErr (%d)", resp.Code, httpruntime.CodeDefaultErr)
 	}
 	if resp.Error == nil {
 		t.Fatal("Error is nil, want non-nil")
@@ -170,8 +175,8 @@ func TestDefaultErrorHandler_NoErrors(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	resp := decodeResponse(t, w)
-	if resp.Code != 0 {
-		t.Errorf("Code = %d, want 0", resp.Code)
+	if resp.Code != httpruntime.CodeOK {
+		t.Errorf("Code = %d, want CodeOK (0)", resp.Code)
 	}
 }
 
@@ -187,11 +192,11 @@ func TestDefaultErrorHandler_PlainError(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	resp := decodeResponse(t, w)
-	if resp.Code != 500 {
-		t.Errorf("Code = %d, want 500", resp.Code)
+	if resp.Code != httpruntime.CodeDefaultErr {
+		t.Errorf("Code = %d, want CodeDefaultErr (%d)", resp.Code, httpruntime.CodeDefaultErr)
 	}
-	if resp.Error == nil || resp.Error.Msg != "something failed" {
-		t.Errorf("Error = %+v, want msg 'something failed'", resp.Error)
+	if resp.Error == nil || resp.Error.Msg != "internal error" {
+		t.Errorf("Error = %+v, want msg 'internal error'", resp.Error)
 	}
 }
 
@@ -208,8 +213,8 @@ func TestDefaultErrorHandler_ValidationError(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	resp := decodeResponse(t, w)
-	if resp.Code != 400 {
-		t.Errorf("Code = %d, want 400", resp.Code)
+	if resp.Code != httpruntime.CodeValidationErr {
+		t.Errorf("Code = %d, want CodeValidationErr (%d)", resp.Code, httpruntime.CodeValidationErr)
 	}
 	if resp.Error == nil {
 		t.Fatal("Error is nil, want non-nil")
@@ -233,8 +238,8 @@ func TestDefaultErrorHandler_WrappedValidationError(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	resp := decodeResponse(t, w)
-	if resp.Code != 400 {
-		t.Errorf("Code = %d, want 400 for wrapped ValidationError", resp.Code)
+	if resp.Code != httpruntime.CodeValidationErr {
+		t.Errorf("Code = %d, want CodeValidationErr (%d) for wrapped ValidationError", resp.Code, httpruntime.CodeValidationErr)
 	}
 	// Msg must be ve.Error(), not the outer wrapper message.
 	if resp.Error == nil || resp.Error.Msg != ve.Error() {
@@ -255,14 +260,14 @@ func TestDefaultErrorHandler_MultipleErrors_UsesLast(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	resp := decodeResponse(t, w)
-	if resp.Error == nil || resp.Error.Msg != "last error" {
-		t.Errorf("Error.Msg = %q, want 'last error'", resp.Error)
+	if resp.Error == nil || resp.Error.Msg != "internal error" {
+		t.Errorf("Error.Msg = %q, want 'internal error'", resp.Error)
 	}
 }
 
 // TestDefaultErrorHandler_MultipleErrors_ValidationErrorFirst verifies that when
 // the first error is a ValidationError but the last is a plain error, the response
-// code is 500 (not 400) — only the last error determines the response.
+// code is CodeDefaultErr (not CodeValidationErr) — only the last error determines the response.
 func TestDefaultErrorHandler_MultipleErrors_ValidationErrorFirst(t *testing.T) {
 	t.Parallel()
 
@@ -277,9 +282,9 @@ func TestDefaultErrorHandler_MultipleErrors_ValidationErrorFirst(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	resp := decodeResponse(t, w)
-	// Last error is a plain error, so code must be 500, not 400.
-	if resp.Code != 500 {
-		t.Errorf("Code = %d, want 500 (last error is plain, not ValidationError)", resp.Code)
+	// Last error is a plain error, so code must be CodeDefaultErr, not CodeValidationErr.
+	if resp.Code != httpruntime.CodeDefaultErr {
+		t.Errorf("Code = %d, want CodeDefaultErr (%d) (last error is plain, not ValidationError)", resp.Code, httpruntime.CodeDefaultErr)
 	}
 }
 
@@ -302,3 +307,300 @@ func TestDefaultErrorHandler_CodedError(t *testing.T) {
 		t.Errorf("Error = %+v, want msg 'forbidden'", resp.Error)
 	}
 }
+
+func TestErrResponse_BizCode(t *testing.T) {
+	t.Parallel()
+
+	err := errorx.New(httpruntime.BizCode(422), "unprocessable entity")
+	resp := httpruntime.ErrResponse(err)
+	if resp.Code != 422 {
+		t.Errorf("Code = %d, want 422", resp.Code)
+	}
+	if resp.Error == nil || resp.Error.Msg != "unprocessable entity" {
+		t.Errorf("Error = %+v, want msg 'unprocessable entity'", resp.Error)
+	}
+}
+
+func TestErrResponse_BizCode_PriorityOverCodedError(t *testing.T) {
+	t.Parallel()
+
+	// errorx.Error[BizCode] should take priority over CodedError.
+	// Wrap a CodedError (code=403) inside an errorx.Error[BizCode] (code=422).
+	inner := &codedErr{code: 403, msg: "forbidden"}
+	err := errorx.Wrap(inner, httpruntime.BizCode(422), "unprocessable entity")
+	resp := httpruntime.ErrResponse(err)
+	if resp.Code != 422 {
+		t.Errorf("Code = %d, want 422 (errorx.Error[BizCode] should take priority)", resp.Code)
+	}
+}
+
+func TestErrResponse_BizCode_WrappedInFmtErrorf(t *testing.T) {
+	t.Parallel()
+
+	// errors.AsType should penetrate fmt.Errorf %w wrapping.
+	inner := errorx.New(httpruntime.BizCode(404), "not found")
+	err := fmt.Errorf("lookup failed: %w", inner)
+	resp := httpruntime.ErrResponse(err)
+	if resp.Code != 404 {
+		t.Errorf("Code = %d, want 404 (should penetrate %%w wrapping)", resp.Code)
+	}
+}
+
+func TestDefaultErrorHandler_BizCodeError(t *testing.T) {
+	t.Parallel()
+
+	r := newHandlerEngine(func(c *gin.Context) {
+		_ = c.Error(errorx.New(httpruntime.BizCode(422), "unprocessable entity"))
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/", nil)
+	r.ServeHTTP(w, req)
+
+	resp := decodeResponse(t, w)
+	if resp.Code != 422 {
+		t.Errorf("Code = %d, want 422", resp.Code)
+	}
+	if resp.Error == nil || resp.Error.Msg != "unprocessable entity" {
+		t.Errorf("Error = %+v, want msg 'unprocessable entity'", resp.Error)
+	}
+}
+
+func TestDefaultErrorHandler_BizCodeWrappedInFmtErrorf(t *testing.T) {
+	t.Parallel()
+
+	// BizCode error wrapped in fmt.Errorf should still be resolved via errors.AsType.
+	inner := errorx.New(httpruntime.BizCode(404), "not found")
+	r := newHandlerEngine(func(c *gin.Context) {
+		_ = c.Error(fmt.Errorf("lookup failed: %w", inner))
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/", nil)
+	r.ServeHTTP(w, req)
+
+	resp := decodeResponse(t, w)
+	if resp.Code != 404 {
+		t.Errorf("Code = %d, want 404 (BizCode should penetrate %%w wrapping)", resp.Code)
+	}
+}
+
+// --- NewHandler --------------------------------------------------------------
+
+// echoReq is a minimal request type without Validate().
+type echoReq struct {
+	Msg string `json:"msg"`
+}
+
+// echoResp is a minimal response type.
+type echoResp struct {
+	Echo string `json:"echo"`
+}
+
+// validateReq is a request type that implements Validate().
+type validateReq struct {
+	Name string `json:"name"`
+}
+
+func (r *validateReq) Validate() error {
+	if r.Name == "" {
+		return &validateruntime.ValidationError{Field: "name", Rule: "required", Message: "name is required"}
+	}
+	return nil
+}
+
+// newHandlerEngineForNewHandler builds a test engine using NewHandler.
+func newHandlerEngineForNewHandler[Req any, Resp any](
+	method func(ctx context.Context, req *Req) (*Resp, error),
+	interceptors ...handlerx.Interceptor[*Req, *Resp],
+) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(httpruntime.DefaultErrorHandler())
+	r.POST("/", httpruntime.NewHandler(method, interceptors...))
+	return r
+}
+
+func postJSON(t *testing.T, r *gin.Engine, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	w := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestNewHandler_Success(t *testing.T) {
+	t.Parallel()
+
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	w := postJSON(t, r, `{"msg":"hello"}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeOK {
+		t.Errorf("Code = %d, want CodeOK", resp.Code)
+	}
+	// Data is decoded as map[string]any from JSON.
+	data, ok := resp.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("Data type = %T, want map[string]any", resp.Data)
+	}
+	if data["echo"] != "hello" {
+		t.Errorf("echo = %v, want hello", data["echo"])
+	}
+}
+
+func TestNewHandler_BindError(t *testing.T) {
+	t.Parallel()
+
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	// Send invalid JSON — bind should fail with CodeBadRequest and a safe message.
+	w := postJSON(t, r, `not-json`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeBadRequest {
+		t.Errorf("Code = %d, want CodeBadRequest (%d)", resp.Code, httpruntime.CodeBadRequest)
+	}
+	if resp.Error == nil {
+		t.Fatal("Error is nil, want non-nil")
+	}
+	if resp.Error.Msg != "malformed request body" {
+		t.Errorf("Error.Msg = %q, want %q", resp.Error.Msg, "malformed request body")
+	}
+}
+
+func TestNewHandler_ValidationError(t *testing.T) {
+	t.Parallel()
+
+	method := func(_ context.Context, req *validateReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Name}, nil
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	// Empty name triggers Validate() failure.
+	w := postJSON(t, r, `{"name":""}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeValidationErr {
+		t.Errorf("Code = %d, want CodeValidationErr (%d)", resp.Code, httpruntime.CodeValidationErr)
+	}
+}
+
+func TestNewHandler_ServiceError(t *testing.T) {
+	t.Parallel()
+
+	method := func(_ context.Context, _ *echoReq) (*echoResp, error) {
+		return nil, errors.New("service failure")
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	w := postJSON(t, r, `{"msg":"hi"}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeDefaultErr {
+		t.Errorf("Code = %d, want CodeDefaultErr (%d)", resp.Code, httpruntime.CodeDefaultErr)
+	}
+}
+
+func TestNewHandler_PanicRecovery(t *testing.T) {
+	t.Parallel()
+
+	method := func(_ context.Context, _ *echoReq) (*echoResp, error) {
+		panic("something went wrong") //nolint // intentional panic to test WithRecovery
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	w := postJSON(t, r, `{"msg":"hi"}`)
+	// The response should be an error (not a server crash).
+	if w.Code == 0 {
+		t.Fatal("expected a response, got none")
+	}
+	resp := decodeResponse(t, w)
+	if resp.Code == httpruntime.CodeOK {
+		t.Errorf("Code = CodeOK, want error code after panic")
+	}
+}
+
+func TestNewHandler_PanicError_IsPanicx(t *testing.T) {
+	t.Parallel()
+
+	// Capture the error produced by WithRecovery to verify errors.Is(err, panicx.ErrPanic).
+	// The interceptor is inside WithRecovery, so it observes the recovered error on return.
+	// Use a gin error-capture middleware to read the error after the handler chain completes.
+	var capturedErr error
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Next()
+		if len(c.Errors) > 0 {
+			capturedErr = c.Errors.Last().Err
+		}
+		// Write a minimal response so decodeResponse doesn't fail.
+		c.JSON(http.StatusOK, httpruntime.ErrResponse(capturedErr))
+	})
+
+	method := func(_ context.Context, _ *echoReq) (*echoResp, error) {
+		panic("boom") //nolint // intentional panic to test WithRecovery
+	}
+	r.POST("/", httpruntime.NewHandler(method))
+	postJSON(t, r, `{"msg":"hi"}`)
+
+	if capturedErr == nil {
+		t.Fatal("capturedErr is nil, expected a panic error")
+	}
+	if !errors.Is(capturedErr, panicx.ErrPanic) {
+		t.Errorf("errors.Is(err, panicx.ErrPanic) = false, want true; err = %v", capturedErr)
+	}
+}
+
+func TestNewHandler_UserInterceptor(t *testing.T) {
+	t.Parallel()
+
+	var preRan, postRan bool
+	interceptor := func(_ context.Context, req *echoReq, next handlerx.Handler[*echoReq, *echoResp]) (*echoResp, error) {
+		preRan = true
+		resp, err := next(context.Background(), req)
+		postRan = true
+		return resp, err
+	}
+
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	r := newHandlerEngineForNewHandler(method, interceptor)
+	postJSON(t, r, `{"msg":"test"}`)
+
+	if !preRan {
+		t.Error("interceptor pre-logic did not run")
+	}
+	if !postRan {
+		t.Error("interceptor post-logic did not run")
+	}
+}
+
+func TestNewHandler_NoValidate_NoError(t *testing.T) {
+	t.Parallel()
+
+	// echoReq has no Validate() — should not error on empty fields.
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	r := newHandlerEngineForNewHandler(method)
+
+	w := postJSON(t, r, `{}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeOK {
+		t.Errorf("Code = %d, want CodeOK for type without Validate()", resp.Code)
+	}
+}
+
+// Compile-time check: ensure decodeResponse handles the Response.Data field
+// which is decoded as map[string]any by encoding/json.
+var _ = json.Unmarshal

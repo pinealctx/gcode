@@ -26,7 +26,7 @@ func writeUnmarshalBinary(b *strings.Builder, msg transform.GoMessage) {
 	fmt.Fprintf(b, "// UnmarshalBinary implements encoding.BinaryUnmarshaler.\n")
 	fmt.Fprintf(b, "// Duplicate non-repeated fields return an error.\n")
 	fmt.Fprintf(b, "func (%s *%s) UnmarshalBinary(data []byte) error {\n", recv, msg.GoName)
-	fmt.Fprintf(b, "\t_, err := %s.unmarshalFrom(data, false)\n", recv)
+	fmt.Fprintf(b, "\t_, err := %s.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)\n", recv)
 	fmt.Fprintf(b, "\treturn err\n}\n\n")
 }
 
@@ -36,7 +36,7 @@ func writeUnmarshalBinaryLenient(b *strings.Builder, msg transform.GoMessage) {
 	fmt.Fprintf(b, "// UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows\n")
 	fmt.Fprintf(b, "// duplicate non-repeated fields, keeping the last value.\n")
 	fmt.Fprintf(b, "func (%s *%s) UnmarshalBinaryLenient(data []byte) error {\n", recv, msg.GoName)
-	fmt.Fprintf(b, "\t_, err := %s.unmarshalFrom(data, true)\n", recv)
+	fmt.Fprintf(b, "\t_, err := %s.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)\n", recv)
 	fmt.Fprintf(b, "\treturn err\n}\n\n")
 }
 
@@ -49,7 +49,9 @@ func writeUnmarshalCore(b *strings.Builder, msg transform.GoMessage) error {
 	fmt.Fprintf(b, "// unmarshalFrom decodes a protobuf wire-format message from b.\n")
 	fmt.Fprintf(b, "// Returns the number of bytes consumed.\n")
 	fmt.Fprintf(b, "// If lenient is true, duplicate non-repeated fields use last-one-wins.\n")
-	fmt.Fprintf(b, "func (%s *%s) unmarshalFrom(b []byte, lenient bool) (int, error) {\n", recv, msg.GoName)
+	fmt.Fprintf(b, "// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.\n")
+	fmt.Fprintf(b, "func (%s *%s) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {\n", recv, msg.GoName)
+	fmt.Fprintf(b, "\tif depth <= 0 { return 0, runtime.ErrNestingDepth }\n")
 
 	// Track seen non-repeated fields for duplicate detection.
 	// We use a [2]uint64 bitmask (128 bits) and assign each non-repeated field
@@ -85,7 +87,8 @@ func writeUnmarshalCore(b *strings.Builder, msg transform.GoMessage) error {
 	fmt.Fprintf(b, "\t\tdefault:\n")
 	fmt.Fprintf(b, "\t\t\tn = runtime.SkipField(b[off:], wireType)\n")
 	fmt.Fprintf(b, "\t\t\tif n < 0 {\n")
-	fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"unknown field %%d: %%w\", fieldNum, runtime.ErrTruncated)\n")
+	fmt.Fprintf(b, "\t\t\t\tif n == -3 { return 0, fmt.Errorf(\"unknown field %%d: %%w\", fieldNum, runtime.ErrUnknownWireType) }\n")
+	fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"unknown field %%d (wire type %%d): %%w\", fieldNum, wireType, runtime.ErrTruncated)\n")
 	fmt.Fprintf(b, "\t\t\t}\n")
 	fmt.Fprintf(b, "\t\t\toff += n\n")
 	fmt.Fprintf(b, "\t\t}\n") // end switch
@@ -103,7 +106,7 @@ func buildSeenIndex(msg transform.GoMessage) (map[int]int, error) {
 	for _, f := range msg.Fields {
 		if f.Cardinality != model.CardinalityRepeated {
 			if bit >= 128 {
-				return nil, fmt.Errorf("message %q has more than 128 non-repeated fields; use nested messages or repeated fields to reduce field count", msg.GoName)
+				return nil, fmt.Errorf("message %q: %w", msg.GoName, ErrTooManyFields)
 			}
 			idx[f.Number] = bit
 			bit++
@@ -133,22 +136,18 @@ func writeUnmarshalFieldCase(b *strings.Builder, recv string, f transform.GoFiel
 		fmt.Fprintf(b, "\t\t\tseen[%d] |= %d\n", slot, bit)
 	}
 
-	writeUnmarshalSingularField(b, recv, accessor, f)
+	writeUnmarshalSingularField(b, accessor, f)
 }
 
 // writeUnmarshalSingularField generates decode logic for a singular field.
-func writeUnmarshalSingularField(b *strings.Builder, _ string, accessor string, f transform.GoField) {
+func writeUnmarshalSingularField(b *strings.Builder, accessor string, f transform.GoField) {
 	switch f.Type.Kind {
 	case model.FieldKindScalar:
 		writeUnmarshalScalar(b, accessor, f.Number, f.Type.Scalar, f.Optional)
 	case model.FieldKindEnum:
-		// Enum is varint-encoded.
+		// Enum is varint-encoded. Same overflow/truncated logic as writeConsumeVarint.
 		fmt.Fprintf(b, "\t\t\tif wireType != runtime.WireVarint { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrWireType) }\n", f.Number)
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeVarint(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 {\n")
-		fmt.Fprintf(b, "\t\t\t\tif n == -2 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrOverflow) }\n", f.Number)
-		fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated)\n", f.Number)
-		fmt.Fprintf(b, "\t\t\t}\n")
+		writeConsumeVarint(b, f.Number)
 		if f.Optional {
 			// optional enum: allocate pointer
 			baseType := strings.TrimPrefix(f.GoType, "*")
@@ -159,17 +158,13 @@ func writeUnmarshalSingularField(b *strings.Builder, _ string, accessor string, 
 		}
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.FieldKindMessage:
-		// Message is length-delimited.
+		// Message is length-delimited. Same overflow/truncated logic as writeConsumeBytes.
 		fmt.Fprintf(b, "\t\t\tif wireType != runtime.WireBytes { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrWireType) }\n", f.Number)
-		fmt.Fprintf(b, "\t\t\tpayload, n := runtime.ConsumeBytes(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 {\n")
-		fmt.Fprintf(b, "\t\t\t\tif n == -2 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrOverflow) }\n", f.Number)
-		fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated)\n", f.Number)
-		fmt.Fprintf(b, "\t\t\t}\n")
+		writeConsumeBytes(b, f.Number)
 		// GoType is "*TypeName" — strip the leading "*" for new().
 		goTypeName := strings.TrimPrefix(f.GoType, "*")
 		fmt.Fprintf(b, "\t\t\tif %s == nil { %s = new(%s) }\n", accessor, accessor, goTypeName)
-		fmt.Fprintf(b, "\t\t\tif _, err := %s.unmarshalFrom(payload, lenient); err != nil {\n", accessor)
+		fmt.Fprintf(b, "\t\t\tif _, err := %s.unmarshalFrom(payload, lenient, depth-1); err != nil {\n", accessor)
 		fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", err)\n", f.Number)
 		fmt.Fprintf(b, "\t\t\t}\n")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
@@ -195,78 +190,63 @@ func writeUnmarshalScalar(b *strings.Builder, accessor string, fieldNum int, sca
 
 	switch scalar {
 	case model.ScalarBool:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeVarint(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeVarint(b, fieldNum)
 		assign("v != 0")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarInt32:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeVarint(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeVarint(b, fieldNum)
 		assign("int32(v)")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarInt64:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeVarint(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeVarint(b, fieldNum)
 		assign("int64(v)")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarUint32:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeVarint(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeVarint(b, fieldNum)
 		assign("uint32(v)")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarUint64:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeVarint(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeVarint(b, fieldNum)
 		assign("v")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarSint32:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeVarint(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeVarint(b, fieldNum)
 		assign("runtime.DecodeZigZag32(v)")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarSint64:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeVarint(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeVarint(b, fieldNum)
 		assign("runtime.DecodeZigZag64(v)")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarFixed32:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeFixed32(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeFixed32(b, fieldNum)
 		assign("v")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarSfixed32:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeFixed32(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeFixed32(b, fieldNum)
 		assign("int32(v)")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarFloat:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeFixed32(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeFixed32(b, fieldNum)
 		assign("math.Float32frombits(v)")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarFixed64:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeFixed64(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeFixed64(b, fieldNum)
 		assign("v")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarSfixed64:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeFixed64(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeFixed64(b, fieldNum)
 		assign("int64(v)")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarDouble:
-		fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeFixed64(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeFixed64(b, fieldNum)
 		assign("math.Float64frombits(v)")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarString:
-		fmt.Fprintf(b, "\t\t\tpayload, n := runtime.ConsumeBytes(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeBytes(b, fieldNum)
 		assign("string(payload)")
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	case model.ScalarBytes:
-		fmt.Fprintf(b, "\t\t\tpayload, n := runtime.ConsumeBytes(b[off:])\n")
-		fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+		writeConsumeBytes(b, fieldNum)
 		fmt.Fprintf(b, "\t\t\ttmp := make([]byte, len(payload))\n")
 		fmt.Fprintf(b, "\t\t\tcopy(tmp, payload)\n")
 		if optional {
@@ -276,6 +256,53 @@ func writeUnmarshalScalar(b *strings.Builder, accessor string, fieldNum int, sca
 		}
 		fmt.Fprintf(b, "\t\t\toff += n\n")
 	}
+}
+
+// writeConsumeVarint emits the ConsumeVarint call and its error check.
+// Declares v (uint64) and n (int); caller emits the assignment and off += n.
+func writeConsumeVarint(b *strings.Builder, fieldNum int) {
+	fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeVarint(b[off:])\n")
+	fmt.Fprintf(b, "\t\t\tif n < 0 {\n")
+	fmt.Fprintf(b, "\t\t\t\tif n == -2 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrOverflow) }\n", fieldNum)
+	fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated)\n", fieldNum)
+	fmt.Fprintf(b, "\t\t\t}\n")
+}
+
+// writeConsumeFixed32 emits the ConsumeFixed32 call and its error check.
+// Declares v (uint32) and n (int); caller emits the assignment and off += n.
+func writeConsumeFixed32(b *strings.Builder, fieldNum int) {
+	fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeFixed32(b[off:])\n")
+	fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+}
+
+// writeConsumeFixed64 emits the ConsumeFixed64 call and its error check.
+// Declares v (uint64) and n (int); caller emits the assignment and off += n.
+func writeConsumeFixed64(b *strings.Builder, fieldNum int) {
+	fmt.Fprintf(b, "\t\t\tv, n := runtime.ConsumeFixed64(b[off:])\n")
+	fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+}
+
+// writeConsumeBytes emits the ConsumeBytes call and its error check.
+// Declares payload ([]byte) and n (int); caller emits the assignment and off += n.
+func writeConsumeBytes(b *strings.Builder, fieldNum int) {
+	fmt.Fprintf(b, "\t\t\tpayload, n := runtime.ConsumeBytes(b[off:])\n")
+	fmt.Fprintf(b, "\t\t\tif n < 0 {\n")
+	fmt.Fprintf(b, "\t\t\t\tif n == -2 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrOverflow) }\n", fieldNum)
+	fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated)\n", fieldNum)
+	fmt.Fprintf(b, "\t\t\t}\n")
+}
+
+// writeConsumePacked emits the ConsumeBytes call for a packed field and its error check.
+// Declares packed ([]byte) and n (int); caller emits off += n and the element decode loop.
+// Same overflow/truncated logic as writeConsumeBytes, but uses variable name "packed"
+// to signal that the payload is a packed repeated field rather than a singular LEN field.
+func writeConsumePacked(b *strings.Builder, fieldNum int) {
+	fmt.Fprintf(b, "\t\t\tpacked, n := runtime.ConsumeBytes(b[off:])\n")
+	fmt.Fprintf(b, "\t\t\tif n < 0 {\n")
+	fmt.Fprintf(b, "\t\t\t\tif n == -2 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrOverflow) }\n", fieldNum)
+	fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated)\n", fieldNum)
+	fmt.Fprintf(b, "\t\t\t}\n")
+	fmt.Fprintf(b, "\t\t\toff += n\n")
 }
 
 // writeUnmarshalRepeatedField generates decode logic for a repeated field.
@@ -298,29 +325,27 @@ func writeUnmarshalRepeatedField(b *strings.Builder, accessor string, f transfor
 // Per §6.3: only packed encoding is accepted; unpacked wire type returns ErrWireType.
 func writeUnmarshalPackedScalar(b *strings.Builder, accessor string, fieldNum int, scalar model.ScalarKind) {
 	fmt.Fprintf(b, "\t\t\tif wireType != runtime.WireBytes { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrWireType) }\n", fieldNum)
-	fmt.Fprintf(b, "\t\t\tpacked, n := runtime.ConsumeBytes(b[off:])\n")
-	fmt.Fprintf(b, "\t\t\tif n < 0 {\n")
-	fmt.Fprintf(b, "\t\t\t\tif n == -2 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrOverflow) }\n", fieldNum)
-	fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated)\n", fieldNum)
-	fmt.Fprintf(b, "\t\t\t}\n")
-	fmt.Fprintf(b, "\t\t\toff += n\n")
+	writeConsumePacked(b, fieldNum)
 
 	// Decode elements from packed payload.
 	switch scalar {
 	case model.ScalarFixed32, model.ScalarSfixed32, model.ScalarFloat:
 		fmt.Fprintf(b, "\t\t\tif len(packed)%%4 != 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrPackedLen) }\n", fieldNum)
 		fmt.Fprintf(b, "\t\t\tfor pi := 0; pi < len(packed); pi += 4 {\n")
+		// ConsumeFixed32 cannot truncate here: packed length is pre-validated to be a multiple of 4.
 		fmt.Fprintf(b, "\t\t\t\tv, _ := runtime.ConsumeFixed32(packed[pi:])\n")
 		writePackedFixed32Assign(b, accessor, scalar)
 		fmt.Fprintf(b, "\t\t\t}\n")
 	case model.ScalarFixed64, model.ScalarSfixed64, model.ScalarDouble:
 		fmt.Fprintf(b, "\t\t\tif len(packed)%%8 != 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrPackedLen) }\n", fieldNum)
 		fmt.Fprintf(b, "\t\t\tfor pi := 0; pi < len(packed); pi += 8 {\n")
+		// ConsumeFixed64 cannot truncate here: packed length is pre-validated to be a multiple of 8.
 		fmt.Fprintf(b, "\t\t\t\tv, _ := runtime.ConsumeFixed64(packed[pi:])\n")
 		writePackedFixed64Assign(b, accessor, scalar)
 		fmt.Fprintf(b, "\t\t\t}\n")
 	default:
-		// Varint elements.
+		// Varint elements. Same overflow/truncated logic as writeConsumeVarint, but
+		// operating on packed[pi:] with loop variable pn instead of b[off:] with n.
 		fmt.Fprintf(b, "\t\t\tfor pi := 0; pi < len(packed); {\n")
 		fmt.Fprintf(b, "\t\t\t\tv, pn := runtime.ConsumeVarint(packed[pi:])\n")
 		fmt.Fprintf(b, "\t\t\t\tif pn < 0 {\n")
@@ -377,12 +402,9 @@ func writePackedVarintAssign(b *strings.Builder, accessor string, scalar model.S
 // writeUnmarshalPackedEnum generates decode for a packed repeated enum field.
 func writeUnmarshalPackedEnum(b *strings.Builder, accessor string, fieldNum int, goType string) {
 	fmt.Fprintf(b, "\t\t\tif wireType != runtime.WireBytes { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrWireType) }\n", fieldNum)
-	fmt.Fprintf(b, "\t\t\tpacked, n := runtime.ConsumeBytes(b[off:])\n")
-	fmt.Fprintf(b, "\t\t\tif n < 0 {\n")
-	fmt.Fprintf(b, "\t\t\t\tif n == -2 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrOverflow) }\n", fieldNum)
-	fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated)\n", fieldNum)
-	fmt.Fprintf(b, "\t\t\t}\n")
-	fmt.Fprintf(b, "\t\t\toff += n\n")
+	writeConsumePacked(b, fieldNum)
+	// Varint elements. Same overflow/truncated logic as writeConsumeVarint, but
+	// operating on packed[pi:] with loop variable pn instead of b[off:] with n.
 	fmt.Fprintf(b, "\t\t\tfor pi := 0; pi < len(packed); {\n")
 	fmt.Fprintf(b, "\t\t\t\tv, pn := runtime.ConsumeVarint(packed[pi:])\n")
 	fmt.Fprintf(b, "\t\t\t\tif pn < 0 {\n")
@@ -399,8 +421,7 @@ func writeUnmarshalPackedEnum(b *strings.Builder, accessor string, fieldNum int,
 // writeUnmarshalRepeatedLEN generates decode for repeated string/bytes (not packed).
 func writeUnmarshalRepeatedLEN(b *strings.Builder, accessor string, fieldNum int, scalar model.ScalarKind) {
 	fmt.Fprintf(b, "\t\t\tif wireType != runtime.WireBytes { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrWireType) }\n", fieldNum)
-	fmt.Fprintf(b, "\t\t\tpayload, n := runtime.ConsumeBytes(b[off:])\n")
-	fmt.Fprintf(b, "\t\t\tif n < 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated) }\n", fieldNum)
+	writeConsumeBytes(b, fieldNum)
 	switch scalar {
 	case model.ScalarString:
 		fmt.Fprintf(b, "\t\t\t%s = append(%s, string(payload))\n", accessor, accessor)
@@ -415,15 +436,12 @@ func writeUnmarshalRepeatedLEN(b *strings.Builder, accessor string, fieldNum int
 // writeUnmarshalRepeatedMessage generates decode for repeated message fields.
 func writeUnmarshalRepeatedMessage(b *strings.Builder, accessor string, f transform.GoField) {
 	fmt.Fprintf(b, "\t\t\tif wireType != runtime.WireBytes { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrWireType) }\n", f.Number)
-	fmt.Fprintf(b, "\t\t\tpayload, n := runtime.ConsumeBytes(b[off:])\n")
-	fmt.Fprintf(b, "\t\t\tif n < 0 {\n")
-	fmt.Fprintf(b, "\t\t\t\tif n == -2 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrOverflow) }\n", f.Number)
-	fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrTruncated)\n", f.Number)
-	fmt.Fprintf(b, "\t\t\t}\n")
+	// Same overflow/truncated logic as writeConsumeBytes.
+	writeConsumeBytes(b, f.Number)
 	// GoType is "[]*TypeName" — strip "[]" and "*" to get the base type name.
 	goTypeName := strings.TrimPrefix(strings.TrimPrefix(f.GoType, "[]"), "*")
 	fmt.Fprintf(b, "\t\t\telem := new(%s)\n", goTypeName)
-	fmt.Fprintf(b, "\t\t\tif _, err := elem.unmarshalFrom(payload, lenient); err != nil {\n")
+	fmt.Fprintf(b, "\t\t\tif _, err := elem.unmarshalFrom(payload, lenient, depth-1); err != nil {\n")
 	fmt.Fprintf(b, "\t\t\t\treturn 0, fmt.Errorf(\"field %d: %%w\", err)\n", f.Number)
 	fmt.Fprintf(b, "\t\t\t}\n")
 	fmt.Fprintf(b, "\t\t\t%s = append(%s, elem)\n", accessor, accessor)
