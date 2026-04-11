@@ -25,6 +25,18 @@ import {
   DeletePersonRequestRules,
 } from "../ts/person_service.pb.ts";
 
+import {
+  type AllScalars,
+  type AllRepeated,
+  type AllValidate,
+  type TreeNode,
+  AllValidateRules,
+} from "../ts/all_types.pb.ts";
+
+import { type AllScalarsCreate } from "../ts/all_types.create.pb.ts";
+
+import { type AllScalarsUpdate } from "../ts/all_types.update.pb.ts";
+
 // --- helpers ---
 
 let passed = 0;
@@ -177,9 +189,141 @@ assertEqual(delReq.id, "xyz789", "DeletePersonRequest.id assigned correctly");
 const delResp: DeletePersonResponse = { ok: false };
 assertEqual(delResp.ok, false, "DeletePersonResponse.ok assigned correctly");
 
+// --- AllScalars: scalar type mappings ---
+
+const scalars: AllScalars = {
+  fSint32: -1,
+  fSint64: "-9007199254740993",
+  fSfixed32: 0,
+  fSfixed64: "0",
+  fDouble: 3.14,
+  fFixed32: 0,
+  fFixed64: "0",
+  fUint32: 0,
+  fUint64: "0",
+  fFloat: 1.5,
+  fBytes: "aGVsbG8=",
+};
+assertEqual(typeof scalars.fSint32, "number", "AllScalars.fSint32 is number");
+assertEqual(typeof scalars.fSint64, "string", "AllScalars.fSint64 is string (int64 → string)");
+assertEqual(typeof scalars.fDouble, "number", "AllScalars.fDouble is number");
+assertEqual(typeof scalars.fBytes, "string", "AllScalars.fBytes is string (bytes → string)");
+
+// --- AllRepeated: repeated field type mappings ---
+
+const repeated: AllRepeated = {
+  rSint32: [-1, 0, 1],
+  rSfixed32: [0],
+  rDouble: [1.1, 2.2],
+  rBytes: ["aGVsbG8="],
+  rMessage: [{ street: "1 Main", city: "Springfield" }],
+  rEnum: [Status.STATUS_ACTIVE, Status.STATUS_INACTIVE],
+};
+assertEqual(Array.isArray(repeated.rSint32), true, "AllRepeated.rSint32 is array");
+assertEqual(repeated.rSint32[0], -1, "AllRepeated.rSint32[0] === -1");
+assertEqual(repeated.rMessage[0].city, "Springfield", "AllRepeated.rMessage cross-file Address type works");
+assertEqual(repeated.rEnum[0], Status.STATUS_ACTIVE, "AllRepeated.rEnum uses imported Status enum");
+
+// --- AllValidateRules: every constraint type has correct runtime value ---
+
+// uint constraints
+assertEqual(AllValidateRules.uGte.type, "integer", "AllValidateRules.uGte.type === integer");
+assertEqual(AllValidateRules.uGte.minimum, 1, "AllValidateRules.uGte.minimum === 1");
+assertEqual(AllValidateRules.uLte.maximum, 1000, "AllValidateRules.uLte.maximum === 1000");
+assert((AllValidateRules.uIn as { enum: readonly number[] }).enum.includes(1), "AllValidateRules.uIn.enum includes 1");
+assert((AllValidateRules.uIn as { enum: readonly number[] }).enum.includes(2), "AllValidateRules.uIn.enum includes 2");
+assert((AllValidateRules.uIn as { enum: readonly number[] }).enum.includes(3), "AllValidateRules.uIn.enum includes 3");
+assert((AllValidateRules.uNotIn as { notIn: readonly number[] }).notIn.includes(0), "AllValidateRules.uNotIn.notIn includes 0");
+
+// float/double constraints
+assertEqual((AllValidateRules.fGt as { type: string }).type, "number", "AllValidateRules.fGt.type === number");
+assertEqual((AllValidateRules.fGt as { exclusiveMinimum: number }).exclusiveMinimum, 0, "AllValidateRules.fGt.exclusiveMinimum === 0");
+assertEqual((AllValidateRules.dLte as { maximum: number }).maximum, 1, "AllValidateRules.dLte.maximum === 1");
+
+// string in/not_in
+assertEqual((AllValidateRules.sIn as { type: string }).type, "string", "AllValidateRules.sIn.type === string");
+assert((AllValidateRules.sIn as { enum: readonly string[] }).enum.includes("a"), "AllValidateRules.sIn.enum includes a");
+assert((AllValidateRules.sIn as { enum: readonly string[] }).enum.includes("b"), "AllValidateRules.sIn.enum includes b");
+assert((AllValidateRules.sIn as { enum: readonly string[] }).enum.includes("c"), "AllValidateRules.sIn.enum includes c");
+assert((AllValidateRules.sNotIn as { notIn: readonly string[] }).notIn.includes("x"), "AllValidateRules.sNotIn.notIn includes x");
+assert((AllValidateRules.sNotIn as { notIn: readonly string[] }).notIn.includes("y"), "AllValidateRules.sNotIn.notIn includes y");
+
+// signed int in
+assertEqual((AllValidateRules.iIn as { type: string }).type, "integer", "AllValidateRules.iIn.type === integer");
+assert((AllValidateRules.iIn as { enum: readonly number[] }).enum.includes(1), "AllValidateRules.iIn.enum includes 1");
+assert((AllValidateRules.iIn as { enum: readonly number[] }).enum.includes(-1), "AllValidateRules.iIn.enum includes -1");
+
+// string uri format
+assertEqual((AllValidateRules.sUri as { format: string }).format, "uri", "AllValidateRules.sUri.format === uri");
+
+// optional enum defined_only
+assertEqual(AllValidateRules.oStatus.definedOnly, true, "AllValidateRules.oStatus.definedOnly === true");
+
+// bytes min/max len
+assertEqual((AllValidateRules.bMinmax as { type: string }).type, "string", "AllValidateRules.bMinmax.type === string");
+assertEqual((AllValidateRules.bMinmax as { minLength: number }).minLength, 1, "AllValidateRules.bMinmax.minLength === 1");
+assertEqual((AllValidateRules.bMinmax as { maxLength: number }).maxLength, 100, "AllValidateRules.bMinmax.maxLength === 100");
+
+// repeated items constraint
+assertEqual((AllValidateRules.rItems as { type: string }).type, "array", "AllValidateRules.rItems.type === array");
+assertEqual((AllValidateRules.rItems as { items: { minimum: number } }).items.minimum, 0, "AllValidateRules.rItems.items.minimum === 0");
+assertEqual((AllValidateRules.rItems as { items: { type: string } }).items.type, "integer", "AllValidateRules.rItems.items.type === integer");
+
+// --- AllScalarsCreate: all fields optional (create message) ---
+
+const createAll: AllScalarsCreate = {};
+assertEqual(createAll.fSint32, undefined, "AllScalarsCreate all fields optional — fSint32 omitted === undefined");
+
+const createAllFull: AllScalarsCreate = {
+  fSint32: -1,
+  fSint64: "-1",
+  fSfixed32: 0,
+  fSfixed64: "0",
+  fFixed32: 0,
+  fFixed64: "0",
+  fUint32: 0,
+  fUint64: "0",
+  fFloat: 1.0,
+  fBytes: "dGVzdA==",
+};
+assertEqual(createAllFull.fSint32, -1, "AllScalarsCreate.fSint32 assigned correctly");
+
+// --- AllScalarsUpdate: condition field non-optional, rest optional ---
+
+const updateAll: AllScalarsUpdate = { fSint32: 42 };
+assertEqual(updateAll.fSint32, 42, "AllScalarsUpdate.fSint32 (condition field) is required and assigned");
+assertEqual(updateAll.fSint64, undefined, "AllScalarsUpdate.fSint64 optional — omitted === undefined");
+
+// --- AllValidate: interface type safety ---
+
+const av: AllValidate = {
+  uGte: 1,
+  uLte: "500",
+  uIn: 2,
+  uNotIn: 1,
+  fGt: 0.1,
+  dLte: 0.5,
+  sIn: "a",
+  sNotIn: "z",
+  iIn: 1,
+  sUri: "https://example.com",
+  bMinmax: "aGVsbG8=",
+  rItems: [0, 1, 2],
+};
+assertEqual(av.uGte, 1, "AllValidate.uGte assigned correctly");
+assertEqual(av.sIn, "a", "AllValidate.sIn assigned correctly");
+assertEqual(av.oStatus, undefined, "AllValidate.oStatus optional — omitted === undefined");
+
+// --- TreeNode: self-referencing interface type safety ---
+
+const treeLeaf: TreeNode = { value: "leaf", child: { value: "deep", child: { value: "deepest" } } } as TreeNode;
+assertEqual(treeLeaf.value, "leaf", "TreeNode.value assigned correctly");
+assertEqual(treeLeaf.child.value, "deep", "TreeNode.child.value nested correctly");
+assertEqual(treeLeaf.child.child.value, "deepest", "TreeNode.child.child.value deeply nested correctly");
+
 // --- summary ---
 
-assertEqual(passed, 43, "expected exactly 43 assertions before count guard");
+assertEqual(passed, 88, "expected exactly 88 assertions before count guard");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {

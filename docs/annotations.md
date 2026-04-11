@@ -161,7 +161,34 @@ db.Model(&dao.Person{}).Where("name = ?", req.Name).Updates(req.ToMap())
 >
 > For example, if `created_at` has `gorm.column = "created_ts"`, the key in `ToMap()` is `"created_ts"`, not `"created_at"`.
 
-#### Validate inheritance {#validate-inheritance}
+#### Condition field convention
+
+`condition_fields` are identified at code-generation time by the rule: **non-optional and non-repeated fields in the derived message are treated as condition fields**. This is an implicit convention, not an explicit proto annotation.
+
+If you write a `*.update.proto` file manually (instead of using `gcode gen-proto`), you must follow this convention: condition fields must be non-optional (non-pointer) and non-repeated. Optional or repeated fields will be treated as update fields and included in `ToMap()`, which is likely not what you want.
+
+> **Recommendation**: Always use `gcode gen-proto` to generate `*.update.proto` files. Do not write them manually.
+
+#### Cross-package enum limitation
+
+`gcode gen-proto` does not support cross-package enum references in derived proto files. If a field's enum type is defined in a different proto file (different package), the generated `*.update.proto` or `*.create.proto` will be missing the required `import` statement, causing a compilation error.
+
+**Workaround**: Define the enum in the same proto file as the message that uses it, or in a proto file within the same package.
+
+```proto
+// ✅ Works: enum and message in the same file
+enum Status { ... }
+message User {
+  Status status = 1;
+  option (gcode.update_message) = { name: "UserUpdate" ... };
+}
+
+// ❌ Does not work: enum defined in another package
+// import "other_package/types.proto";
+// message User {
+//   other_package.Status status = 1;  // gen-proto cannot resolve this import
+// }
+```
 
 The `Validate()` method of an update derived message automatically inherits validate rules from the source message, with the following differences:
 

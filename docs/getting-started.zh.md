@@ -18,8 +18,6 @@ CLI 参数：
 gcode [flags]                 从 proto 文件生成 Go 代码
   -in string                  输入 proto 目录
   -out string                 输出目录
-  -allow-json-unknown-fields  JSON 反序列化时允许未知字段
-  -duplicate-singular string  重复标量字段策略：error|last-wins（默认 "error"）
 
 gcode gen-proto [flags]       生成派生 proto 文件（*.update.proto / *.create.proto）
   -in string                  输入 proto 目录（生成文件写入同一目录）
@@ -47,6 +45,8 @@ go get github.com/pinealctx/gcode/httpruntime
 ```
 
 如果只生成 struct 和序列化代码（不使用 validate 和 HTTP），只需安装 `runtime`。
+
+> **运行时 import 路径固定**：生成的代码始终 import `github.com/pinealctx/gcode/runtime`、`github.com/pinealctx/gcode/validateruntime` 和 `github.com/pinealctx/gcode/httpruntime`，这些路径在生成器中硬编码，无法自定义。如果你 fork 或重命名了模块，需要同步修改生成代码中的 import 路径——这属于大版本升级级别的变更。
 
 ---
 
@@ -421,15 +421,17 @@ func (s *personServiceImpl) CreatePerson(ctx context.Context, req *dao.PersonCre
 > go get github.com/gin-gonic/gin
 > ```
 
-生成的 handler 工厂函数接收 service interface，返回 `gin.HandlerFunc`：
+生成的 handler 工厂函数接收 service interface 和可选的 interceptor 列表，返回 `gin.HandlerFunc`：
 
 ```go
 // dao/person_service.pb.http.go（生成，勿手动修改）
-func CreatePersonHandler(svc PersonService) gin.HandlerFunc
-func GetPersonHandler(svc PersonService) gin.HandlerFunc
-func UpdatePersonHandler(svc PersonService) gin.HandlerFunc
-func DeletePersonHandler(svc PersonService) gin.HandlerFunc
+func CreatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*PersonCreate, *CreatePersonResponse]) gin.HandlerFunc
+func GetPersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*GetPersonRequest, *GetPersonResponse]) gin.HandlerFunc
+func UpdatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*PersonUpdateByName, *UpdatePersonResponse]) gin.HandlerFunc
+func DeletePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*DeletePersonRequest, *DeletePersonResponse]) gin.HandlerFunc
 ```
+
+`interceptors` 是可变参数——现有调用 `dao.CreatePersonHandler(svc)` 无需任何修改，继续有效。
 
 注册路由：
 
@@ -460,11 +462,11 @@ func main() {
 // 成功
 {"code": 0, "data": {"id": "new-id"}}
 
-// validate 错误（code 400）
-{"code": 400, "error": {"msg": "length must be >= 1"}}
+// validate 错误（CodeValidationErr）
+{"code": 1001, "error": {"msg": "length must be >= 1"}}
 
-// 业务错误（code 500，或 CodedError.Code()）
-{"code": 500, "error": {"msg": "internal error"}}
+// 业务错误（CodeDefaultErr，或 CodedError.Code()）
+{"code": 5000, "error": {"msg": "internal error"}}
 ```
 
 业务层可通过实现 `httpruntime.CodedError` 接口自定义错误 code：
@@ -478,7 +480,7 @@ type AppError struct {
 func (e *AppError) Error() string { return e.msg }
 func (e *AppError) Code() int     { return e.code }
 
-// 返回此 error 时，响应 code 为 404 而非默认 500
+// 返回此 error 时，响应 code 为 404 而非默认 CodeDefaultErr (5000)
 return nil, &AppError{code: 404, msg: "person not found"}
 ```
 
@@ -495,11 +497,28 @@ curl -X POST http://localhost:8080/persons \
 curl -X POST http://localhost:8080/persons \
   -H "Content-Type: application/json" \
   -d '{"nickname": "this-name-is-way-too-long"}'
-# → {"code": 400, "error": {"msg": "length must be <= 10"}}
+# → {"code": 1001, "error": {"msg": "length must be <= 10"}}
 
 # 查询 person
 curl http://localhost:8080/persons/some-id
 # → {"code": 0, "data": {"name": "Alice", "age": 30}}
+```
+
+#### 请求体大小限制
+
+每个 handler 委托给 `httpruntime.NewHandler`，由其内部调用 `c.ShouldBindJSON`。gin 默认不限制请求体大小。生产环境中应通过 middleware 设置上限，防止超大请求体：
+
+```go
+import "net/http"
+
+func MaxBodyBytes(n int64) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, n)
+        c.Next()
+    }
+}
+
+r.Use(MaxBodyBytes(1 << 20)) // 1 MiB
 ```
 
 #### 给请求配置超时
@@ -518,6 +537,54 @@ func TimeoutMiddleware(d time.Duration) gin.HandlerFunc {
 
 r.Use(TimeoutMiddleware(5 * time.Second))
 ```
+
+#### 添加 interceptor（可选）
+
+每个生成的 handler 内置 panic 恢复——service 方法发生 panic 时会被自动捕获并转为错误，服务不会崩溃。在此基础上，可以为每个路由注入自定义 interceptor，用于日志、metrics、tracing 等横切关注点。
+
+interceptor 的签名为：
+
+```go
+func(ctx context.Context, req *Req, next handlerx.Handler[*Req, *Resp]) (*Resp, error)
+```
+
+**示例：请求日志 interceptor**
+
+```go
+import (
+    "context"
+    "log/slog"
+
+    "github.com/pinealctx/x/handlerx"
+)
+
+func LoggingInterceptor[Req, Resp any](logger *slog.Logger) handlerx.Interceptor[*Req, *Resp] {
+    return func(ctx context.Context, req *Req, next handlerx.Handler[*Req, *Resp]) (*Resp, error) {
+        logger.Info("request", "type", fmt.Sprintf("%T", req))
+        resp, err := next(ctx, req)
+        if err != nil {
+            logger.Error("request failed", "error", err)
+        }
+        return resp, err
+    }
+}
+```
+
+**注册路由时传入 interceptor**
+
+```go
+logger := slog.Default()
+
+// 不传 interceptor——与之前完全一致
+r.POST("/persons", dao.CreatePersonHandler(svc))
+
+// 为特定路由注入日志 interceptor
+r.DELETE("/persons/:id", dao.DeletePersonHandler(svc,
+    LoggingInterceptor[DeletePersonRequest, DeletePersonResponse](logger),
+))
+```
+
+interceptor 按传入顺序执行，位于内置 panic 恢复层的内侧。service 方法始终是最内层调用。
 
 ---
 
@@ -680,3 +747,20 @@ npm test
 ```
 
 这些测试也通过 `go test ./testdata/compat/...`（TestTSTypeCheck、TestTSRuntime）集成到 Go 测试中，当本地有 Node.js 时自动调用 npm。
+
+---
+
+## 已知限制
+
+以下 proto 特性尚未支持。遇到不支持的特性时，gcode 会报错退出，不会静默生成错误代码。
+
+| 限制 | 严重程度 | 说明 |
+| --- | --- | --- |
+| 不支持 streaming RPC | 中 | service 定义中使用 `stream` 关键字会报错退出 |
+| 不支持 `map<K,V>` | 中 | map 字段在解析阶段报错 |
+| 不支持 `oneof` | 中 | 非合成的 oneof 字段在解析阶段报错 |
+| 不支持 well-known types | 中 | `google.protobuf.*` 类型（如 `Timestamp`）会报错 |
+| 不支持 proto2 | 低 | 仅接受 `syntax = "proto3"` |
+| 跨 package enum import 不会自动生成 | 低 | 当 message 引用其他 proto package 的 enum 时，生成的 `*.update.proto` / `*.create.proto` 会缺少该 import，需手动补充 |
+| HTTP path param 不支持 | 低 | 生成的 handler 仅从请求体绑定数据，路径参数（如 `/users/:id`）需在 service 层手动提取 |
+| `repeated` enum 的 `defined_only` 不生效 | 低 | repeated enum 字段的 `defined_only` 约束会被静默跳过 |

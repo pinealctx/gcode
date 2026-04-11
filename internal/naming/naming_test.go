@@ -1,6 +1,7 @@
 package naming
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/pinealctx/gcode/internal/model"
@@ -67,6 +68,9 @@ func TestGoTypeName(t *testing.T) {
 		{"test.foo.Person.Address", "test.foo", "Person_Address"},
 		{"test.foo.Person.Status", "test.foo", "Person_Status"},
 		{"test.foo.Outer.Middle.Inner", "test.foo", "Outer_Middle_Inner"},
+		// Cross-package: fullName does not start with packageName, so TrimPrefix
+		// is a no-op and GoCamelCase converts the full dotted name.
+		{"other.pkg.Person", "test.foo", "OtherPkg_Person"},
 	}
 
 	for _, tt := range tests {
@@ -161,6 +165,31 @@ func TestGoScalarType(t *testing.T) {
 	}
 }
 
+func TestGoScalarType_UnknownKindPanics(t *testing.T) {
+	t.Parallel()
+
+	for _, kind := range []model.ScalarKind{"nonexistent", ""} {
+		kind := kind
+		t.Run(string(kind)+"_panics", func(t *testing.T) {
+			t.Parallel()
+			defer func() {
+				r := recover()
+				if r == nil {
+					t.Fatal("expected panic for unknown ScalarKind, got none")
+				}
+				msg, ok := r.(string)
+				if !ok {
+					t.Fatalf("expected panic value to be string, got %T: %v", r, r)
+				}
+				if !strings.Contains(msg, "GoScalarType") || !strings.Contains(msg, "unexpected ScalarKind") {
+					t.Errorf("panic message %q does not contain expected text", msg)
+				}
+			}()
+			GoScalarType(kind)
+		})
+	}
+}
+
 func TestResolveFieldNames(t *testing.T) {
 	t.Parallel()
 
@@ -173,6 +202,16 @@ func TestResolveFieldNames(t *testing.T) {
 			name:  "no conflicts",
 			input: []string{"Name", "Age", "Email"},
 			want:  []string{"Name", "Age", "Email"},
+		},
+		{
+			name:  "empty input",
+			input: []string{},
+			want:  []string{},
+		},
+		{
+			name:  "nil input",
+			input: nil,
+			want:  []string{},
 		},
 		{
 			name:  "reserved name collision",
@@ -198,6 +237,37 @@ func TestResolveFieldNames(t *testing.T) {
 			name:  "Marshal reserved",
 			input: []string{"Marshal", "Unmarshal"},
 			want:  []string{"Marshal_", "Unmarshal_"},
+		},
+		{
+			name:  "gcode generated method names",
+			input: []string{"Size", "Validate", "ToMap", "MarshalBinary", "MarshalAppend", "UnmarshalBinary", "UnmarshalBinaryLenient"},
+			want:  []string{"Size_", "Validate_", "ToMap_", "MarshalBinary_", "MarshalAppend_", "UnmarshalBinary_", "UnmarshalBinaryLenient_"},
+		},
+		{
+			// Chain collision: "Validate" is reserved, so it becomes "Validate_".
+			// Then "Validate_" is claimed by the first field, so the second field
+			// must keep appending '_' until it finds a free name.
+			name:  "chain collision with reserved name",
+			input: []string{"Validate", "Validate_"},
+			want:  []string{"Validate_", "Validate__"},
+		},
+		{
+			// "GetReset" is processed first (index 0) and passes immediately —
+			// neither "GetReset" nor "GetGetReset" is reserved or used.
+			// "Reset" is processed second: it is reserved, so it becomes "Reset_".
+			// Result: ["GetReset", "Reset_"].
+			name:  "getter chain collision with reserved name",
+			input: []string{"GetReset", "Reset"},
+			want:  []string{"GetReset", "Reset_"},
+		},
+		{
+			// Multi-step getter chain: "GetFoo" (field 0) occupies used["GetFoo"].
+			// "Foo" (field 1) fails the loop condition used["GetFoo"]=true, so it
+			// escapes to "Foo_", which claims used["Foo_"] and used["GetFoo_"].
+			// "Foo_" (field 2) finds used["Foo_"]=true, escapes to "Foo__".
+			name:  "getter multi-step chain collision",
+			input: []string{"GetFoo", "Foo", "Foo_"},
+			want:  []string{"GetFoo", "Foo_", "Foo__"},
 		},
 	}
 

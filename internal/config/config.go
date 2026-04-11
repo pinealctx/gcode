@@ -1,14 +1,8 @@
 package config
 
 import (
-	"errors"
 	"flag"
 	"fmt"
-)
-
-const (
-	DuplicateSingularError    = "error"
-	DuplicateSingularLastWins = "last-wins"
 )
 
 // GenProtoConfig contains configuration for the gen-proto subcommand.
@@ -20,14 +14,14 @@ type GenProtoConfig struct {
 func ParseGenProto(args []string) (GenProtoConfig, error) {
 	var cfg GenProtoConfig
 
-	fs := flag.NewFlagSet("gcode gen-proto", flag.ContinueOnError)
-	fs.StringVar(&cfg.InputDir, "in", "", "input proto directory (generated files are written to the same directory)")
+	fset := flag.NewFlagSet("gcode gen-proto", flag.ContinueOnError)
+	fset.StringVar(&cfg.InputDir, "in", "", "input proto directory (generated files are written to the same directory)")
 
-	if err := fs.Parse(args); err != nil {
+	if err := fset.Parse(args); err != nil {
 		return GenProtoConfig{}, fmt.Errorf("parse gen-proto flags: %w", err)
 	}
 
-	if remainingArgs := fs.Args(); len(remainingArgs) > 0 {
+	if remainingArgs := fset.Args(); len(remainingArgs) > 0 {
 		return GenProtoConfig{}, fmt.Errorf("parse gen-proto flags: unexpected positional arguments %q", remainingArgs)
 	}
 
@@ -41,33 +35,31 @@ func ParseGenProto(args []string) (GenProtoConfig, error) {
 // Validate validates gen-proto configuration values.
 func (c GenProtoConfig) Validate() error {
 	if c.InputDir == "" {
-		return errors.New("validate gen-proto config: missing -in")
+		return ErrMissingProtoInputDir
 	}
 	return nil
 }
 
+// Config holds the parsed and validated CLI configuration for the main gcode command
+// (gen-dao subcommand). It is populated by Parse() and validated by Validate().
 type Config struct {
-	InputDir                  string
-	OutputDir                 string
-	DuplicateSingularStrategy string
-	AllowJSONUnknownFields    bool
+	InputDir  string
+	OutputDir string
 }
 
 // Parse parses CLI arguments into a validated configuration.
 func Parse(args []string) (Config, error) {
 	var cfg Config
 
-	fs := flag.NewFlagSet("gcode", flag.ContinueOnError)
-	fs.StringVar(&cfg.InputDir, "in", "", "input proto directory")
-	fs.StringVar(&cfg.OutputDir, "out", "", "output directory")
-	fs.StringVar(&cfg.DuplicateSingularStrategy, "duplicate-singular", DuplicateSingularError, "duplicate singular field strategy: error|last-wins")
-	fs.BoolVar(&cfg.AllowJSONUnknownFields, "allow-json-unknown-fields", false, "allow unknown JSON fields during unmarshal")
+	fset := flag.NewFlagSet("gcode", flag.ContinueOnError)
+	fset.StringVar(&cfg.InputDir, "in", "", "input proto directory")
+	fset.StringVar(&cfg.OutputDir, "out", "", "output directory")
 
-	if err := fs.Parse(args); err != nil {
+	if err := fset.Parse(args); err != nil {
 		return Config{}, fmt.Errorf("parse cli flags: %w", err)
 	}
 
-	if remainingArgs := fs.Args(); len(remainingArgs) > 0 {
+	if remainingArgs := fset.Args(); len(remainingArgs) > 0 {
 		return Config{}, fmt.Errorf("parse cli flags: unexpected positional arguments %q", remainingArgs)
 	}
 
@@ -81,16 +73,10 @@ func Parse(args []string) (Config, error) {
 // Validate validates configuration values.
 func (c Config) Validate() error {
 	if c.InputDir == "" {
-		return errors.New("validate cli config: missing -in")
+		return ErrMissingInputDir
 	}
 	if c.OutputDir == "" {
-		return errors.New("validate cli config: missing -out")
+		return ErrMissingOutputDir
 	}
-
-	switch c.DuplicateSingularStrategy {
-	case DuplicateSingularError, DuplicateSingularLastWins:
-		return nil
-	default:
-		return fmt.Errorf("validate cli config: unsupported -duplicate-singular value %q", c.DuplicateSingularStrategy)
-	}
+	return nil
 }

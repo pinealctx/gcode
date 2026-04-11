@@ -4,10 +4,13 @@
 package httpruntime
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pinealctx/x/errorx"
+	"github.com/pinealctx/x/handlerx"
 
 	"github.com/pinealctx/gcode/validateruntime"
 )
@@ -31,36 +34,147 @@ type Error struct {
 // CodedError may be implemented by application errors to supply a custom
 // business error code (not an HTTP status code). If an error passed to
 // ErrResponse implements this interface, its Code() value is used; otherwise
-// the default code 500 applies.
+// the default code CodeDefaultErr applies.
 type CodedError interface {
+	error
 	Code() int
 }
 
-// OKResponse constructs a success Response with code 0 and the given data.
+// BizCode is the business error code type for application-defined errors.
+// Use errorx.Error[BizCode] to define typed business errors that integrate
+// with ErrResponse without implementing CodedError manually:
+//
+//	var ErrUnprocessable = errorx.New(httpruntime.BizCode(1002), "invalid parameter combination")
+//
+// BizCode values are application-defined 4-digit codes with no relation to
+// HTTP status codes. The numeric value is carried as-is in the response Code field.
+//
+// Reserved ranges:
+//
+//	0        success (CodeOK)
+//	1000-1999 input errors — client data problems, message safe to expose
+//	5000-5999 server errors — internal failures, message hidden from client
+type BizCode int
+
+const (
+	// CodeOK is the response code for successful requests.
+	CodeOK = 0
+	// CodeBadRequest is the response code for malformed request bodies (JSON parse errors).
+	// The request body could not be decoded; the client should fix its serialization.
+	CodeBadRequest = 1000
+	// CodeValidationErr is the response code for field-level constraint validation failures.
+	// The request body was decoded successfully but one or more fields failed business rules.
+	CodeValidationErr = 1001
+	// CodeDefaultErr is the response code used when no specific business code is available.
+	// Message is always "internal error" — the original error is never exposed to the client.
+	CodeDefaultErr = 5000
+)
+
+// errBadRequest is returned when ShouldBindJSON fails to decode the request body.
+// It uses BizCode(CodeBadRequest) so ErrResponse maps it to CodeBadRequest with a safe,
+// client-visible message that does not expose internal Go type or field details.
+var errBadRequest = errorx.New(BizCode(CodeBadRequest), "malformed request body")
+
+// OKResponse constructs a success Response with code CodeOK (0) and the given data.
 func OKResponse(data any) Response {
-	return Response{Code: 0, Data: data}
+	return Response{Code: CodeOK, Data: data}
 }
 
 // ErrResponse constructs an error Response from err.
-// If err implements CodedError, its Code() is used as the response code.
-// Otherwise the response code defaults to 500.
-// If err is nil, ErrResponse returns a generic code-500 error response.
+// Code resolution order:
+//  1. If err (or any error in its chain) is *errorx.Error[BizCode], its Code field is used.
+//  2. If err implements CodedError, its Code() value is used.
+//  3. Otherwise the response code defaults to CodeDefaultErr and the message
+//     is "internal error" — the original error is NOT exposed to the client.
+//
+// Error visibility contract:
+//   - Business errors (BizCode / CodedError): message is safe to expose to clients.
+//     Wrap internal errors with a business error to control the client-visible message:
+//     errorx.Wrap(dbErr, BizCode(5001), "service unavailable")
+//   - System errors (plain errors.New / fmt.Errorf): message is hidden from clients.
+//     Log the full error chain before or after calling ErrResponse to preserve
+//     internal context for debugging.
+//
+// If err is nil, ErrResponse returns a generic CodeDefaultErr response.
 func ErrResponse(err error) Response {
 	if err == nil {
-		return Response{Code: 500, Error: &Error{Msg: "internal error"}}
+		return Response{Code: CodeDefaultErr, Error: &Error{Msg: "internal error"}}
 	}
-	code := 500
-	if ce, ok := err.(CodedError); ok {
+	code := CodeDefaultErr
+	msg := "internal error"
+	if he, ok := errors.AsType[*errorx.Error[BizCode]](err); ok {
+		code = int(he.Code)
+		msg = err.Error()
+	} else if ce, ok := errors.AsType[CodedError](err); ok {
 		code = ce.Code()
+		msg = err.Error()
 	}
-	return Response{Code: code, Error: &Error{Msg: err.Error()}}
+	return Response{Code: code, Error: &Error{Msg: msg}}
+}
+
+// NewHandler creates a gin.HandlerFunc that binds JSON, validates, and calls
+// the service method through a handlerx interceptor chain.
+// WithRecovery is always applied as the outermost interceptor.
+// Additional interceptors are applied inside recovery, before the service method.
+func NewHandler[Req any, Resp any](
+	method func(ctx context.Context, req *Req) (*Resp, error),
+	interceptors ...handlerx.Interceptor[*Req, *Resp],
+) gin.HandlerFunc {
+	all := make([]handlerx.Interceptor[*Req, *Resp], 0, 1+len(interceptors))
+	all = append(all, handlerx.WithRecovery[*Req, *Resp]())
+	all = append(all, interceptors...)
+	h := handlerx.Chain(handlerx.Handler[*Req, *Resp](method), all...)
+	return func(c *gin.Context) {
+		var req Req
+		if err := c.ShouldBindJSON(&req); err != nil {
+			_ = c.Error(errBadRequest)
+			return
+		}
+		if v, ok := any(&req).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				_ = c.Error(err)
+				return
+			}
+		}
+		resp, err := h(c.Request.Context(), &req)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+		c.JSON(http.StatusOK, OKResponse(resp))
+	}
 }
 
 // DefaultErrorHandler returns a gin middleware that writes a JSON error response
 // for any errors accumulated via c.Error() during handler execution.
-// ValidationError maps to code 400; all other errors map to code 500 (or the
-// code returned by CodedError.Code() if the error implements that interface).
+// ValidationError maps to CodeValidationErr; all other errors use ErrResponse (see its
+// doc for the business vs system error visibility contract).
 // Only the last error (c.Errors.Last()) is used when multiple errors are present.
+//
+// Logging contract: this middleware does NOT log errors. System errors (plain
+// errors.New / fmt.Errorf) are hidden from the client response; to preserve the
+// full error chain for debugging, log the error in the handler before calling
+// c.Error(), or register a separate logging middleware that reads c.Errors:
+//
+//	// Option A: log in the handler
+//	if err := svc.Create(req); err != nil {
+//	    logger.Error("create failed", "error", err)
+//	    _ = c.Error(err)
+//	    return
+//	}
+//
+//	// Option B: separate logging middleware (registered before DefaultErrorHandler)
+//	func LogErrors(logger *slog.Logger) gin.HandlerFunc {
+//	    return func(c *gin.Context) {
+//	        c.Next()
+//	        for _, e := range c.Errors {
+//	            logger.Error("request error", "error", e.Err)
+//	        }
+//	    }
+//	}
+//
+// Note: when the error is (or wraps) a *validateruntime.ValidationError, the
+// response Msg is taken from the ValidationError itself, not from any outer wrapper.
 //
 // WARNING: Generated handlers use c.Error(err)+return and do not write their own
 // error responses. If this middleware is not registered, error paths will return
@@ -73,9 +187,8 @@ func DefaultErrorHandler() gin.HandlerFunc {
 			return
 		}
 		err := c.Errors.Last().Err
-		var ve *validateruntime.ValidationError
-		if errors.As(err, &ve) {
-			c.JSON(http.StatusOK, Response{Code: 400, Error: &Error{Msg: ve.Error()}})
+		if ve, ok := errors.AsType[*validateruntime.ValidationError](err); ok {
+			c.JSON(http.StatusOK, Response{Code: CodeValidationErr, Error: &Error{Msg: ve.Error()}})
 		} else {
 			c.JSON(http.StatusOK, ErrResponse(err))
 		}

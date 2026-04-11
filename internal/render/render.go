@@ -24,9 +24,9 @@ type Context struct {
 	EnumIndex map[string]transform.GoEnum
 }
 
-// _defaultProviders is the ordered list of TagProviders used during rendering.
+// defaultProviders is the ordered list of TagProviders used during rendering.
 // json tag is always generated as a built-in; providers add extra tags.
-var _defaultProviders = []TagProvider{
+var defaultProviders = []TagProvider{
 	&GormTagProvider{},
 }
 
@@ -63,7 +63,7 @@ func File(gf transform.GoFile, modulePath string, ctx Context) ([]byte, error) {
 	var body strings.Builder
 
 	for _, msg := range gf.Messages {
-		writeMessage(&body, msg, _defaultProviders)
+		writeMessage(&body, msg, defaultProviders)
 	}
 	for _, msg := range gf.Messages {
 		writeMarshalMethods(&body, msg)
@@ -75,7 +75,7 @@ func File(gf transform.GoFile, modulePath string, ctx Context) ([]byte, error) {
 	}
 	for _, msg := range gf.Messages {
 		if msg.UpdateSource != "" {
-			writeToMapMethod(&body, msg, ctx)
+			writeToMapMethod(&body, msg)
 		}
 	}
 	for _, enum := range gf.Enums {
@@ -89,6 +89,10 @@ func File(gf transform.GoFile, modulePath string, ctx Context) ([]byte, error) {
 	writePackage(&b, gf.Package)
 
 	if len(gf.Messages) > 0 {
+		// Import detection by scanning the rendered body. This is safe because:
+		// - "math." only appears from math.Float32frombits/Float64frombits in unmarshal
+		// - "fmt." only appears from fmt.Errorf in unmarshal error paths
+		// Neither string can appear in comments or string literals in generated code.
 		needsMath := strings.Contains(bodyStr, "math.")
 		needsFmt := strings.Contains(bodyStr, "fmt.")
 		switch {

@@ -169,8 +169,8 @@ This document records the key architectural decisions for gcode, using ADR (Arch
 - `Validate()` is a public method usable in any context; built-in handler invocation ensures uniform interception at the transport layer
 
 **Decision**:
-- Generate handler factory functions `XxxHandler(svc XxxService) gin.HandlerFunc` accepting an interface, not a concrete type
-- Use `c.ShouldBind` uniformly (auto-selects JSON/form/query based on Content-Type); no path param support
+- Generate handler factory functions `XxxHandler(svc XxxService, interceptors ...handlerx.Interceptor[*Req, *Resp]) gin.HandlerFunc` accepting an interface, not a concrete type; delegate to `httpruntime.NewHandler` which applies the interceptor chain with built-in panic recovery
+- Use `c.ShouldBindJSON` uniformly (enforces JSON body; no path param support)
 - Handlers call `req.Validate()` built-in (after bind, before svc call); `Validate()` remains a public method for reuse in other contexts
 - Use `c.Request.Context()` to propagate request context, preserving deadline/cancel/trace information
 
@@ -191,10 +191,10 @@ This document records the key architectural decisions for gcode, using ADR (Arch
 
 **Decision**: HTTP status always returns 200; business results are conveyed via the `code` field in the response body:
 - Success: `{"code": 0, "data": {...}}`
-- Error: `{"code": 500, "error": {"msg": "..."}}`
+- Error: `{"code": 5000, "error": {"msg": "..."}}`
 
 Two-layer error code mechanism:
-1. `CodedError` interface: business errors implement `Code() int`; `ErrResponse` extracts it automatically; defaults to 500 otherwise
+1. `CodedError` interface: business errors implement `Code() int`; `ErrResponse` extracts it automatically; defaults to CodeDefaultErr (5000) otherwise
 2. gin middleware: can completely replace the error response format for cross-cutting concerns
 
 **Consequences**:
@@ -244,19 +244,19 @@ Two-layer error code mechanism:
 **Problem**: Should generated HTTP handlers write error responses directly, or propagate errors through the gin context?
 
 **Constraints**:
-- When handlers write responses directly (`c.JSON`), middleware cannot intercept errors, making it impossible to handle ValidationError (400) and business errors (500) uniformly
+- When handlers write responses directly (`c.JSON`), middleware cannot intercept errors, making it impossible to handle ValidationError (CodeValidationErr) and business errors (CodeDefaultErr) uniformly
 - Users may need to customize error response format (e.g. adding request_id, trace_id, internationalized messages)
-- ValidationError should map to code 400; other errors should map to code 500 or CodedError.Code()
+- ValidationError should map to CodeValidationErr (1001); other errors should map to CodeDefaultErr (5000) or CodedError.Code()
 - When no error-handling middleware is registered, behavior must be clearly documented — errors must not be silently lost
 
 **Decision**:
 - All error paths in handlers use `_ = c.Error(err); return` — no direct response writing
-- `httpruntime.DefaultErrorHandler()` serves as a gin middleware fallback: ValidationError → code 400, others → code 500 or CodedError.Code()
+- `httpruntime.DefaultErrorHandler()` serves as a gin middleware fallback: ValidationError → CodeValidationErr (1001), others → CodeDefaultErr (5000) or CodedError.Code()
 - The function's doc comment explicitly warns: without this middleware, error paths return HTTP 200 with an empty body
 
 **Consequences**:
 - Users can replace DefaultErrorHandler with a custom implementation without modifying generated code
-- ValidationError automatically maps to code 400 — no per-handler repetition needed
+- ValidationError automatically maps to CodeValidationErr (1001) — no per-handler repetition needed
 - Error handling logic is centralized in middleware; handlers remain clean
 - The risk of not registering DefaultErrorHandler is clearly communicated via documentation and code comments
 
@@ -308,3 +308,24 @@ Two-layer error code mechanism:
 - No runtime serialization — frontend consumes data via JSON fetch, which is the dominant pattern
 - Validation metadata can drive form validation, UI constraints, or be converted to zod/yup schemas
 - `gen-ts` is a separate subcommand, cleanly decoupled from Go generation
+
+---
+
+## D16: Runtime import paths are hardcoded
+
+**Problem**: Should the import paths for `runtime`, `validateruntime`, and `httpruntime` be configurable?
+
+**Constraints**:
+- Generated code must import the runtime packages to compile
+- Making import paths configurable adds CLI flags, configuration complexity, and documentation burden
+- The module path `github.com/pinealctx/gcode` is stable; changing it is a major-version-level event
+
+**Decision**: Hardcode the runtime import paths in the generator. Generated code always imports:
+- `github.com/pinealctx/gcode/runtime`
+- `github.com/pinealctx/gcode/validateruntime`
+- `github.com/pinealctx/gcode/httpruntime`
+
+**Consequences**:
+- No configuration needed for the common case
+- If the module is forked or renamed, the generated import paths must be updated manually — this is intentional: a module rename is a breaking change and warrants explicit action
+- Customizable import paths are deferred to a future major version if the need arises

@@ -41,9 +41,10 @@ func TestHTTPFileSingleServiceSingleRPC(t *testing.T) {
 		"source":             "// source: user_service.proto",
 		"package":            "package dao",
 		"import gin":         `"github.com/gin-gonic/gin"`,
+		"import handlerx":    `"github.com/pinealctx/x/handlerx"`,
 		"import httpruntime": `"github.com/pinealctx/gcode/httpruntime"`,
-		"handler func":       "func CreateUserHandler(svc UserService) gin.HandlerFunc",
-		"request context":    "c.Request.Context()",
+		"handler func":       "func CreateUserHandler(svc UserService, interceptors ...handlerx.Interceptor[*CreateUserRequest, *CreateUserResponse]) gin.HandlerFunc",
+		"NewHandler call":    "return httpruntime.NewHandler(svc.CreateUser, interceptors...)",
 	})
 }
 
@@ -77,9 +78,9 @@ func TestHTTPFileMultipleServicesMultipleRPCs(t *testing.T) {
 	src := string(got)
 
 	containsAll(t, src, map[string]string{
-		"CreateUserHandler": "func CreateUserHandler(svc UserService) gin.HandlerFunc",
-		"GetUserHandler":    "func GetUserHandler(svc UserService) gin.HandlerFunc",
-		"PlaceOrderHandler": "func PlaceOrderHandler(svc OrderService) gin.HandlerFunc",
+		"CreateUserHandler": "func CreateUserHandler(svc UserService, interceptors ...handlerx.Interceptor[*CreateUserRequest, *CreateUserResponse]) gin.HandlerFunc",
+		"GetUserHandler":    "func GetUserHandler(svc UserService, interceptors ...handlerx.Interceptor[*GetUserRequest, *GetUserResponse]) gin.HandlerFunc",
+		"PlaceOrderHandler": "func PlaceOrderHandler(svc OrderService, interceptors ...handlerx.Interceptor[*PlaceOrderRequest, *PlaceOrderResponse]) gin.HandlerFunc",
 	})
 }
 
@@ -132,13 +133,17 @@ func TestHTTPFileImportsPresent(t *testing.T) {
 	src := string(got)
 
 	for _, imp := range []string{
-		`"net/http"`,
 		`"github.com/gin-gonic/gin"`,
+		`"github.com/pinealctx/x/handlerx"`,
 		`"github.com/pinealctx/gcode/httpruntime"`,
 	} {
 		if !strings.Contains(src, imp) {
 			t.Errorf("expected import %s in output:\n%s", imp, src)
 		}
+	}
+	// net/http is no longer used directly in generated handlers.
+	if strings.Contains(src, `"net/http"`) {
+		t.Errorf("unexpected import \"net/http\" in output:\n%s", src)
 	}
 }
 
@@ -164,15 +169,14 @@ func TestHTTPFileHandlerSignatureFormat(t *testing.T) {
 	}
 	src := string(got)
 
-	if !strings.Contains(src, "func GetPersonHandler(svc PersonService) gin.HandlerFunc") {
+	if !strings.Contains(src, "func GetPersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*GetPersonRequest, *GetPersonResponse]) gin.HandlerFunc") {
 		t.Errorf("expected handler signature in output:\n%s", src)
 	}
 }
 
-// TestHTTPFileErrorPaths verifies that the generated handler contains the correct
-// error-handling structure: ShouldBind → req.Validate() → svc call, with all error
-// paths using c.Error(err)+return (not ErrResponse), in the correct order.
-func TestHTTPFileErrorPaths(t *testing.T) {
+// TestHTTPFileHandlerDelegation verifies that the generated handler delegates to
+// httpruntime.NewHandler and contains no inline bind/validate/error/response logic.
+func TestHTTPFileHandlerDelegation(t *testing.T) {
 	t.Parallel()
 
 	gf := transform.GoFile{
@@ -194,58 +198,21 @@ func TestHTTPFileErrorPaths(t *testing.T) {
 	}
 	src := string(got)
 
-	// All three steps must be present.
-	containsAll(t, src, map[string]string{
-		"ShouldBind":   "ShouldBind(",
-		"req.Validate": "req.Validate()",
-		"c.Error":      "c.Error(err)",
-	})
-	// ErrResponse must NOT appear — errors are forwarded via c.Error.
-	if strings.Contains(src, "httpruntime.ErrResponse") {
-		t.Errorf("ErrResponse should not appear in generated handler (use c.Error instead):\n%s", src)
+	// Generated handler must delegate to NewHandler.
+	if !strings.Contains(src, "httpruntime.NewHandler(svc.DoFoo, interceptors...)") {
+		t.Errorf("expected NewHandler delegation in output:\n%s", src)
 	}
-	// Order: ShouldBind < req.Validate() < svc call.
-	// Search within the handler body (after the opening brace) to avoid matching
-	// "svc" in the import path "github.com/pinealctx/gcode/httpruntime".
-	handlerStart := strings.Index(src, "return func(c *gin.Context)")
-	if handlerStart < 0 {
-		t.Fatalf("handler body not found in:\n%s", src)
-	}
-	body := src[handlerStart:]
-	bindPos := strings.Index(body, "ShouldBind(")
-	validatePos := strings.Index(body, "req.Validate()")
-	svcPos := strings.Index(body, "svc.")
-	if bindPos >= validatePos || validatePos >= svcPos {
-		t.Errorf("expected order ShouldBind(%d) < Validate(%d) < svc(%d) in handler body:\n%s",
-			bindPos, validatePos, svcPos, body)
-	}
-}
-
-func TestHTTPFileSuccessPath(t *testing.T) {
-	t.Parallel()
-
-	gf := transform.GoFile{
-		Source:  "svc.proto",
-		Package: "dao",
-		Services: []transform.GoService{
-			{
-				GoName: "FooService",
-				Methods: []transform.GoRPCMethod{
-					{GoName: "DoFoo", RequestType: "FooRequest", ResponseType: "FooResponse"},
-				},
-			},
-		},
-	}
-
-	got, err := HTTPFile(gf, testModulePath)
-	if err != nil {
-		t.Fatalf("HTTPFile() error: %v", err)
-	}
-	src := string(got)
-
-	// OKResponse must be present for success path.
-	if !strings.Contains(src, "httpruntime.OKResponse(resp)") {
-		t.Errorf("expected OKResponse in success path:\n%s", src)
+	// Inline logic and direct response helpers must NOT appear — all handled inside NewHandler.
+	for _, token := range []string{
+		"ShouldBindJSON(",
+		"req.Validate()",
+		"c.Error(err)",
+		"httpruntime.ErrResponse",
+		"httpruntime.OKResponse",
+	} {
+		if strings.Contains(src, token) {
+			t.Errorf("token %q should not appear in generated handler (delegated to NewHandler):\n%s", token, src)
+		}
 	}
 }
 
@@ -319,7 +286,7 @@ func TestHTTPFileServiceCommentNotWritten(t *testing.T) {
 	// Method comment must appear; handler function must be generated.
 	containsAll(t, src, map[string]string{
 		"method comment": "// GetUser retrieves a user.",
-		"handler func":   "func GetUserHandler(svc UserService) gin.HandlerFunc",
+		"handler func":   "func GetUserHandler(svc UserService, interceptors ...handlerx.Interceptor[*GetUserRequest, *GetUserResponse]) gin.HandlerFunc",
 	})
 }
 

@@ -18,7 +18,7 @@ const (
 
 // AppendTag appends a protobuf field tag (field_number << 3 | wire_type).
 func AppendTag(b []byte, fieldNumber int, wireType int) []byte {
-	return AppendVarint(b, uint64(fieldNumber<<3|wireType))
+	return AppendVarint(b, uint64(fieldNumber)<<3|uint64(wireType))
 }
 
 // AppendVarint appends a base-128 varint-encoded uint64.
@@ -98,7 +98,7 @@ func SizeVarint(v uint64) int {
 
 // SizeTag returns the number of bytes needed to encode a field tag.
 func SizeTag(fieldNumber int) int {
-	return SizeVarint(uint64(fieldNumber << 3))
+	return SizeVarint(uint64(fieldNumber) << 3)
 }
 
 // DecodeZigZag32 decodes a ZigZag-encoded uint64 back to int32.
@@ -160,6 +160,9 @@ func ConsumeBytes(b []byte) ([]byte, int) {
 	if uint64(len(b)-n) < l {
 		return nil, -1
 	}
+	// Safe to convert l to int: the check above guarantees l <= len(b)-n,
+	// and len(b)-n fits in int by definition, so int(l) cannot overflow
+	// on any platform where this code can run.
 	return b[n : n+int(l)], n + int(l)
 }
 
@@ -178,6 +181,20 @@ var ErrPackedLen = errorString("protobuf: packed field length mismatch")
 // ErrDuplicateField is returned when a non-repeated field appears more than once.
 var ErrDuplicateField = errorString("protobuf: duplicate non-repeated field")
 
+// ErrUnknownWireType is returned when SkipField encounters an unrecognized wire type.
+// Wire types 0-5 are defined by the protobuf spec; any other value is invalid.
+var ErrUnknownWireType = errorString("protobuf: unknown wire type")
+
+// ErrNestingDepth is returned when message nesting exceeds DefaultRecursionLimit.
+var ErrNestingDepth = errorString("protobuf: message nesting depth exceeded")
+
+// DefaultRecursionLimit is the maximum message nesting depth allowed during
+// unmarshal. Generated UnmarshalBinary / UnmarshalBinaryLenient start with
+// this budget and decrement it on each nested message call.
+// 100 is sufficient for any realistic business schema; deeply nested messages
+// indicate a design problem and are rejected early to prevent stack exhaustion.
+const DefaultRecursionLimit = 100
+
 // errorString is a simple error type to avoid importing errors package.
 type errorString string
 
@@ -194,7 +211,8 @@ func ConsumeTag(b []byte) (int, int, int) {
 }
 
 // SkipField skips a field value given its wire type.
-// Returns the number of bytes consumed, or a negative error code.
+// Returns the number of bytes consumed, or a negative error code:
+// -1 for truncated input, -3 for an unrecognized wire type.
 func SkipField(b []byte, wireType int) int {
 	switch wireType {
 	case WireVarint:
@@ -214,6 +232,6 @@ func SkipField(b []byte, wireType int) int {
 		}
 		return 4
 	default:
-		return -1 // unsupported wire type
+		return -3 // unrecognized wire type
 	}
 }

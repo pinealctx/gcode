@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"go/format"
+	"maps"
 	"strings"
 
 	"github.com/pinealctx/gcode/internal/model"
@@ -70,12 +71,8 @@ func writeValidateMethod(b *strings.Builder, msg transform.GoMessage, enumByGoNa
 			mergedEnums := enumByGoName
 			if ctx.EnumIndex != nil {
 				mergedEnums = make(map[string]transform.GoEnum, len(enumByGoName)+len(ctx.EnumIndex))
-				for k, v := range ctx.EnumIndex {
-					mergedEnums[k] = v
-				}
-				for k, v := range enumByGoName {
-					mergedEnums[k] = v
-				}
+				maps.Copy(mergedEnums, ctx.EnumIndex)
+				maps.Copy(mergedEnums, enumByGoName) // local file takes precedence
 			}
 			writeInheritedValidation(b, recv, msg, srcMsg, mergedEnums)
 			b.WriteString("return nil\n}\n\n")
@@ -84,11 +81,20 @@ func writeValidateMethod(b *strings.Builder, msg transform.GoMessage, enumByGoNa
 	}
 
 	// Standard validate: use the message's own field validate rules.
+	// Merge ctx.EnumIndex so that defined_only checks work even when the enum
+	// is defined in a different file (e.g. Status in person.proto referenced
+	// from AllValidate in all_types.proto).
+	effectiveEnums := enumByGoName
+	if ctx.EnumIndex != nil {
+		effectiveEnums = make(map[string]transform.GoEnum, len(enumByGoName)+len(ctx.EnumIndex))
+		maps.Copy(effectiveEnums, ctx.EnumIndex)
+		maps.Copy(effectiveEnums, enumByGoName) // local file takes precedence
+	}
 	for _, f := range msg.Fields {
 		if f.ValidateOptions == nil && f.Type.Kind != model.FieldKindMessage {
 			continue
 		}
-		writeFieldValidation(b, recv, f, enumByGoName)
+		writeFieldValidation(b, recv, f, effectiveEnums)
 	}
 	b.WriteString("return nil\n}\n\n")
 }
@@ -149,7 +155,7 @@ func writeFieldValidationExpr(b *strings.Builder, fieldExpr string, f transform.
 
 	switch {
 	case f.Cardinality == model.CardinalityRepeated:
-		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo, f, enumByGoName)
+		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo)
 	case f.Type.Kind == model.FieldKindMessage:
 		writeMessageFieldValidation(b, fieldExpr, fieldName, vm, vo)
 	case f.Type.Kind == model.FieldKindEnum:
@@ -170,7 +176,7 @@ func writeFieldValidation(b *strings.Builder, recv string, f transform.GoField, 
 
 	switch {
 	case f.Cardinality == model.CardinalityRepeated:
-		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo, f, enumByGoName)
+		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo)
 
 	case f.Type.Kind == model.FieldKindMessage:
 		writeMessageFieldValidation(b, fieldExpr, fieldName, vm, vo)
@@ -212,7 +218,7 @@ func writeScalarValidation(b *strings.Builder, fieldExpr, fieldName, vm string, 
 	case model.ScalarBool:
 		// bool required not supported (parser rejects it)
 	case model.ScalarFloat, model.ScalarDouble:
-		writeFloatValidation(b, fieldExpr, fieldName, vm, vo, scalar)
+		writeFloatValidation(b, fieldExpr, fieldName, vm, vo)
 	default:
 		// signed or unsigned integer
 		writeIntValidation(b, fieldExpr, fieldName, vm, vo, scalar)
@@ -250,8 +256,8 @@ func writeStringValidation(b *strings.Builder, fieldExpr, fieldName, vm string, 
 			fieldExpr, *vo.MaxLen, fieldName, vm, *vo.MaxLen)
 	}
 	if vo.Pattern != "" {
-		fmt.Fprintf(b, "if !validateruntime.MatchPattern(%s, %q) {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"pattern\", Message: validateruntime.MsgOr(%q, \"must match pattern %s\")}\n}\n",
-			fieldExpr, vo.Pattern, fieldName, vm, vo.Pattern)
+		fmt.Fprintf(b, "if !validateruntime.MatchPattern(%s, %q) {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"pattern\", Message: validateruntime.MsgOr(%q, %q)}\n}\n",
+			fieldExpr, vo.Pattern, fieldName, vm, "must match pattern "+vo.Pattern)
 	}
 	if vo.Email {
 		fmt.Fprintf(b, "if !validateruntime.IsEmail(%s) {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"email\", Message: validateruntime.MsgOr(%q, \"must be a valid email address\")}\n}\n",
@@ -273,35 +279,45 @@ func writeStringValidation(b *strings.Builder, fieldExpr, fieldName, vm string, 
 	}
 }
 
+// writeStringInCheck writes an "in" membership check for a string field.
 func writeStringInCheck(b *strings.Builder, fieldExpr, fieldName, vm string, vals []string) {
-	b.WriteString("{\nfound := false\n")
-	b.WriteString("for _, v := range []string{")
-	for i, s := range vals {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "%q", s)
-	}
-	b.WriteString("} {\n")
-	fmt.Fprintf(b, "if %s == v {\nfound = true\nbreak\n}\n}\n", fieldExpr)
-	// build display list
-	display := buildStringList(vals)
-	fmt.Fprintf(b, "if !found {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"in\", Message: validateruntime.MsgOr(%q, \"must be one of %s\")}\n}\n}\n",
-		fieldName, vm, display)
+	writeStringSetCheck(b, fieldExpr, fieldName, vm, vals, false)
 }
 
+// writeStringNotInCheck writes a "not_in" membership check for a string field.
 func writeStringNotInCheck(b *strings.Builder, fieldExpr, fieldName, vm string, vals []string) {
-	b.WriteString("for _, v := range []string{")
-	for i, s := range vals {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(b, "%q", s)
-	}
-	b.WriteString("} {\n")
+	writeStringSetCheck(b, fieldExpr, fieldName, vm, vals, true)
+}
+
+// writeStringSetCheck writes an in/not_in membership check for a string field.
+// negate=false generates an "in" check; negate=true generates a "not_in" check.
+func writeStringSetCheck(b *strings.Builder, fieldExpr, fieldName, vm string, vals []string, negate bool) {
 	display := buildStringList(vals)
-	fmt.Fprintf(b, "if %s == v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"not_in\", Message: validateruntime.MsgOr(%q, \"must not be one of %s\")}\n}\n}\n",
-		fieldExpr, fieldName, vm, display)
+	if !negate {
+		b.WriteString("{\nfound := false\n")
+		b.WriteString("for _, v := range []string{")
+		for i, s := range vals {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%q", s)
+		}
+		b.WriteString("} {\n")
+		fmt.Fprintf(b, "if %s == v {\nfound = true\nbreak\n}\n}\n", fieldExpr)
+		fmt.Fprintf(b, "if !found {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"in\", Message: validateruntime.MsgOr(%q, %q)}\n}\n}\n",
+			fieldName, vm, "must be one of "+display)
+	} else {
+		b.WriteString("for _, v := range []string{")
+		for i, s := range vals {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%q", s)
+		}
+		b.WriteString("} {\n")
+		fmt.Fprintf(b, "if %s == v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"not_in\", Message: validateruntime.MsgOr(%q, %q)}\n}\n}\n",
+			fieldExpr, fieldName, vm, "must not be one of "+display)
+	}
 }
 
 // writeBytesValidation writes bytes field constraints.
@@ -446,21 +462,21 @@ func writeUnsignedNotInCheck(b *strings.Builder, fieldExpr, fieldName, vm string
 }
 
 // writeFloatValidation writes float/double field constraints.
-func writeFloatValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions, _ model.ScalarKind) {
+func writeFloatValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions) {
 	if vo.GTFloat != nil {
-		fmt.Fprintf(b, "if %s <= %v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %v\")}\n}\n",
+		fmt.Fprintf(b, "if %s <= %g {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %g\")}\n}\n",
 			fieldExpr, *vo.GTFloat, fieldName, vm, *vo.GTFloat)
 	}
 	if vo.GTEFloat != nil {
-		fmt.Fprintf(b, "if %s < %v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"gte\", Message: validateruntime.MsgOr(%q, \"must be >= %v\")}\n}\n",
+		fmt.Fprintf(b, "if %s < %g {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"gte\", Message: validateruntime.MsgOr(%q, \"must be >= %g\")}\n}\n",
 			fieldExpr, *vo.GTEFloat, fieldName, vm, *vo.GTEFloat)
 	}
 	if vo.LTFloat != nil {
-		fmt.Fprintf(b, "if %s >= %v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"lt\", Message: validateruntime.MsgOr(%q, \"must be < %v\")}\n}\n",
+		fmt.Fprintf(b, "if %s >= %g {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"lt\", Message: validateruntime.MsgOr(%q, \"must be < %g\")}\n}\n",
 			fieldExpr, *vo.LTFloat, fieldName, vm, *vo.LTFloat)
 	}
 	if vo.LTEFloat != nil {
-		fmt.Fprintf(b, "if %s > %v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %v\")}\n}\n",
+		fmt.Fprintf(b, "if %s > %g {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %g\")}\n}\n",
 			fieldExpr, *vo.LTEFloat, fieldName, vm, *vo.LTEFloat)
 	}
 }
@@ -504,7 +520,9 @@ func writeMessageFieldValidation(b *strings.Builder, fieldExpr, fieldName, vm st
 }
 
 // writeRepeatedValidation writes repeated field constraints.
-func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions, f transform.GoField, _ map[string]transform.GoEnum) {
+// Note: defined_only for repeated enum fields is not currently supported
+// and is silently skipped.
+func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions) {
 	if vo == nil {
 		return
 	}
@@ -517,12 +535,12 @@ func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string
 			fieldExpr, *vo.MaxItems, fieldName, vm, *vo.MaxItems)
 	}
 	if vo.Items != nil {
-		writeItemsValidation(b, fieldExpr, fieldName, vm, vo.Items, f)
+		writeItemsValidation(b, fieldExpr, fieldName, vm, vo.Items)
 	}
 }
 
 // writeItemsValidation writes element-level validation for repeated fields.
-func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, items *model.ValidateFieldOptions, _ transform.GoField) {
+func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, items *model.ValidateFieldOptions) {
 	// Determine element variable name and type based on field scalar.
 	// For repeated string → v is string; for repeated int32 → v is int32, etc.
 	fmt.Fprintf(b, "for i, v := range %s {\n", fieldExpr)
@@ -538,8 +556,8 @@ func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, i
 			*items.MaxLen, elemField, vm, *items.MaxLen)
 	}
 	if items.Pattern != "" {
-		fmt.Fprintf(b, "if !validateruntime.MatchPattern(v, %q) {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"pattern\", Message: validateruntime.MsgOr(%q, \"must match pattern %s\")}\n}\n",
-			items.Pattern, elemField, vm, items.Pattern)
+		fmt.Fprintf(b, "if !validateruntime.MatchPattern(v, %q) {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"pattern\", Message: validateruntime.MsgOr(%q, %q)}\n}\n",
+			items.Pattern, elemField, vm, "must match pattern "+items.Pattern)
 	}
 	if items.Email {
 		fmt.Fprintf(b, "if !validateruntime.IsEmail(v) {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"email\", Message: validateruntime.MsgOr(%q, \"must be a valid email address\")}\n}\n",
@@ -585,26 +603,20 @@ func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, i
 	}
 	// float items
 	if items.GTFloat != nil {
-		fmt.Fprintf(b, "if v <= %v {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %v\")}\n}\n",
+		fmt.Fprintf(b, "if v <= %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %g\")}\n}\n",
 			*items.GTFloat, elemField, vm, *items.GTFloat)
 	}
 	if items.GTEFloat != nil {
-		fmt.Fprintf(b, "if v < %v {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"gte\", Message: validateruntime.MsgOr(%q, \"must be >= %v\")}\n}\n",
+		fmt.Fprintf(b, "if v < %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"gte\", Message: validateruntime.MsgOr(%q, \"must be >= %g\")}\n}\n",
 			*items.GTEFloat, elemField, vm, *items.GTEFloat)
 	}
 	if items.LTFloat != nil {
-		fmt.Fprintf(b, "if v >= %v {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lt\", Message: validateruntime.MsgOr(%q, \"must be < %v\")}\n}\n",
+		fmt.Fprintf(b, "if v >= %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lt\", Message: validateruntime.MsgOr(%q, \"must be < %g\")}\n}\n",
 			*items.LTFloat, elemField, vm, *items.LTFloat)
 	}
 	if items.LTEFloat != nil {
-		fmt.Fprintf(b, "if v > %v {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %v\")}\n}\n",
+		fmt.Fprintf(b, "if v > %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %g\")}\n}\n",
 			*items.LTEFloat, elemField, vm, *items.LTEFloat)
-	}
-	// required for string/bytes items
-	if items.Required {
-		// string required: v == ""
-		fmt.Fprintf(b, "if v == \"\" {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"required\", Message: validateruntime.MsgOr(%q, \"is required\")}\n}\n",
-			elemField, vm)
 	}
 	b.WriteString("}\n")
 }

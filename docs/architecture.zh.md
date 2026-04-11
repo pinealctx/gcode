@@ -147,8 +147,8 @@ HTTP adapter 运行时辅助包。提供：
 - `Error`（`Msg string`、`Fields map[string]any`）
 - `CodedError` interface — 业务 error 实现此接口可携带自定义 code
 - `OKResponse(data any) Response` — 构造成功响应（code 0）
-- `ErrResponse(err error) Response` — 构造错误响应（自动提取 CodedError.Code()，缺省 500）
-- `DefaultErrorHandler() gin.HandlerFunc` — gin middleware，将 `c.Error()` 中的错误转换为 JSON 响应（ValidationError → code 400，其他 → code 500 或 CodedError.Code()）
+- `ErrResponse(err error) Response` — 构造错误响应（自动提取 CodedError.Code()，缺省 CodeDefaultErr (5000)）
+- `DefaultErrorHandler() gin.HandlerFunc` — gin middleware，将 `c.Error()` 中的错误转换为 JSON 响应（ValidationError → CodeValidationErr (1001)，其他 → CodeDefaultErr (5000) 或 CodedError.Code()）
 
 公开包，用户项目可直接引用。
 
@@ -161,7 +161,7 @@ HTTP adapter 运行时辅助包。提供：
 | `*.pb.dao.go`          | 所有 proto 文件             | struct 定义、json/gorm tag、MarshalBinary、UnmarshalBinary、UnmarshalBinaryLenient、ToMap（update 派生 message）、TableName()（有 gorm.table 注解时） |
 | `*.pb.dao.validate.go` | 所有 proto 文件             | `Validate() error` 方法，覆盖全部 buf/validate 约束类型                                                                                               |
 | `*.pb.rpc.go`          | proto 文件含 `service` 定义 | Go interface，方法签名 `Method(ctx context.Context, req *XxxRequest) (*XxxResponse, error)`                                                           |
-| `*.pb.http.go`         | proto 文件含 `service` 定义 | gin handler 工厂函数 `XxxHandler(svc XxxService) gin.HandlerFunc`，内置 bind → validate → svc 调用流程                                                |
+| `*.pb.http.go`         | proto 文件含 `service` 定义 | gin handler 工厂函数 `XxxHandler(svc XxxService, interceptors ...handlerx.Interceptor[*Req, *Resp]) gin.HandlerFunc`；委托给 `httpruntime.NewHandler`（bind → validate → interceptor chain → svc 调用，内置 panic 恢复） |
 | `*.pb.ts`              | `gcode gen-ts` 子命令       | TypeScript interface、enum、enum 名称映射、验证元数据、跨文件 ES module import                                                                        |
 
 ---

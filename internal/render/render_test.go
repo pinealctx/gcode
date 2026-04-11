@@ -1,6 +1,7 @@
 package render
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -385,7 +386,7 @@ func TestFileUnmarshalMethods(t *testing.T) {
 	src := string(got)
 
 	containsAll(t, src, map[string]string{
-		"unmarshalFrom":          "func (p *Person) unmarshalFrom(b []byte, lenient bool) (int, error)",
+		"unmarshalFrom":          "func (p *Person) unmarshalFrom(b []byte, lenient bool, depth int) (int, error)",
 		"UnmarshalBinary":        "func (p *Person) UnmarshalBinary(data []byte) error",
 		"UnmarshalBinaryLenient": "func (p *Person) UnmarshalBinaryLenient(data []byte) error",
 		"ConsumeTag":             "runtime.ConsumeTag",
@@ -455,8 +456,8 @@ func TestFileTooManyNonRepeatedFields(t *testing.T) {
 	if err == nil {
 		t.Fatal("File() expected error for >128 non-repeated fields, got nil")
 	}
-	if !strings.Contains(err.Error(), "more than 128 non-repeated fields") {
-		t.Fatalf("unexpected error: %v", err)
+	if !errors.Is(err, ErrTooManyFields) {
+		t.Fatalf("expected ErrTooManyFields, got: %v", err)
 	}
 }
 

@@ -1,13 +1,16 @@
 package app
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/pinealctx/gcode/internal/config"
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/parser"
+	"github.com/pinealctx/gcode/internal/source"
 )
 
 // writeFile writes content to path, creating parent dirs as needed.
@@ -275,8 +278,8 @@ message Order {
 	if err == nil {
 		t.Fatal("expected error for message-type field, got nil")
 	}
-	if !strings.Contains(err.Error(), "message-type fields are not allowed") {
-		t.Errorf("error = %q, want to contain 'message-type fields are not allowed'", err.Error())
+	if !errors.Is(err, ErrMessageTypeField) {
+		t.Errorf("error = %q, want ErrMessageTypeField", err.Error())
 	}
 }
 
@@ -341,7 +344,7 @@ message Plain { string name = 1; }
 	if err == nil {
 		t.Fatal("expected error for unknown -out flag, got nil")
 	}
-	if !strings.Contains(err.Error(), "out") {
+	if !strings.Contains(err.Error(), "-out") {
 		t.Errorf("error = %q, want to mention 'out'", err.Error())
 	}
 }
@@ -353,8 +356,8 @@ func TestRunGenProto_MissingInFlag(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing -in flag, got nil")
 	}
-	if !strings.Contains(err.Error(), "-in") {
-		t.Errorf("error = %q, want to mention '-in'", err.Error())
+	if !errors.Is(err, config.ErrMissingProtoInputDir) {
+		t.Errorf("expected config.ErrMissingProtoInputDir, got %T: %v", err, err)
 	}
 }
 
@@ -367,8 +370,8 @@ func TestRunGenProto_EmptyDirectory(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty directory, got nil")
 	}
-	if !strings.Contains(err.Error(), "no .proto files") {
-		t.Errorf("error = %q, want to mention 'no .proto files'", err.Error())
+	if !errors.Is(err, source.ErrNoProtoFiles) {
+		t.Errorf("expected source.ErrNoProtoFiles, got %T: %v", err, err)
 	}
 }
 
@@ -427,8 +430,8 @@ func TestProtoFieldLine_MessageTypeRejected(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for message-type field")
 	}
-	if !strings.Contains(err.Error(), "message-type fields are not allowed") {
-		t.Errorf("error = %q", err.Error())
+	if !errors.Is(err, ErrMessageTypeField) {
+		t.Errorf("error = %q, want ErrMessageTypeField", err.Error())
 	}
 }
 
@@ -676,5 +679,94 @@ message User {
 	}
 	if !strings.Contains(err.Error(), "remove stale") {
 		t.Errorf("error = %q, want to contain 'remove stale'", err.Error())
+	}
+}
+
+func TestBuildUpdateMessage_EmptyName(t *testing.T) {
+	t.Parallel()
+
+	msg := model.Message{FullName: "pkg.Person"}
+	opt := model.UpdateMessageOptions{Name: ""}
+	_, err := buildUpdateMessage(msg, opt)
+	if err == nil {
+		t.Fatal("expected error for empty opt.Name, got nil")
+	}
+	if !errors.Is(err, ErrNameEmpty) {
+		t.Errorf("error = %q, want ErrNameEmpty", err.Error())
+	}
+}
+
+func TestBuildCreateMessage_EmptyName(t *testing.T) {
+	t.Parallel()
+
+	msg := model.Message{FullName: "pkg.Person"}
+	opt := model.CreateMessageOptions{Name: ""}
+	_, err := buildCreateMessage(msg, opt)
+	if err == nil {
+		t.Fatal("expected error for empty opt.Name, got nil")
+	}
+	if !errors.Is(err, ErrNameEmpty) {
+		t.Errorf("error = %q, want ErrNameEmpty", err.Error())
+	}
+}
+
+func TestIsProtoIdentifier(t *testing.T) {
+	t.Parallel()
+
+	valid := []string{
+		"Foo", "FooBar", "_Foo", "Foo123", "A", "_", "foo_bar",
+	}
+	for _, s := range valid {
+		if !isProtoIdentifier(s) {
+			t.Errorf("isProtoIdentifier(%q) = false, want true", s)
+		}
+	}
+
+	invalid := []string{
+		"", "123Foo", "foo-bar", "foo bar", "foo{bar}", "foo;bar",
+		"foo\nbar", "foo.bar", "foo/bar",
+	}
+	for _, s := range invalid {
+		if isProtoIdentifier(s) {
+			t.Errorf("isProtoIdentifier(%q) = true, want false", s)
+		}
+	}
+}
+
+// TestBuildUpdateMessage_InvalidName verifies that buildUpdateMessage returns
+// an error containing "not a valid proto identifier" for syntactically invalid names.
+func TestBuildUpdateMessage_InvalidName(t *testing.T) {
+	t.Parallel()
+
+	msg := model.Message{FullName: "pkg.Person", Fields: []model.Field{}}
+	for _, name := range []string{"123invalid", "has space", "foo{bar}", "foo;bar"} {
+		opt := model.UpdateMessageOptions{Name: name}
+		_, err := buildUpdateMessage(msg, opt)
+		if err == nil {
+			t.Errorf("buildUpdateMessage with name %q: expected error, got nil", name)
+			continue
+		}
+		if !errors.Is(err, ErrInvalidName) {
+			t.Errorf("buildUpdateMessage with name %q: error = %q, want ErrInvalidName", name, err.Error())
+		}
+	}
+}
+
+// TestBuildCreateMessage_InvalidName verifies that buildCreateMessage returns
+// an error containing "not a valid proto identifier" for syntactically invalid names.
+func TestBuildCreateMessage_InvalidName(t *testing.T) {
+	t.Parallel()
+
+	msg := model.Message{FullName: "pkg.Person", Fields: []model.Field{}}
+	for _, name := range []string{"123invalid", "has space", "foo{bar}", "foo;bar"} {
+		opt := model.CreateMessageOptions{Name: name}
+		_, err := buildCreateMessage(msg, opt)
+		if err == nil {
+			t.Errorf("buildCreateMessage with name %q: expected error, got nil", name)
+			continue
+		}
+		if !errors.Is(err, ErrInvalidName) {
+			t.Errorf("buildCreateMessage with name %q: error = %q, want ErrInvalidName", name, err.Error())
+		}
 	}
 }

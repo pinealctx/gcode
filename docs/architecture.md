@@ -147,8 +147,8 @@ HTTP adapter runtime helpers. Provides:
 - `Error` (`Msg string`, `Fields map[string]any`)
 - `CodedError` interface — application errors implement this to carry a custom code
 - `OKResponse(data any) Response` — constructs a success response (code 0)
-- `ErrResponse(err error) Response` — constructs an error response (extracts CodedError.Code(), defaults to 500)
-- `DefaultErrorHandler() gin.HandlerFunc` — gin middleware that converts `c.Error()` errors to JSON responses (ValidationError → code 400, others → code 500 or CodedError.Code())
+- `ErrResponse(err error) Response` — constructs an error response (extracts CodedError.Code(), defaults to CodeDefaultErr (5000))
+- `DefaultErrorHandler() gin.HandlerFunc` — gin middleware that converts `c.Error()` errors to JSON responses (ValidationError → CodeValidationErr (1001), others → CodeDefaultErr (5000) or CodedError.Code())
 
 Public package, importable by user projects.
 
@@ -161,7 +161,7 @@ Public package, importable by user projects.
 | `*.pb.dao.go`          | All proto files                        | struct definitions, json/gorm tags, MarshalBinary, UnmarshalBinary, UnmarshalBinaryLenient, ToMap (update derived messages), TableName() (when gorm.table annotation is present) |
 | `*.pb.dao.validate.go` | All proto files                        | `Validate() error` methods covering all buf/validate constraint types                                                                                                            |
 | `*.pb.rpc.go`          | Proto files with `service` definitions | Go interface, method signature: `Method(ctx context.Context, req *XxxRequest) (*XxxResponse, error)`                                                                             |
-| `*.pb.http.go`         | Proto files with `service` definitions | gin handler factory functions `XxxHandler(svc XxxService) gin.HandlerFunc`, with built-in bind → validate → svc call flow                                                        |
+| `*.pb.http.go`         | Proto files with `service` definitions | gin handler factory functions `XxxHandler(svc XxxService, interceptors ...handlerx.Interceptor[*Req, *Resp]) gin.HandlerFunc`; delegates to `httpruntime.NewHandler` (bind → validate → interceptor chain → svc call, with built-in panic recovery) |
 | `*.pb.ts`              | `gcode gen-ts` subcommand              | TypeScript interfaces, enums, enum name mapping, validation metadata, cross-file ES module imports                                                                               |
 
 ---

@@ -28,7 +28,7 @@ func RunGenTS(ctx context.Context, args []string) error {
 	}
 
 	if len(scanResult.Files) == 0 {
-		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, config.ErrNoProtoFiles)
+		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, source.ErrNoProtoFiles)
 	}
 
 	files, err := parser.Parse(ctx, []string{scanResult.ImportPath}, scanResult.Files)
@@ -43,6 +43,11 @@ func RunGenTS(ctx context.Context, args []string) error {
 	// Ensure output directory exists.
 	if err := os.MkdirAll(cfg.OutputDir, 0o755); err != nil {
 		return fmt.Errorf("create output directory %q: %w", cfg.OutputDir, err)
+	}
+
+	// Check for output filename collisions before writing anything.
+	if err := checkOutputCollisions(files, tsOutputFileName); err != nil {
+		return err
 	}
 
 	// First pass: flatten all files.
@@ -71,7 +76,7 @@ func RunGenTS(ctx context.Context, args []string) error {
 		}
 
 		outPath := filepath.Join(cfg.OutputDir, tsOutputFileName(files[i].Path))
-		if err := os.WriteFile(outPath, tsSrc, 0o600); err != nil {
+		if err := os.WriteFile(outPath, tsSrc, 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
 			return fmt.Errorf("write %q: %w", outPath, err)
 		}
 	}

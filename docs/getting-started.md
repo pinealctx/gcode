@@ -18,8 +18,6 @@ CLI flags:
 gcode [flags]                 Generate Go code from proto files
   -in string                  Input proto directory
   -out string                 Output directory
-  -allow-json-unknown-fields  Allow unknown JSON fields during unmarshal
-  -duplicate-singular string  Duplicate singular field strategy: error|last-wins (default "error")
 
 gcode gen-proto [flags]       Generate derived proto files (*.update.proto / *.create.proto)
   -in string                  Input proto directory (generated files are written to the same directory)
@@ -47,6 +45,8 @@ go get github.com/pinealctx/gcode/httpruntime
 ```
 
 If you only generate structs and serialization code (no validate or HTTP), only `runtime` is needed.
+
+> **Runtime import path is fixed**: Generated code always imports `github.com/pinealctx/gcode/runtime`, `github.com/pinealctx/gcode/validateruntime`, and `github.com/pinealctx/gcode/httpruntime`. These paths are hardcoded in the generator and cannot be customized. If you fork or rename the module, you will need to update the generated import paths accordingly — this is a major-version-level change.
 
 ---
 
@@ -419,15 +419,17 @@ func (s *personServiceImpl) CreatePerson(ctx context.Context, req *dao.PersonCre
 > go get github.com/gin-gonic/gin
 > ```
 
-Generated handler factory functions accept a service interface and return `gin.HandlerFunc`:
+Generated handler factory functions accept a service interface and an optional list of interceptors, returning `gin.HandlerFunc`:
 
 ```go
 // dao/person_service.pb.http.go (generated, do not edit)
-func CreatePersonHandler(svc PersonService) gin.HandlerFunc
-func GetPersonHandler(svc PersonService) gin.HandlerFunc
-func UpdatePersonHandler(svc PersonService) gin.HandlerFunc
-func DeletePersonHandler(svc PersonService) gin.HandlerFunc
+func CreatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*PersonCreate, *CreatePersonResponse]) gin.HandlerFunc
+func GetPersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*GetPersonRequest, *GetPersonResponse]) gin.HandlerFunc
+func UpdatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*PersonUpdateByName, *UpdatePersonResponse]) gin.HandlerFunc
+func DeletePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*DeletePersonRequest, *DeletePersonResponse]) gin.HandlerFunc
 ```
+
+The `interceptors` parameter is variadic — existing calls like `dao.CreatePersonHandler(svc)` continue to work without any changes.
 
 Register routes:
 
@@ -459,11 +461,11 @@ func main() {
 // Success
 {"code": 0, "data": {"id": "new-id"}}
 
-// Validation error (code 400)
-{"code": 400, "error": {"msg": "length must be >= 1"}}
+// Validation error (CodeValidationErr)
+{"code": 1001, "error": {"msg": "length must be >= 1"}}
 
-// Business error (code 500, or CodedError.Code())
-{"code": 500, "error": {"msg": "internal error"}}
+// Business error (CodeDefaultErr, or CodedError.Code())
+{"code": 5000, "error": {"msg": "internal error"}}
 ```
 
 Implement `httpruntime.CodedError` to return a custom error code:
@@ -477,7 +479,7 @@ type AppError struct {
 func (e *AppError) Error() string { return e.msg }
 func (e *AppError) Code() int     { return e.code }
 
-// This error produces code 404 instead of the default 500
+// This error produces code 404 instead of the default CodeDefaultErr (5000)
 return nil, &AppError{code: 404, msg: "person not found"}
 ```
 
@@ -494,11 +496,28 @@ curl -X POST http://localhost:8080/persons \
 curl -X POST http://localhost:8080/persons \
   -H "Content-Type: application/json" \
   -d '{"nickname": "this-name-is-way-too-long"}'
-# → {"code": 400, "error": {"msg": "length must be <= 10"}}
+# → {"code": 1001, "error": {"msg": "length must be <= 10"}}
 
 # Get a person
 curl http://localhost:8080/persons/some-id
 # → {"code": 0, "data": {"name": "Alice", "age": 30}}
+```
+
+#### Request body size limit
+
+Each handler delegates to `httpruntime.NewHandler`, which calls `c.ShouldBindJSON` internally. gin does not impose a default body size limit. For production deployments, set a limit via middleware to prevent oversized payloads:
+
+```go
+import "net/http"
+
+func MaxBodyBytes(n int64) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, n)
+        c.Next()
+    }
+}
+
+r.Use(MaxBodyBytes(1 << 20)) // 1 MiB
 ```
 
 #### Configuring request timeouts
@@ -517,6 +536,54 @@ func TimeoutMiddleware(d time.Duration) gin.HandlerFunc {
 
 r.Use(TimeoutMiddleware(5 * time.Second))
 ```
+
+#### Adding interceptors (optional)
+
+Every generated handler has panic recovery built in — a panic in the service method is caught and converted to an error, so the server never crashes. On top of that, you can inject custom interceptors per route for logging, metrics, tracing, or any cross-cutting concern.
+
+An interceptor has the signature:
+
+```go
+func(ctx context.Context, req *Req, next handlerx.Handler[*Req, *Resp]) (*Resp, error)
+```
+
+**Example: request logging interceptor**
+
+```go
+import (
+    "context"
+    "log/slog"
+
+    "github.com/pinealctx/x/handlerx"
+)
+
+func LoggingInterceptor[Req, Resp any](logger *slog.Logger) handlerx.Interceptor[*Req, *Resp] {
+    return func(ctx context.Context, req *Req, next handlerx.Handler[*Req, *Resp]) (*Resp, error) {
+        logger.Info("request", "type", fmt.Sprintf("%T", req))
+        resp, err := next(ctx, req)
+        if err != nil {
+            logger.Error("request failed", "error", err)
+        }
+        return resp, err
+    }
+}
+```
+
+**Registering routes with interceptors**
+
+```go
+logger := slog.Default()
+
+// No interceptors — works exactly as before
+r.POST("/persons", dao.CreatePersonHandler(svc))
+
+// With a logging interceptor on a specific route
+r.DELETE("/persons/:id", dao.DeletePersonHandler(svc,
+    LoggingInterceptor[DeletePersonRequest, DeletePersonResponse](logger),
+))
+```
+
+Interceptors are applied in the order they are passed, inside the built-in panic recovery layer. The service method is always the innermost call.
 
 ---
 
@@ -679,3 +746,20 @@ npm test
 ```
 
 These tests are also integrated into Go via `go test ./testdata/compat/...` (TestTSTypeCheck, TestTSRuntime), which automatically invokes npm when Node.js is available.
+
+---
+
+## Known Limitations
+
+The following proto features are not supported. When unsupported features are encountered, gcode reports an error and exits rather than silently producing incorrect code.
+
+| Limitation | Severity | Details |
+| --- | --- | --- |
+| Streaming RPC not supported | Medium | Service definitions with `stream` keyword cause an error exit |
+| `map<K,V>` not supported | Medium | Map fields cause an error at parse time |
+| `oneof` not supported | Medium | Non-synthetic oneof fields cause an error at parse time |
+| Well-known types not supported | Medium | `google.protobuf.*` types (e.g. `Timestamp`) cause an error |
+| proto2 not supported | Low | Only `syntax = "proto3"` is accepted |
+| Cross-package enum imports not auto-generated | Low | If a message references an enum from a different proto package, the generated `*.update.proto` / `*.create.proto` will be missing that import. Add it manually. |
+| HTTP path params not supported | Low | Generated handlers bind from request body only. Extract path params (e.g. `/users/:id`) manually in the service layer. |
+| `repeated` enum `defined_only` not enforced | Low | The `defined_only` constraint is silently skipped for repeated enum fields |

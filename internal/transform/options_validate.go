@@ -1,7 +1,7 @@
 package transform
 
 import (
-	"fmt"
+	"github.com/pinealctx/x/errorx"
 
 	"github.com/pinealctx/gcode/internal/model"
 )
@@ -31,11 +31,11 @@ func validateMessageCreateOptions(msg model.Message) error {
 			for _, rf := range co.RequiredFields {
 				isOpt, exists := optionalSet[rf]
 				if !exists {
-					return fmt.Errorf("message %q: create_message %q required_fields: field %q not found in message",
+					return errorx.NewSentinelf[transformTag]("message %q: create_message %q required_fields: field %q not found in message",
 						msg.FullName, co.Name, rf)
 				}
 				if !isOpt {
-					return fmt.Errorf("message %q: create_message %q required_fields: field %q is already non-optional",
+					return errorx.NewSentinelf[transformTag]("message %q: create_message %q required_fields: field %q is already non-optional",
 						msg.FullName, co.Name, rf)
 				}
 			}
