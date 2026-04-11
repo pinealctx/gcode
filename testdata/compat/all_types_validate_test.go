@@ -12,19 +12,24 @@ import (
 func validAllValidate() *dao.AllValidate {
 	status := dao.Status_STATUS_ACTIVE
 	return &dao.AllValidate{
-		UGte:    1,                     // gte=1: exactly at boundary
-		ULte:    1000,                  // lte=1000: exactly at boundary
-		UIn:     2,                     // in=[1,2,3]
-		UNotIn:  5,                     // not_in=[0]: any non-zero value
-		FGt:     0.1,                   // gt=0
-		DLte:    0.5,                   // lte=1.0
-		SIn:     "b",                   // in=[a,b,c]
-		SNotIn:  "z",                   // not_in=[x,y]
-		IIn:     1,                     // in=[1,2,-1]
-		SUri:    "https://example.com", // valid URI
-		OStatus: &status,               // defined_only
-		BMinmax: []byte{0x01},          // min_len=1, max_len=100
-		RItems:  []int32{0, 1, 2},      // items.gte=0
+		UGte:     1,                     // gte=1: exactly at boundary
+		ULte:     1000,                  // lte=1000: exactly at boundary
+		UIn:      2,                     // in=[1,2,3]
+		UNotIn:   5,                     // not_in=[0]: any non-zero value
+		FGt:      0.1,                   // gt=0
+		DLte:     0.5,                   // lte=1.0
+		SIn:      "b",                   // in=[a,b,c]
+		SNotIn:   "z",                   // not_in=[x,y]
+		IIn:      1,                     // in=[1,2,-1]
+		SUri:     "https://example.com", // valid URI
+		OStatus:  &status,               // defined_only
+		BMinmax:  []byte{0x01},          // min_len=1, max_len=100
+		RItems:   []int32{0, 1, 2},      // items.gte=0
+		IGtLt:    0,                     // gt=-10, lt=10: 0 is in range
+		UGtLt:    50,                    // gt=5, lt=100: 50 is in range
+		FLt:      50.0,                  // lt=99.5: 50 < 99.5
+		DGt:      0.0,                   // gt=-1.0: 0 > -1
+		SPattern: "Hello",              // pattern=^[A-Z][a-z]+$
 	}
 }
 
@@ -348,5 +353,112 @@ func TestAllValidate_RItems(t *testing.T) {
 	a4.RItems = nil
 	if err := a4.Validate(); err != nil {
 		t.Errorf("nil r_items should pass, got: %v", err)
+	}
+}
+
+// TestAllValidate_IGtLt verifies int32 gt+lt (exclusive bounds for signed int).
+func TestAllValidate_IGtLt(t *testing.T) {
+	t.Parallel()
+
+	// fail: -10 is not > -10
+	a := validAllValidate()
+	a.IGtLt = -10
+	assertVE(t, a.Validate(), "i_gt_lt", "gt")
+
+	// fail: 10 is not < 10
+	a2 := validAllValidate()
+	a2.IGtLt = 10
+	assertVE(t, a2.Validate(), "i_gt_lt", "lt")
+
+	// pass: within range
+	a3 := validAllValidate()
+	a3.IGtLt = 0
+	if err := a3.Validate(); err != nil {
+		t.Errorf("i_gt_lt=0 should pass, got: %v", err)
+	}
+}
+
+// TestAllValidate_UGtLt verifies uint32 gt+lt (exclusive bounds for unsigned int).
+func TestAllValidate_UGtLt(t *testing.T) {
+	t.Parallel()
+
+	// fail: 5 is not > 5
+	a := validAllValidate()
+	a.UGtLt = 5
+	assertVE(t, a.Validate(), "u_gt_lt", "gt")
+
+	// fail: 100 is not < 100
+	a2 := validAllValidate()
+	a2.UGtLt = 100
+	assertVE(t, a2.Validate(), "u_gt_lt", "lt")
+
+	// pass: within range
+	a3 := validAllValidate()
+	a3.UGtLt = 50
+	if err := a3.Validate(); err != nil {
+		t.Errorf("u_gt_lt=50 should pass, got: %v", err)
+	}
+}
+
+// TestAllValidate_FLt verifies float32 lt (exclusiveMaximum).
+func TestAllValidate_FLt(t *testing.T) {
+	t.Parallel()
+
+	// fail: 99.5 is not < 99.5
+	a := validAllValidate()
+	a.FLt = 99.5
+	assertVE(t, a.Validate(), "f_lt", "lt")
+
+	// pass: below limit
+	a2 := validAllValidate()
+	a2.FLt = 50.0
+	if err := a2.Validate(); err != nil {
+		t.Errorf("f_lt=50.0 should pass, got: %v", err)
+	}
+}
+
+// TestAllValidate_DGt verifies float64 gt (exclusiveMinimum).
+func TestAllValidate_DGt(t *testing.T) {
+	t.Parallel()
+
+	// fail: -1 is not > -1
+	a := validAllValidate()
+	a.DGt = -1
+	assertVE(t, a.Validate(), "d_gt", "gt")
+
+	// pass: above limit
+	a2 := validAllValidate()
+	a2.DGt = 0
+	if err := a2.Validate(); err != nil {
+		t.Errorf("d_gt=0 should pass, got: %v", err)
+	}
+}
+
+// TestAllValidate_SPattern verifies string pattern constraint.
+func TestAllValidate_SPattern(t *testing.T) {
+	t.Parallel()
+
+	// fail: lowercase first char
+	a := validAllValidate()
+	a.SPattern = "hello"
+	assertVE(t, a.Validate(), "s_pattern", "pattern")
+
+	// fail: all uppercase doesn't match [A-Z][a-z]+
+	a2 := validAllValidate()
+	a2.SPattern = "HELLO"
+	assertVE(t, a2.Validate(), "s_pattern", "pattern")
+
+	// pass: matches pattern
+	a3 := validAllValidate()
+	a3.SPattern = "Hello"
+	if err := a3.Validate(); err != nil {
+		t.Errorf("s_pattern=\"Hello\" should pass, got: %v", err)
+	}
+
+	// pass: empty string skips check
+	a4 := validAllValidate()
+	a4.SPattern = ""
+	if err := a4.Validate(); err != nil {
+		t.Errorf("s_pattern=\"\" (zero value) should skip check, got: %v", err)
 	}
 }

@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -677,8 +678,8 @@ message User {
 	if err == nil {
 		t.Fatal("expected error when os.Remove fails, got nil")
 	}
-	if !strings.Contains(err.Error(), "remove stale") {
-		t.Errorf("error = %q, want to contain 'remove stale'", err.Error())
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Errorf("error = %q, want fs.ErrPermission", err.Error())
 	}
 }
 

@@ -53,6 +53,16 @@ type AllValidate struct {
 	OStatus *Status `json:"oStatus"`
 	BMinmax []byte  `json:"bMinmax"`
 	RItems  []int32 `json:"rItems"`
+	// exclusive bounds for signed int
+	IGtLt int32 `json:"iGtLt"`
+	// exclusive bounds for unsigned int
+	UGtLt uint32 `json:"uGtLt"`
+	// exclusiveMaximum for float
+	FLt float32 `json:"fLt"`
+	// exclusiveMinimum for double
+	DGt float64 `json:"dGt"`
+	// pattern for string
+	SPattern string `json:"sPattern"`
 }
 
 // TreeNode is a self-referencing message used to test recursion depth limits.
@@ -311,6 +321,21 @@ func (a *AllValidate) Size() int {
 		}
 		n += 1 + runtime.SizeVarint(uint64(es)) + es
 	}
+	if a.IGtLt != 0 {
+		n += 1 + runtime.SizeInt32(a.IGtLt)
+	}
+	if a.UGtLt != 0 {
+		n += 1 + runtime.SizeUint32(a.UGtLt)
+	}
+	if !runtime.IsZeroFloat(a.FLt) {
+		n += 2 + 4
+	}
+	if !runtime.IsZeroDouble(a.DGt) {
+		n += 2 + 8
+	}
+	if len(a.SPattern) > 0 {
+		n += 2 + runtime.SizeString(a.SPattern)
+	}
 	return n
 }
 
@@ -379,6 +404,26 @@ func (a *AllValidate) MarshalAppend(b []byte) ([]byte, error) {
 		for _, v := range a.RItems {
 			b = runtime.AppendVarint(b, uint64(v))
 		}
+	}
+	if a.IGtLt != 0 {
+		b = runtime.AppendTag(b, 14, runtime.WireVarint)
+		b = runtime.AppendVarint(b, uint64(a.IGtLt))
+	}
+	if a.UGtLt != 0 {
+		b = runtime.AppendTag(b, 15, runtime.WireVarint)
+		b = runtime.AppendVarint(b, uint64(a.UGtLt))
+	}
+	if !runtime.IsZeroFloat(a.FLt) {
+		b = runtime.AppendTag(b, 16, runtime.WireFixed32)
+		b = runtime.AppendFloat(b, a.FLt)
+	}
+	if !runtime.IsZeroDouble(a.DGt) {
+		b = runtime.AppendTag(b, 17, runtime.WireFixed64)
+		b = runtime.AppendDouble(b, a.DGt)
+	}
+	if len(a.SPattern) > 0 {
+		b = runtime.AppendTag(b, 18, runtime.WireBytes)
+		b = runtime.AppendString(b, a.SPattern)
 	}
 	return b, nil
 }
@@ -1097,6 +1142,95 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				a.RItems = append(a.RItems, int32(v))
 				pi += pn
 			}
+		case 14:
+			if seen[0]&4096 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 14: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 4096
+			if wireType != runtime.WireVarint {
+				return 0, fmt.Errorf("field 14: %w", runtime.ErrWireType)
+			}
+			v, n := runtime.ConsumeVarint(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 14: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 14: %w", runtime.ErrTruncated)
+			}
+			a.IGtLt = int32(v)
+			off += n
+		case 15:
+			if seen[0]&8192 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 15: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 8192
+			if wireType != runtime.WireVarint {
+				return 0, fmt.Errorf("field 15: %w", runtime.ErrWireType)
+			}
+			v, n := runtime.ConsumeVarint(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 15: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 15: %w", runtime.ErrTruncated)
+			}
+			a.UGtLt = uint32(v)
+			off += n
+		case 16:
+			if seen[0]&16384 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 16: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 16384
+			if wireType != runtime.WireFixed32 {
+				return 0, fmt.Errorf("field 16: %w", runtime.ErrWireType)
+			}
+			v, n := runtime.ConsumeFixed32(b[off:])
+			if n < 0 {
+				return 0, fmt.Errorf("field 16: %w", runtime.ErrTruncated)
+			}
+			a.FLt = math.Float32frombits(v)
+			off += n
+		case 17:
+			if seen[0]&32768 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 17: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 32768
+			if wireType != runtime.WireFixed64 {
+				return 0, fmt.Errorf("field 17: %w", runtime.ErrWireType)
+			}
+			v, n := runtime.ConsumeFixed64(b[off:])
+			if n < 0 {
+				return 0, fmt.Errorf("field 17: %w", runtime.ErrTruncated)
+			}
+			a.DGt = math.Float64frombits(v)
+			off += n
+		case 18:
+			if seen[0]&65536 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 18: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 65536
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 18: %w", runtime.ErrWireType)
+			}
+			payload, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 18: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 18: %w", runtime.ErrTruncated)
+			}
+			a.SPattern = string(payload)
+			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)
 			if n < 0 {

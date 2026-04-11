@@ -91,6 +91,23 @@ message AllValidate {
   repeated int32 r_items = 13 [
     (buf.validate.field).repeated.items.int32.gte = 0
   ];
+
+  // exclusive bounds for signed int
+  int32  i_gt_lt  = 14 [
+    (buf.validate.field).int32.gt = -10,
+    (buf.validate.field).int32.lt = 10
+  ];
+  // exclusive bounds for unsigned int
+  uint32 u_gt_lt  = 15 [
+    (buf.validate.field).uint32.gt = 5,
+    (buf.validate.field).uint32.lt = 100
+  ];
+  // exclusiveMaximum for float
+  float  f_lt     = 16 [(buf.validate.field).float.lt = 99.5];
+  // exclusiveMinimum for double
+  double d_gt     = 17 [(buf.validate.field).double.gt = -1.0];
+  // pattern for string
+  string s_pattern = 18 [(buf.validate.field).string.pattern = "^[A-Z][a-z]+$"];
 }
 
 // TreeNode is a self-referencing message used to test recursion depth limits.
