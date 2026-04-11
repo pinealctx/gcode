@@ -345,8 +345,8 @@ message Plain { string name = 1; }
 	if err == nil {
 		t.Fatal("expected error for unknown -out flag, got nil")
 	}
-	if !strings.Contains(err.Error(), "-out") {
-		t.Errorf("error = %q, want to mention 'out'", err.Error())
+	if !errors.Is(err, config.ErrUnknownFlag) {
+		t.Errorf("error = %q, want config.ErrUnknownFlag", err.Error())
 	}
 }
 
