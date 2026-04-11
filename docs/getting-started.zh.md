@@ -19,6 +19,8 @@ gcode [flags]                 从 proto 文件生成 Go 代码
   -in string                  输入 proto 目录
   -out string                 输出目录
 
+gcode version                 打印版本信息
+
 gcode gen-proto [flags]       生成派生 proto 文件（*.update.proto / *.create.proto）
   -in string                  输入 proto 目录（生成文件写入同一目录）
 

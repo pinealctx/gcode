@@ -140,6 +140,14 @@ validate 运行时辅助包。提供：
 
 公开包，用户项目可直接引用。
 
+### version
+
+构建时元数据解析。Version、Commit、BuildTime 按优先级解析：
+1. `-ldflags` 覆盖（自定义构建）
+2. Go 模块版本 + VCS 元数据，通过 `runtime/debug.ReadBuildInfo` 获取（Go 1.18+ 自动嵌入）
+
+确保 `go install github.com/pinealctx/gcode/cmd/gcode@latest` 无需构建脚本即可输出有意义的版本信息。
+
 ### httpruntime
 
 HTTP adapter 运行时辅助包。提供：
@@ -175,6 +183,7 @@ github.com/pinealctx/gcode/
 │   ├── app/                流水线编排（Run / RunGenProto / RunGenTS）
 │   ├── config/             CLI 参数解析与校验
 │   ├── model/              中间语义模型
+│   ├── version/            构建时元数据（版本、commit、构建时间）
 │   ├── parser/             proto → model
 │   ├── naming/             protobuf-to-Go 命名规则
 │   ├── transform/          model → Go 中间表示
