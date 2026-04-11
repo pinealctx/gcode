@@ -105,6 +105,29 @@ func (a *AllValidate) Validate() error {
 			return &validateruntime.ValidationError{Field: fmt.Sprintf("r_items[%d]", i), Rule: "gte", Message: validateruntime.MsgOr("", "must be >= 0")}
 		}
 	}
+	if a.IGtLt <= -10 {
+		return &validateruntime.ValidationError{Field: "i_gt_lt", Rule: "gt", Message: validateruntime.MsgOr("", "must be > -10")}
+	}
+	if a.IGtLt >= 10 {
+		return &validateruntime.ValidationError{Field: "i_gt_lt", Rule: "lt", Message: validateruntime.MsgOr("", "must be < 10")}
+	}
+	if a.UGtLt <= 5 {
+		return &validateruntime.ValidationError{Field: "u_gt_lt", Rule: "gt", Message: validateruntime.MsgOr("", "must be > 5")}
+	}
+	if a.UGtLt >= 100 {
+		return &validateruntime.ValidationError{Field: "u_gt_lt", Rule: "lt", Message: validateruntime.MsgOr("", "must be < 100")}
+	}
+	if a.FLt >= 99.5 {
+		return &validateruntime.ValidationError{Field: "f_lt", Rule: "lt", Message: validateruntime.MsgOr("", "must be < 99.5")}
+	}
+	if a.DGt <= -1 {
+		return &validateruntime.ValidationError{Field: "d_gt", Rule: "gt", Message: validateruntime.MsgOr("", "must be > -1")}
+	}
+	if a.SPattern != "" {
+		if !validateruntime.MatchPattern(a.SPattern, "^[A-Z][a-z]+$") {
+			return &validateruntime.ValidationError{Field: "s_pattern", Rule: "pattern", Message: validateruntime.MsgOr("", "must match pattern ^[A-Z][a-z]+$")}
+		}
+	}
 	return nil
 }
 

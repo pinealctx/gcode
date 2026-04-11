@@ -19,6 +19,8 @@ gcode [flags]                 Generate Go code from proto files
   -in string                  Input proto directory
   -out string                 Output directory
 
+gcode version                 Print version information
+
 gcode gen-proto [flags]       Generate derived proto files (*.update.proto / *.create.proto)
   -in string                  Input proto directory (generated files are written to the same directory)
 

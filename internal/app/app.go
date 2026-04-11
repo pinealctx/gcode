@@ -25,16 +25,9 @@ import (
 // must be regenerated.
 const modulePath = "github.com/pinealctx/gcode"
 
-// Run is the process entry used by the CLI main package.
+// Run is the process entry used by the CLI main package for the default
+// gen-dao action.
 func Run(ctx context.Context, args []string) error {
-	if len(args) > 0 {
-		switch args[0] {
-		case "gen-proto":
-			return RunGenProto(ctx, args[1:])
-		case "gen-ts":
-			return RunGenTS(ctx, args[1:])
-		}
-	}
 	cfg, err := config.Parse(args)
 	if err != nil {
 		return err

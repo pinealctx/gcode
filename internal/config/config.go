@@ -18,7 +18,7 @@ func ParseGenProto(args []string) (GenProtoConfig, error) {
 	fset.StringVar(&cfg.InputDir, "in", "", "input proto directory (generated files are written to the same directory)")
 
 	if err := fset.Parse(args); err != nil {
-		return GenProtoConfig{}, fmt.Errorf("parse gen-proto flags: %w", err)
+		return GenProtoConfig{}, fmt.Errorf("%w: %s", ErrUnknownFlag, err)
 	}
 
 	if remainingArgs := fset.Args(); len(remainingArgs) > 0 {
@@ -56,7 +56,7 @@ func Parse(args []string) (Config, error) {
 	fset.StringVar(&cfg.OutputDir, "out", "", "output directory")
 
 	if err := fset.Parse(args); err != nil {
-		return Config{}, fmt.Errorf("parse cli flags: %w", err)
+		return Config{}, fmt.Errorf("%w: %s", ErrUnknownFlag, err)
 	}
 
 	if remainingArgs := fset.Args(); len(remainingArgs) > 0 {

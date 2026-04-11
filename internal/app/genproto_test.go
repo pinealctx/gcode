@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -344,8 +345,8 @@ message Plain { string name = 1; }
 	if err == nil {
 		t.Fatal("expected error for unknown -out flag, got nil")
 	}
-	if !strings.Contains(err.Error(), "-out") {
-		t.Errorf("error = %q, want to mention 'out'", err.Error())
+	if !errors.Is(err, config.ErrUnknownFlag) {
+		t.Errorf("error = %q, want config.ErrUnknownFlag", err.Error())
 	}
 }
 
@@ -677,8 +678,8 @@ message User {
 	if err == nil {
 		t.Fatal("expected error when os.Remove fails, got nil")
 	}
-	if !strings.Contains(err.Error(), "remove stale") {
-		t.Errorf("error = %q, want to contain 'remove stale'", err.Error())
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Errorf("error = %q, want fs.ErrPermission", err.Error())
 	}
 }
 

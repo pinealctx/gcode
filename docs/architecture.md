@@ -140,6 +140,14 @@ Validation runtime helpers. Provides:
 
 Public package, importable by user projects.
 
+### version
+
+Build-time metadata resolution. Version, commit, and build time are resolved in priority order:
+1. `-ldflags` overrides (custom builds)
+2. Go module version + VCS metadata from `runtime/debug.ReadBuildInfo` (automatically embedded by Go 1.18+)
+
+This ensures `go install github.com/pinealctx/gcode/cmd/gcode@latest` produces meaningful version output without any build script.
+
 ### httpruntime
 
 HTTP adapter runtime helpers. Provides:
@@ -175,6 +183,7 @@ github.com/pinealctx/gcode/
 │   ├── app/                Pipeline orchestration (Run / RunGenProto / RunGenTS)
 │   ├── config/             CLI argument parsing and validation
 │   ├── model/              Intermediate semantic model
+│   ├── version/            Build-time metadata (version, commit, build time)
 │   ├── parser/             proto → model
 │   ├── naming/             protobuf-to-Go naming rules
 │   ├── transform/          model → Go intermediate representation

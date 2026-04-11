@@ -20,7 +20,7 @@ func ParseGenTS(args []string) (GenTSConfig, error) {
 	fset.StringVar(&cfg.OutputDir, "out", "", "output TypeScript directory")
 
 	if err := fset.Parse(args); err != nil {
-		return GenTSConfig{}, fmt.Errorf("parse gen-ts flags: %w", err)
+		return GenTSConfig{}, fmt.Errorf("%w: %s", ErrUnknownFlag, err)
 	}
 
 	if remainingArgs := fset.Args(); len(remainingArgs) > 0 {

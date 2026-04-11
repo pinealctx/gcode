@@ -269,6 +269,23 @@ assertEqual((AllValidateRules.rItems as { type: string }).type, "array", "AllVal
 assertEqual((AllValidateRules.rItems as { items: { minimum: number } }).items.minimum, 0, "AllValidateRules.rItems.items.minimum === 0");
 assertEqual((AllValidateRules.rItems as { items: { type: string } }).items.type, "integer", "AllValidateRules.rItems.items.type === integer");
 
+// exclusive bounds for signed int (gt + lt → exclusiveMinimum + exclusiveMaximum)
+assertEqual((AllValidateRules.iGtLt as { exclusiveMinimum: number }).exclusiveMinimum, -10, "AllValidateRules.iGtLt.exclusiveMinimum === -10");
+assertEqual((AllValidateRules.iGtLt as { exclusiveMaximum: number }).exclusiveMaximum, 10, "AllValidateRules.iGtLt.exclusiveMaximum === 10");
+
+// exclusive bounds for unsigned int (gt + lt → exclusiveMinimum + exclusiveMaximum)
+assertEqual((AllValidateRules.uGtLt as { exclusiveMinimum: number }).exclusiveMinimum, 5, "AllValidateRules.uGtLt.exclusiveMinimum === 5");
+assertEqual((AllValidateRules.uGtLt as { exclusiveMaximum: number }).exclusiveMaximum, 100, "AllValidateRules.uGtLt.exclusiveMaximum === 100");
+
+// float exclusiveMaximum (lt)
+assertEqual((AllValidateRules.fLt as { exclusiveMaximum: number }).exclusiveMaximum, 99.5, "AllValidateRules.fLt.exclusiveMaximum === 99.5");
+
+// double exclusiveMinimum (gt)
+assertEqual((AllValidateRules.dGt as { exclusiveMinimum: number }).exclusiveMinimum, -1, "AllValidateRules.dGt.exclusiveMinimum === -1");
+
+// string pattern
+assertEqual((AllValidateRules.sPattern as { pattern: string }).pattern, "^[A-Z][a-z]+$", "AllValidateRules.sPattern.pattern === /^[A-Z][a-z]+$/");
+
 // --- AllScalarsCreate: all fields optional (create message) ---
 
 const createAll: AllScalarsCreate = {};
@@ -309,10 +326,17 @@ const av: AllValidate = {
   sUri: "https://example.com",
   bMinmax: "aGVsbG8=",
   rItems: [0, 1, 2],
+  iGtLt: 0,
+  uGtLt: 50,
+  fLt: 50.0,
+  dGt: 0.0,
+  sPattern: "Hello",
 };
 assertEqual(av.uGte, 1, "AllValidate.uGte assigned correctly");
 assertEqual(av.sIn, "a", "AllValidate.sIn assigned correctly");
 assertEqual(av.oStatus, undefined, "AllValidate.oStatus optional — omitted === undefined");
+assertEqual(av.iGtLt, 0, "AllValidate.iGtLt assigned correctly");
+assertEqual(av.sPattern, "Hello", "AllValidate.sPattern assigned correctly");
 
 // --- TreeNode: self-referencing interface type safety ---
 
@@ -323,7 +347,7 @@ assertEqual(treeLeaf.child.child.value, "deepest", "TreeNode.child.child.value d
 
 // --- summary ---
 
-assertEqual(passed, 88, "expected exactly 88 assertions before count guard");
+assertEqual(passed, 97, "expected exactly 97 assertions before count guard");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {

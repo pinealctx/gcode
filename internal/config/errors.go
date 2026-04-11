@@ -16,6 +16,9 @@ var (
 	ErrMissingInputDir  = ConfigError("validate cli config: missing -in")
 	ErrMissingOutputDir = ConfigError("validate cli config: missing -out")
 
+	// flag parsing
+	ErrUnknownFlag = ConfigError("parse flags: unknown flag provided")
+
 	// gen-proto flags
 	ErrMissingProtoInputDir = ConfigError("validate gen-proto config: missing -in")
 
