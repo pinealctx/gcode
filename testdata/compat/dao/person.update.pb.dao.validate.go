@@ -7,52 +7,52 @@ import (
 	"github.com/pinealctx/gcode/validateruntime"
 )
 
-func (p *PersonUpdateByName) Validate() error {
-	if len(p.Name) < 1 {
+func (x *PersonUpdateByName) Validate() error {
+	if len(x.Name) < 1 {
 		return &validateruntime.ValidationError{Field: "name", Rule: "min_len", Message: validateruntime.MsgOr("", "length must be >= 1")}
 	}
-	if len(p.Name) > 100 {
+	if len(x.Name) > 100 {
 		return &validateruntime.ValidationError{Field: "name", Rule: "max_len", Message: validateruntime.MsgOr("", "length must be <= 100")}
 	}
-	if p.Age != nil {
-		if *p.Age < 0 {
+	if x.Age != nil {
+		if *x.Age < 0 {
 			return &validateruntime.ValidationError{Field: "age", Rule: "gte", Message: validateruntime.MsgOr("", "must be >= 0")}
 		}
-		if *p.Age > 150 {
+		if *x.Age > 150 {
 			return &validateruntime.ValidationError{Field: "age", Rule: "lte", Message: validateruntime.MsgOr("", "must be <= 150")}
 		}
 	}
-	if p.Status != nil {
-		switch *p.Status {
+	if x.Status != nil {
+		switch *x.Status {
 		case Status_STATUS_UNSPECIFIED, Status_STATUS_ACTIVE, Status_STATUS_INACTIVE:
 		// ok
 		default:
 			return &validateruntime.ValidationError{Field: "status", Rule: "defined_only", Message: validateruntime.MsgOr("", "must be a defined enum value")}
 		}
 	}
-	if p.Nickname != nil {
-		if *p.Nickname != "" {
-			if len(*p.Nickname) < 1 {
+	if x.Nickname != nil {
+		if *x.Nickname != "" {
+			if len(*x.Nickname) < 1 {
 				return &validateruntime.ValidationError{Field: "nickname", Rule: "min_len", Message: validateruntime.MsgOr("", "length must be >= 1")}
 			}
-			if len(*p.Nickname) > 10 {
+			if len(*x.Nickname) > 10 {
 				return &validateruntime.ValidationError{Field: "nickname", Rule: "max_len", Message: validateruntime.MsgOr("", "length must be <= 10")}
 			}
 		}
 	}
-	if p.Email != nil {
-		if *p.Email != "" {
-			if !validateruntime.IsEmail(*p.Email) {
+	if x.Email != nil {
+		if *x.Email != "" {
+			if !validateruntime.IsEmail(*x.Email) {
 				return &validateruntime.ValidationError{Field: "email", Rule: "email", Message: validateruntime.MsgOr("", "must be a valid email address")}
 			}
 		}
 	}
-	if p.Role != nil {
-		if *p.Role != "" {
+	if x.Role != nil {
+		if *x.Role != "" {
 			{
 				found := false
 				for _, v := range []string{"admin", "user", "guest"} {
-					if *p.Role == v {
+					if *x.Role == v {
 						found = true
 						break
 					}
@@ -63,9 +63,9 @@ func (p *PersonUpdateByName) Validate() error {
 			}
 		}
 	}
-	if p.TypeId != nil {
+	if x.TypeId != nil {
 		for _, v := range []int32{0, -1} {
-			if *p.TypeId == v {
+			if *x.TypeId == v {
 				return &validateruntime.ValidationError{Field: "type_id", Rule: "not_in", Message: validateruntime.MsgOr("", "must not be one of [0, -1]")}
 			}
 		}

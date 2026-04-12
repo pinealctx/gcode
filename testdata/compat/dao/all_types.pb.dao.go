@@ -72,136 +72,136 @@ type TreeNode struct {
 }
 
 // Size returns the protobuf wire size of AllScalars.
-func (a *AllScalars) Size() int {
-	if a == nil {
+func (x *AllScalars) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if a.FSint32 != 0 {
-		n += 1 + runtime.SizeSint32(a.FSint32)
+	if x.FSint32 != 0 {
+		n += 1 + runtime.SizeSint32(x.FSint32)
 	}
-	if a.FSint64 != 0 {
-		n += 1 + runtime.SizeSint64(a.FSint64)
+	if x.FSint64 != 0 {
+		n += 1 + runtime.SizeSint64(x.FSint64)
 	}
-	if a.FSfixed32 != 0 {
+	if x.FSfixed32 != 0 {
 		n += 1 + 4
 	}
-	if a.FSfixed64 != 0 {
+	if x.FSfixed64 != 0 {
 		n += 1 + 8
 	}
-	if !runtime.IsZeroDouble(a.FDouble) {
+	if !runtime.IsZeroDouble(x.FDouble) {
 		n += 1 + 8
 	}
-	if a.FFixed32 != 0 {
+	if x.FFixed32 != 0 {
 		n += 1 + 4
 	}
-	if a.FFixed64 != 0 {
+	if x.FFixed64 != 0 {
 		n += 1 + 8
 	}
-	if a.FUint32 != 0 {
-		n += 1 + runtime.SizeUint32(a.FUint32)
+	if x.FUint32 != 0 {
+		n += 1 + runtime.SizeUint32(x.FUint32)
 	}
-	if a.FUint64 != 0 {
-		n += 1 + runtime.SizeUint64(a.FUint64)
+	if x.FUint64 != 0 {
+		n += 1 + runtime.SizeUint64(x.FUint64)
 	}
-	if !runtime.IsZeroFloat(a.FFloat) {
+	if !runtime.IsZeroFloat(x.FFloat) {
 		n += 1 + 4
 	}
-	if len(a.FBytes) > 0 {
-		n += 1 + runtime.SizeBytes(a.FBytes)
+	if len(x.FBytes) > 0 {
+		n += 1 + runtime.SizeBytes(x.FBytes)
 	}
 	return n
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (a *AllScalars) MarshalBinary() ([]byte, error) {
-	return a.MarshalAppend(make([]byte, 0, a.Size()))
+func (x *AllScalars) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of AllScalars to b.
-func (a *AllScalars) MarshalAppend(b []byte) ([]byte, error) {
-	if a.FSint32 != 0 {
+func (x *AllScalars) MarshalAppend(b []byte) ([]byte, error) {
+	if x.FSint32 != 0 {
 		b = runtime.AppendTag(b, 1, runtime.WireVarint)
-		b = runtime.AppendSint32(b, a.FSint32)
+		b = runtime.AppendSint32(b, x.FSint32)
 	}
-	if a.FSint64 != 0 {
+	if x.FSint64 != 0 {
 		b = runtime.AppendTag(b, 2, runtime.WireVarint)
-		b = runtime.AppendSint64(b, a.FSint64)
+		b = runtime.AppendSint64(b, x.FSint64)
 	}
-	if a.FSfixed32 != 0 {
+	if x.FSfixed32 != 0 {
 		b = runtime.AppendTag(b, 3, runtime.WireFixed32)
-		b = runtime.AppendFixed32(b, uint32(a.FSfixed32))
+		b = runtime.AppendFixed32(b, uint32(x.FSfixed32))
 	}
-	if a.FSfixed64 != 0 {
+	if x.FSfixed64 != 0 {
 		b = runtime.AppendTag(b, 4, runtime.WireFixed64)
-		b = runtime.AppendFixed64(b, uint64(a.FSfixed64))
+		b = runtime.AppendFixed64(b, uint64(x.FSfixed64))
 	}
-	if !runtime.IsZeroDouble(a.FDouble) {
+	if !runtime.IsZeroDouble(x.FDouble) {
 		b = runtime.AppendTag(b, 5, runtime.WireFixed64)
-		b = runtime.AppendDouble(b, a.FDouble)
+		b = runtime.AppendDouble(b, x.FDouble)
 	}
-	if a.FFixed32 != 0 {
+	if x.FFixed32 != 0 {
 		b = runtime.AppendTag(b, 6, runtime.WireFixed32)
-		b = runtime.AppendFixed32(b, a.FFixed32)
+		b = runtime.AppendFixed32(b, x.FFixed32)
 	}
-	if a.FFixed64 != 0 {
+	if x.FFixed64 != 0 {
 		b = runtime.AppendTag(b, 7, runtime.WireFixed64)
-		b = runtime.AppendFixed64(b, a.FFixed64)
+		b = runtime.AppendFixed64(b, x.FFixed64)
 	}
-	if a.FUint32 != 0 {
+	if x.FUint32 != 0 {
 		b = runtime.AppendTag(b, 8, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(a.FUint32))
+		b = runtime.AppendVarint(b, uint64(x.FUint32))
 	}
-	if a.FUint64 != 0 {
+	if x.FUint64 != 0 {
 		b = runtime.AppendTag(b, 9, runtime.WireVarint)
-		b = runtime.AppendVarint(b, a.FUint64)
+		b = runtime.AppendVarint(b, x.FUint64)
 	}
-	if !runtime.IsZeroFloat(a.FFloat) {
+	if !runtime.IsZeroFloat(x.FFloat) {
 		b = runtime.AppendTag(b, 10, runtime.WireFixed32)
-		b = runtime.AppendFloat(b, a.FFloat)
+		b = runtime.AppendFloat(b, x.FFloat)
 	}
-	if len(a.FBytes) > 0 {
+	if len(x.FBytes) > 0 {
 		b = runtime.AppendTag(b, 11, runtime.WireBytes)
-		b = runtime.AppendBytes(b, a.FBytes)
+		b = runtime.AppendBytes(b, x.FBytes)
 	}
 	return b, nil
 }
 
 // Size returns the protobuf wire size of AllRepeated.
-func (a *AllRepeated) Size() int {
-	if a == nil {
+func (x *AllRepeated) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if len(a.RSint32) > 0 {
+	if len(x.RSint32) > 0 {
 		var es int
-		for _, v := range a.RSint32 {
+		for _, v := range x.RSint32 {
 			es += runtime.SizeSint32(v)
 		}
 		n += 1 + runtime.SizeVarint(uint64(es)) + es
 	}
-	if len(a.RSfixed32) > 0 {
-		es := len(a.RSfixed32) * 4
+	if len(x.RSfixed32) > 0 {
+		es := len(x.RSfixed32) * 4
 		n += 1 + runtime.SizeVarint(uint64(es)) + es
 	}
-	if len(a.RDouble) > 0 {
-		es := len(a.RDouble) * 8
+	if len(x.RDouble) > 0 {
+		es := len(x.RDouble) * 8
 		n += 1 + runtime.SizeVarint(uint64(es)) + es
 	}
-	if len(a.RBytes) > 0 {
-		for _, v := range a.RBytes {
+	if len(x.RBytes) > 0 {
+		for _, v := range x.RBytes {
 			n += 1 + runtime.SizeBytes(v)
 		}
 	}
-	if len(a.RMessage) > 0 {
-		for _, v := range a.RMessage {
+	if len(x.RMessage) > 0 {
+		for _, v := range x.RMessage {
 			s := v.Size()
 			n += 1 + runtime.SizeVarint(uint64(s)) + s
 		}
 	}
-	if len(a.REnum) > 0 {
+	if len(x.REnum) > 0 {
 		var es int
-		for _, v := range a.REnum {
+		for _, v := range x.REnum {
 			es += runtime.SizeEnum(int32(v))
 		}
 		n += 1 + runtime.SizeVarint(uint64(es)) + es
@@ -210,45 +210,45 @@ func (a *AllRepeated) Size() int {
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (a *AllRepeated) MarshalBinary() ([]byte, error) {
-	return a.MarshalAppend(make([]byte, 0, a.Size()))
+func (x *AllRepeated) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of AllRepeated to b.
-func (a *AllRepeated) MarshalAppend(b []byte) ([]byte, error) {
-	if len(a.RSint32) > 0 {
+func (x *AllRepeated) MarshalAppend(b []byte) ([]byte, error) {
+	if len(x.RSint32) > 0 {
 		b = runtime.AppendTag(b, 1, runtime.WireBytes)
 		var es int
-		for _, v := range a.RSint32 {
+		for _, v := range x.RSint32 {
 			es += runtime.SizeSint32(v)
 		}
 		b = runtime.AppendVarint(b, uint64(es))
-		for _, v := range a.RSint32 {
+		for _, v := range x.RSint32 {
 			b = runtime.AppendSint32(b, v)
 		}
 	}
-	if len(a.RSfixed32) > 0 {
+	if len(x.RSfixed32) > 0 {
 		b = runtime.AppendTag(b, 2, runtime.WireBytes)
-		b = runtime.AppendVarint(b, uint64(len(a.RSfixed32)*4))
-		for _, v := range a.RSfixed32 {
+		b = runtime.AppendVarint(b, uint64(len(x.RSfixed32)*4))
+		for _, v := range x.RSfixed32 {
 			b = runtime.AppendFixed32(b, uint32(v))
 		}
 	}
-	if len(a.RDouble) > 0 {
+	if len(x.RDouble) > 0 {
 		b = runtime.AppendTag(b, 3, runtime.WireBytes)
-		b = runtime.AppendVarint(b, uint64(len(a.RDouble)*8))
-		for _, v := range a.RDouble {
+		b = runtime.AppendVarint(b, uint64(len(x.RDouble)*8))
+		for _, v := range x.RDouble {
 			b = runtime.AppendDouble(b, v)
 		}
 	}
-	if len(a.RBytes) > 0 {
-		for _, v := range a.RBytes {
+	if len(x.RBytes) > 0 {
+		for _, v := range x.RBytes {
 			b = runtime.AppendTag(b, 4, runtime.WireBytes)
 			b = runtime.AppendBytes(b, v)
 		}
 	}
-	if len(a.RMessage) > 0 {
-		for _, v := range a.RMessage {
+	if len(x.RMessage) > 0 {
+		for _, v := range x.RMessage {
 			b = runtime.AppendTag(b, 5, runtime.WireBytes)
 			b = runtime.AppendVarint(b, uint64(v.Size()))
 			var err error
@@ -258,14 +258,14 @@ func (a *AllRepeated) MarshalAppend(b []byte) ([]byte, error) {
 			}
 		}
 	}
-	if len(a.REnum) > 0 {
+	if len(x.REnum) > 0 {
 		b = runtime.AppendTag(b, 6, runtime.WireBytes)
 		var es int
-		for _, v := range a.REnum {
+		for _, v := range x.REnum {
 			es += runtime.SizeEnum(int32(v))
 		}
 		b = runtime.AppendVarint(b, uint64(es))
-		for _, v := range a.REnum {
+		for _, v := range x.REnum {
 			b = runtime.AppendVarint(b, uint64(v))
 		}
 	}
@@ -273,193 +273,193 @@ func (a *AllRepeated) MarshalAppend(b []byte) ([]byte, error) {
 }
 
 // Size returns the protobuf wire size of AllValidate.
-func (a *AllValidate) Size() int {
-	if a == nil {
+func (x *AllValidate) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if a.UGte != 0 {
-		n += 1 + runtime.SizeUint32(a.UGte)
+	if x.UGte != 0 {
+		n += 1 + runtime.SizeUint32(x.UGte)
 	}
-	if a.ULte != 0 {
-		n += 1 + runtime.SizeUint64(a.ULte)
+	if x.ULte != 0 {
+		n += 1 + runtime.SizeUint64(x.ULte)
 	}
-	if a.UIn != 0 {
-		n += 1 + runtime.SizeUint32(a.UIn)
+	if x.UIn != 0 {
+		n += 1 + runtime.SizeUint32(x.UIn)
 	}
-	if a.UNotIn != 0 {
-		n += 1 + runtime.SizeUint32(a.UNotIn)
+	if x.UNotIn != 0 {
+		n += 1 + runtime.SizeUint32(x.UNotIn)
 	}
-	if !runtime.IsZeroFloat(a.FGt) {
+	if !runtime.IsZeroFloat(x.FGt) {
 		n += 1 + 4
 	}
-	if !runtime.IsZeroDouble(a.DLte) {
+	if !runtime.IsZeroDouble(x.DLte) {
 		n += 1 + 8
 	}
-	if len(a.SIn) > 0 {
-		n += 1 + runtime.SizeString(a.SIn)
+	if len(x.SIn) > 0 {
+		n += 1 + runtime.SizeString(x.SIn)
 	}
-	if len(a.SNotIn) > 0 {
-		n += 1 + runtime.SizeString(a.SNotIn)
+	if len(x.SNotIn) > 0 {
+		n += 1 + runtime.SizeString(x.SNotIn)
 	}
-	if a.IIn != 0 {
-		n += 1 + runtime.SizeInt32(a.IIn)
+	if x.IIn != 0 {
+		n += 1 + runtime.SizeInt32(x.IIn)
 	}
-	if len(a.SUri) > 0 {
-		n += 1 + runtime.SizeString(a.SUri)
+	if len(x.SUri) > 0 {
+		n += 1 + runtime.SizeString(x.SUri)
 	}
-	if a.OStatus != nil {
-		n += 1 + runtime.SizeEnum(int32(*a.OStatus))
+	if x.OStatus != nil {
+		n += 1 + runtime.SizeEnum(int32(*x.OStatus))
 	}
-	if len(a.BMinmax) > 0 {
-		n += 1 + runtime.SizeBytes(a.BMinmax)
+	if len(x.BMinmax) > 0 {
+		n += 1 + runtime.SizeBytes(x.BMinmax)
 	}
-	if len(a.RItems) > 0 {
+	if len(x.RItems) > 0 {
 		var es int
-		for _, v := range a.RItems {
+		for _, v := range x.RItems {
 			es += runtime.SizeInt32(v)
 		}
 		n += 1 + runtime.SizeVarint(uint64(es)) + es
 	}
-	if a.IGtLt != 0 {
-		n += 1 + runtime.SizeInt32(a.IGtLt)
+	if x.IGtLt != 0 {
+		n += 1 + runtime.SizeInt32(x.IGtLt)
 	}
-	if a.UGtLt != 0 {
-		n += 1 + runtime.SizeUint32(a.UGtLt)
+	if x.UGtLt != 0 {
+		n += 1 + runtime.SizeUint32(x.UGtLt)
 	}
-	if !runtime.IsZeroFloat(a.FLt) {
+	if !runtime.IsZeroFloat(x.FLt) {
 		n += 2 + 4
 	}
-	if !runtime.IsZeroDouble(a.DGt) {
+	if !runtime.IsZeroDouble(x.DGt) {
 		n += 2 + 8
 	}
-	if len(a.SPattern) > 0 {
-		n += 2 + runtime.SizeString(a.SPattern)
+	if len(x.SPattern) > 0 {
+		n += 2 + runtime.SizeString(x.SPattern)
 	}
 	return n
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (a *AllValidate) MarshalBinary() ([]byte, error) {
-	return a.MarshalAppend(make([]byte, 0, a.Size()))
+func (x *AllValidate) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of AllValidate to b.
-func (a *AllValidate) MarshalAppend(b []byte) ([]byte, error) {
-	if a.UGte != 0 {
+func (x *AllValidate) MarshalAppend(b []byte) ([]byte, error) {
+	if x.UGte != 0 {
 		b = runtime.AppendTag(b, 1, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(a.UGte))
+		b = runtime.AppendVarint(b, uint64(x.UGte))
 	}
-	if a.ULte != 0 {
+	if x.ULte != 0 {
 		b = runtime.AppendTag(b, 2, runtime.WireVarint)
-		b = runtime.AppendVarint(b, a.ULte)
+		b = runtime.AppendVarint(b, x.ULte)
 	}
-	if a.UIn != 0 {
+	if x.UIn != 0 {
 		b = runtime.AppendTag(b, 3, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(a.UIn))
+		b = runtime.AppendVarint(b, uint64(x.UIn))
 	}
-	if a.UNotIn != 0 {
+	if x.UNotIn != 0 {
 		b = runtime.AppendTag(b, 4, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(a.UNotIn))
+		b = runtime.AppendVarint(b, uint64(x.UNotIn))
 	}
-	if !runtime.IsZeroFloat(a.FGt) {
+	if !runtime.IsZeroFloat(x.FGt) {
 		b = runtime.AppendTag(b, 5, runtime.WireFixed32)
-		b = runtime.AppendFloat(b, a.FGt)
+		b = runtime.AppendFloat(b, x.FGt)
 	}
-	if !runtime.IsZeroDouble(a.DLte) {
+	if !runtime.IsZeroDouble(x.DLte) {
 		b = runtime.AppendTag(b, 6, runtime.WireFixed64)
-		b = runtime.AppendDouble(b, a.DLte)
+		b = runtime.AppendDouble(b, x.DLte)
 	}
-	if len(a.SIn) > 0 {
+	if len(x.SIn) > 0 {
 		b = runtime.AppendTag(b, 7, runtime.WireBytes)
-		b = runtime.AppendString(b, a.SIn)
+		b = runtime.AppendString(b, x.SIn)
 	}
-	if len(a.SNotIn) > 0 {
+	if len(x.SNotIn) > 0 {
 		b = runtime.AppendTag(b, 8, runtime.WireBytes)
-		b = runtime.AppendString(b, a.SNotIn)
+		b = runtime.AppendString(b, x.SNotIn)
 	}
-	if a.IIn != 0 {
+	if x.IIn != 0 {
 		b = runtime.AppendTag(b, 9, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(a.IIn))
+		b = runtime.AppendVarint(b, uint64(x.IIn))
 	}
-	if len(a.SUri) > 0 {
+	if len(x.SUri) > 0 {
 		b = runtime.AppendTag(b, 10, runtime.WireBytes)
-		b = runtime.AppendString(b, a.SUri)
+		b = runtime.AppendString(b, x.SUri)
 	}
-	if a.OStatus != nil {
+	if x.OStatus != nil {
 		b = runtime.AppendTag(b, 11, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(*a.OStatus))
+		b = runtime.AppendVarint(b, uint64(*x.OStatus))
 	}
-	if len(a.BMinmax) > 0 {
+	if len(x.BMinmax) > 0 {
 		b = runtime.AppendTag(b, 12, runtime.WireBytes)
-		b = runtime.AppendBytes(b, a.BMinmax)
+		b = runtime.AppendBytes(b, x.BMinmax)
 	}
-	if len(a.RItems) > 0 {
+	if len(x.RItems) > 0 {
 		b = runtime.AppendTag(b, 13, runtime.WireBytes)
 		var es int
-		for _, v := range a.RItems {
+		for _, v := range x.RItems {
 			es += runtime.SizeInt32(v)
 		}
 		b = runtime.AppendVarint(b, uint64(es))
-		for _, v := range a.RItems {
+		for _, v := range x.RItems {
 			b = runtime.AppendVarint(b, uint64(v))
 		}
 	}
-	if a.IGtLt != 0 {
+	if x.IGtLt != 0 {
 		b = runtime.AppendTag(b, 14, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(a.IGtLt))
+		b = runtime.AppendVarint(b, uint64(x.IGtLt))
 	}
-	if a.UGtLt != 0 {
+	if x.UGtLt != 0 {
 		b = runtime.AppendTag(b, 15, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(a.UGtLt))
+		b = runtime.AppendVarint(b, uint64(x.UGtLt))
 	}
-	if !runtime.IsZeroFloat(a.FLt) {
+	if !runtime.IsZeroFloat(x.FLt) {
 		b = runtime.AppendTag(b, 16, runtime.WireFixed32)
-		b = runtime.AppendFloat(b, a.FLt)
+		b = runtime.AppendFloat(b, x.FLt)
 	}
-	if !runtime.IsZeroDouble(a.DGt) {
+	if !runtime.IsZeroDouble(x.DGt) {
 		b = runtime.AppendTag(b, 17, runtime.WireFixed64)
-		b = runtime.AppendDouble(b, a.DGt)
+		b = runtime.AppendDouble(b, x.DGt)
 	}
-	if len(a.SPattern) > 0 {
+	if len(x.SPattern) > 0 {
 		b = runtime.AppendTag(b, 18, runtime.WireBytes)
-		b = runtime.AppendString(b, a.SPattern)
+		b = runtime.AppendString(b, x.SPattern)
 	}
 	return b, nil
 }
 
 // Size returns the protobuf wire size of TreeNode.
-func (t *TreeNode) Size() int {
-	if t == nil {
+func (x *TreeNode) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if len(t.Value) > 0 {
-		n += 1 + runtime.SizeString(t.Value)
+	if len(x.Value) > 0 {
+		n += 1 + runtime.SizeString(x.Value)
 	}
-	if t.Child != nil {
-		s := t.Child.Size()
+	if x.Child != nil {
+		s := x.Child.Size()
 		n += 1 + runtime.SizeVarint(uint64(s)) + s
 	}
 	return n
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (t *TreeNode) MarshalBinary() ([]byte, error) {
-	return t.MarshalAppend(make([]byte, 0, t.Size()))
+func (x *TreeNode) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of TreeNode to b.
-func (t *TreeNode) MarshalAppend(b []byte) ([]byte, error) {
-	if len(t.Value) > 0 {
+func (x *TreeNode) MarshalAppend(b []byte) ([]byte, error) {
+	if len(x.Value) > 0 {
 		b = runtime.AppendTag(b, 1, runtime.WireBytes)
-		b = runtime.AppendString(b, t.Value)
+		b = runtime.AppendString(b, x.Value)
 	}
-	if t.Child != nil {
+	if x.Child != nil {
 		b = runtime.AppendTag(b, 2, runtime.WireBytes)
-		b = runtime.AppendVarint(b, uint64(t.Child.Size()))
+		b = runtime.AppendVarint(b, uint64(x.Child.Size()))
 		var err error
-		b, err = t.Child.MarshalAppend(b)
+		b, err = x.Child.MarshalAppend(b)
 		if err != nil {
 			return nil, err
 		}
@@ -471,7 +471,7 @@ func (t *TreeNode) MarshalAppend(b []byte) ([]byte, error) {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -505,7 +505,7 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
-			a.FSint32 = runtime.DecodeZigZag32(v)
+			x.FSint32 = runtime.DecodeZigZag32(v)
 			off += n
 		case 2:
 			if seen[0]&2 != 0 {
@@ -524,7 +524,7 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 				}
 				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
 			}
-			a.FSint64 = runtime.DecodeZigZag64(v)
+			x.FSint64 = runtime.DecodeZigZag64(v)
 			off += n
 		case 3:
 			if seen[0]&4 != 0 {
@@ -540,7 +540,7 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 			if n < 0 {
 				return 0, fmt.Errorf("field 3: %w", runtime.ErrTruncated)
 			}
-			a.FSfixed32 = int32(v)
+			x.FSfixed32 = int32(v)
 			off += n
 		case 4:
 			if seen[0]&8 != 0 {
@@ -556,7 +556,7 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 			if n < 0 {
 				return 0, fmt.Errorf("field 4: %w", runtime.ErrTruncated)
 			}
-			a.FSfixed64 = int64(v)
+			x.FSfixed64 = int64(v)
 			off += n
 		case 5:
 			if seen[0]&16 != 0 {
@@ -572,7 +572,7 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 			if n < 0 {
 				return 0, fmt.Errorf("field 5: %w", runtime.ErrTruncated)
 			}
-			a.FDouble = math.Float64frombits(v)
+			x.FDouble = math.Float64frombits(v)
 			off += n
 		case 6:
 			if seen[0]&32 != 0 {
@@ -588,7 +588,7 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 			if n < 0 {
 				return 0, fmt.Errorf("field 6: %w", runtime.ErrTruncated)
 			}
-			a.FFixed32 = v
+			x.FFixed32 = v
 			off += n
 		case 7:
 			if seen[0]&64 != 0 {
@@ -604,7 +604,7 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 			if n < 0 {
 				return 0, fmt.Errorf("field 7: %w", runtime.ErrTruncated)
 			}
-			a.FFixed64 = v
+			x.FFixed64 = v
 			off += n
 		case 8:
 			if seen[0]&128 != 0 {
@@ -623,7 +623,7 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 				}
 				return 0, fmt.Errorf("field 8: %w", runtime.ErrTruncated)
 			}
-			a.FUint32 = uint32(v)
+			x.FUint32 = uint32(v)
 			off += n
 		case 9:
 			if seen[0]&256 != 0 {
@@ -642,7 +642,7 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 				}
 				return 0, fmt.Errorf("field 9: %w", runtime.ErrTruncated)
 			}
-			a.FUint64 = v
+			x.FUint64 = v
 			off += n
 		case 10:
 			if seen[0]&512 != 0 {
@@ -658,7 +658,7 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 			if n < 0 {
 				return 0, fmt.Errorf("field 10: %w", runtime.ErrTruncated)
 			}
-			a.FFloat = math.Float32frombits(v)
+			x.FFloat = math.Float32frombits(v)
 			off += n
 		case 11:
 			if seen[0]&1024 != 0 {
@@ -679,7 +679,7 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 			}
 			tmp := make([]byte, len(payload))
 			copy(tmp, payload)
-			a.FBytes = tmp
+			x.FBytes = tmp
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)
@@ -697,15 +697,15 @@ func (a *AllScalars) unmarshalFrom(b []byte, lenient bool, depth int) (int, erro
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (a *AllScalars) UnmarshalBinary(data []byte) error {
-	_, err := a.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *AllScalars) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (a *AllScalars) UnmarshalBinaryLenient(data []byte) error {
-	_, err := a.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *AllScalars) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
@@ -713,7 +713,7 @@ func (a *AllScalars) UnmarshalBinaryLenient(data []byte) error {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *AllRepeated) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -749,7 +749,7 @@ func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 					}
 					return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 				}
-				a.RSint32 = append(a.RSint32, runtime.DecodeZigZag32(v))
+				x.RSint32 = append(x.RSint32, runtime.DecodeZigZag32(v))
 				pi += pn
 			}
 		case 2:
@@ -769,7 +769,7 @@ func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 			}
 			for pi := 0; pi < len(packed); pi += 4 {
 				v, _ := runtime.ConsumeFixed32(packed[pi:])
-				a.RSfixed32 = append(a.RSfixed32, int32(v))
+				x.RSfixed32 = append(x.RSfixed32, int32(v))
 			}
 		case 3:
 			if wireType != runtime.WireBytes {
@@ -788,7 +788,7 @@ func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 			}
 			for pi := 0; pi < len(packed); pi += 8 {
 				v, _ := runtime.ConsumeFixed64(packed[pi:])
-				a.RDouble = append(a.RDouble, math.Float64frombits(v))
+				x.RDouble = append(x.RDouble, math.Float64frombits(v))
 			}
 		case 4:
 			if wireType != runtime.WireBytes {
@@ -803,7 +803,7 @@ func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 			}
 			tmp := make([]byte, len(payload))
 			copy(tmp, payload)
-			a.RBytes = append(a.RBytes, tmp)
+			x.RBytes = append(x.RBytes, tmp)
 			off += n
 		case 5:
 			if wireType != runtime.WireBytes {
@@ -820,7 +820,7 @@ func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 			if _, err := elem.unmarshalFrom(payload, lenient, depth-1); err != nil {
 				return 0, fmt.Errorf("field 5: %w", err)
 			}
-			a.RMessage = append(a.RMessage, elem)
+			x.RMessage = append(x.RMessage, elem)
 			off += n
 		case 6:
 			if wireType != runtime.WireBytes {
@@ -842,7 +842,7 @@ func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 					}
 					return 0, fmt.Errorf("field 6: %w", runtime.ErrTruncated)
 				}
-				a.REnum = append(a.REnum, Status(int32(v)))
+				x.REnum = append(x.REnum, Status(int32(v)))
 				pi += pn
 			}
 		default:
@@ -861,15 +861,15 @@ func (a *AllRepeated) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (a *AllRepeated) UnmarshalBinary(data []byte) error {
-	_, err := a.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *AllRepeated) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (a *AllRepeated) UnmarshalBinaryLenient(data []byte) error {
-	_, err := a.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *AllRepeated) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
@@ -877,7 +877,7 @@ func (a *AllRepeated) UnmarshalBinaryLenient(data []byte) error {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -911,7 +911,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
-			a.UGte = uint32(v)
+			x.UGte = uint32(v)
 			off += n
 		case 2:
 			if seen[0]&2 != 0 {
@@ -930,7 +930,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				}
 				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
 			}
-			a.ULte = v
+			x.ULte = v
 			off += n
 		case 3:
 			if seen[0]&4 != 0 {
@@ -949,7 +949,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				}
 				return 0, fmt.Errorf("field 3: %w", runtime.ErrTruncated)
 			}
-			a.UIn = uint32(v)
+			x.UIn = uint32(v)
 			off += n
 		case 4:
 			if seen[0]&8 != 0 {
@@ -968,7 +968,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				}
 				return 0, fmt.Errorf("field 4: %w", runtime.ErrTruncated)
 			}
-			a.UNotIn = uint32(v)
+			x.UNotIn = uint32(v)
 			off += n
 		case 5:
 			if seen[0]&16 != 0 {
@@ -984,7 +984,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 			if n < 0 {
 				return 0, fmt.Errorf("field 5: %w", runtime.ErrTruncated)
 			}
-			a.FGt = math.Float32frombits(v)
+			x.FGt = math.Float32frombits(v)
 			off += n
 		case 6:
 			if seen[0]&32 != 0 {
@@ -1000,7 +1000,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 			if n < 0 {
 				return 0, fmt.Errorf("field 6: %w", runtime.ErrTruncated)
 			}
-			a.DLte = math.Float64frombits(v)
+			x.DLte = math.Float64frombits(v)
 			off += n
 		case 7:
 			if seen[0]&64 != 0 {
@@ -1019,7 +1019,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				}
 				return 0, fmt.Errorf("field 7: %w", runtime.ErrTruncated)
 			}
-			a.SIn = string(payload)
+			x.SIn = string(payload)
 			off += n
 		case 8:
 			if seen[0]&128 != 0 {
@@ -1038,7 +1038,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				}
 				return 0, fmt.Errorf("field 8: %w", runtime.ErrTruncated)
 			}
-			a.SNotIn = string(payload)
+			x.SNotIn = string(payload)
 			off += n
 		case 9:
 			if seen[0]&256 != 0 {
@@ -1057,7 +1057,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				}
 				return 0, fmt.Errorf("field 9: %w", runtime.ErrTruncated)
 			}
-			a.IIn = int32(v)
+			x.IIn = int32(v)
 			off += n
 		case 10:
 			if seen[0]&512 != 0 {
@@ -1076,7 +1076,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				}
 				return 0, fmt.Errorf("field 10: %w", runtime.ErrTruncated)
 			}
-			a.SUri = string(payload)
+			x.SUri = string(payload)
 			off += n
 		case 11:
 			if seen[0]&1024 != 0 {
@@ -1096,7 +1096,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				return 0, fmt.Errorf("field 11: %w", runtime.ErrTruncated)
 			}
 			tmp := Status(v)
-			a.OStatus = &tmp
+			x.OStatus = &tmp
 			off += n
 		case 12:
 			if seen[0]&2048 != 0 {
@@ -1117,7 +1117,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 			}
 			tmp := make([]byte, len(payload))
 			copy(tmp, payload)
-			a.BMinmax = tmp
+			x.BMinmax = tmp
 			off += n
 		case 13:
 			if wireType != runtime.WireBytes {
@@ -1139,7 +1139,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 					}
 					return 0, fmt.Errorf("field 13: %w", runtime.ErrTruncated)
 				}
-				a.RItems = append(a.RItems, int32(v))
+				x.RItems = append(x.RItems, int32(v))
 				pi += pn
 			}
 		case 14:
@@ -1159,7 +1159,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				}
 				return 0, fmt.Errorf("field 14: %w", runtime.ErrTruncated)
 			}
-			a.IGtLt = int32(v)
+			x.IGtLt = int32(v)
 			off += n
 		case 15:
 			if seen[0]&8192 != 0 {
@@ -1178,7 +1178,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				}
 				return 0, fmt.Errorf("field 15: %w", runtime.ErrTruncated)
 			}
-			a.UGtLt = uint32(v)
+			x.UGtLt = uint32(v)
 			off += n
 		case 16:
 			if seen[0]&16384 != 0 {
@@ -1194,7 +1194,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 			if n < 0 {
 				return 0, fmt.Errorf("field 16: %w", runtime.ErrTruncated)
 			}
-			a.FLt = math.Float32frombits(v)
+			x.FLt = math.Float32frombits(v)
 			off += n
 		case 17:
 			if seen[0]&32768 != 0 {
@@ -1210,7 +1210,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 			if n < 0 {
 				return 0, fmt.Errorf("field 17: %w", runtime.ErrTruncated)
 			}
-			a.DGt = math.Float64frombits(v)
+			x.DGt = math.Float64frombits(v)
 			off += n
 		case 18:
 			if seen[0]&65536 != 0 {
@@ -1229,7 +1229,7 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				}
 				return 0, fmt.Errorf("field 18: %w", runtime.ErrTruncated)
 			}
-			a.SPattern = string(payload)
+			x.SPattern = string(payload)
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)
@@ -1247,15 +1247,15 @@ func (a *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (a *AllValidate) UnmarshalBinary(data []byte) error {
-	_, err := a.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *AllValidate) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (a *AllValidate) UnmarshalBinaryLenient(data []byte) error {
-	_, err := a.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *AllValidate) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
@@ -1263,7 +1263,7 @@ func (a *AllValidate) UnmarshalBinaryLenient(data []byte) error {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (t *TreeNode) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *TreeNode) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -1297,7 +1297,7 @@ func (t *TreeNode) unmarshalFrom(b []byte, lenient bool, depth int) (int, error)
 				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
-			t.Value = string(payload)
+			x.Value = string(payload)
 			off += n
 		case 2:
 			if seen[0]&2 != 0 {
@@ -1316,10 +1316,10 @@ func (t *TreeNode) unmarshalFrom(b []byte, lenient bool, depth int) (int, error)
 				}
 				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
 			}
-			if t.Child == nil {
-				t.Child = new(TreeNode)
+			if x.Child == nil {
+				x.Child = new(TreeNode)
 			}
-			if _, err := t.Child.unmarshalFrom(payload, lenient, depth-1); err != nil {
+			if _, err := x.Child.unmarshalFrom(payload, lenient, depth-1); err != nil {
 				return 0, fmt.Errorf("field 2: %w", err)
 			}
 			off += n
@@ -1339,14 +1339,14 @@ func (t *TreeNode) unmarshalFrom(b []byte, lenient bool, depth int) (int, error)
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (t *TreeNode) UnmarshalBinary(data []byte) error {
-	_, err := t.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *TreeNode) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (t *TreeNode) UnmarshalBinaryLenient(data []byte) error {
-	_, err := t.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *TreeNode) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }

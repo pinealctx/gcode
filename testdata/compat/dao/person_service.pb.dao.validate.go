@@ -7,42 +7,42 @@ import (
 	"github.com/pinealctx/gcode/validateruntime"
 )
 
-func (c *CreatePersonResponse) Validate() error {
+func (x *CreatePersonResponse) Validate() error {
 	return nil
 }
 
-func (g *GetPersonRequest) Validate() error {
-	if g.Id != "" {
-		if len(g.Id) < 1 {
+func (x *GetPersonRequest) Validate() error {
+	if x.Id != "" {
+		if len(x.Id) < 1 {
 			return &validateruntime.ValidationError{Field: "id", Rule: "min_len", Message: validateruntime.MsgOr("", "length must be >= 1")}
 		}
-		if len(g.Id) > 64 {
+		if len(x.Id) > 64 {
 			return &validateruntime.ValidationError{Field: "id", Rule: "max_len", Message: validateruntime.MsgOr("", "length must be <= 64")}
 		}
 	}
 	return nil
 }
 
-func (g *GetPersonResponse) Validate() error {
+func (x *GetPersonResponse) Validate() error {
 	return nil
 }
 
-func (u *UpdatePersonResponse) Validate() error {
+func (x *UpdatePersonResponse) Validate() error {
 	return nil
 }
 
-func (d *DeletePersonRequest) Validate() error {
-	if d.Id != "" {
-		if len(d.Id) < 1 {
+func (x *DeletePersonRequest) Validate() error {
+	if x.Id != "" {
+		if len(x.Id) < 1 {
 			return &validateruntime.ValidationError{Field: "id", Rule: "min_len", Message: validateruntime.MsgOr("", "length must be >= 1")}
 		}
-		if len(d.Id) > 64 {
+		if len(x.Id) > 64 {
 			return &validateruntime.ValidationError{Field: "id", Rule: "max_len", Message: validateruntime.MsgOr("", "length must be <= 64")}
 		}
 	}
 	return nil
 }
 
-func (d *DeletePersonResponse) Validate() error {
+func (x *DeletePersonResponse) Validate() error {
 	return nil
 }

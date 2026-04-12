@@ -8,25 +8,25 @@ import (
 	"github.com/pinealctx/gcode/validateruntime"
 )
 
-func (a *AllScalars) Validate() error {
+func (x *AllScalars) Validate() error {
 	return nil
 }
 
-func (a *AllRepeated) Validate() error {
+func (x *AllRepeated) Validate() error {
 	return nil
 }
 
-func (a *AllValidate) Validate() error {
-	if a.UGte < 1 {
+func (x *AllValidate) Validate() error {
+	if x.UGte < 1 {
 		return &validateruntime.ValidationError{Field: "u_gte", Rule: "gte", Message: validateruntime.MsgOr("", "must be >= 1")}
 	}
-	if a.ULte > 1000 {
+	if x.ULte > 1000 {
 		return &validateruntime.ValidationError{Field: "u_lte", Rule: "lte", Message: validateruntime.MsgOr("", "must be <= 1000")}
 	}
 	{
 		found := false
 		for _, v := range []uint32{1, 2, 3} {
-			if a.UIn == v {
+			if x.UIn == v {
 				found = true
 				break
 			}
@@ -36,21 +36,21 @@ func (a *AllValidate) Validate() error {
 		}
 	}
 	for _, v := range []uint32{0} {
-		if a.UNotIn == v {
+		if x.UNotIn == v {
 			return &validateruntime.ValidationError{Field: "u_not_in", Rule: "not_in", Message: validateruntime.MsgOr("", "must not be one of [0]")}
 		}
 	}
-	if a.FGt <= 0 {
+	if x.FGt <= 0 {
 		return &validateruntime.ValidationError{Field: "f_gt", Rule: "gt", Message: validateruntime.MsgOr("", "must be > 0")}
 	}
-	if a.DLte > 1 {
+	if x.DLte > 1 {
 		return &validateruntime.ValidationError{Field: "d_lte", Rule: "lte", Message: validateruntime.MsgOr("", "must be <= 1")}
 	}
-	if a.SIn != "" {
+	if x.SIn != "" {
 		{
 			found := false
 			for _, v := range []string{"a", "b", "c"} {
-				if a.SIn == v {
+				if x.SIn == v {
 					found = true
 					break
 				}
@@ -60,9 +60,9 @@ func (a *AllValidate) Validate() error {
 			}
 		}
 	}
-	if a.SNotIn != "" {
+	if x.SNotIn != "" {
 		for _, v := range []string{"x", "y"} {
-			if a.SNotIn == v {
+			if x.SNotIn == v {
 				return &validateruntime.ValidationError{Field: "s_not_in", Rule: "not_in", Message: validateruntime.MsgOr("", "must not be one of [x, y]")}
 			}
 		}
@@ -70,7 +70,7 @@ func (a *AllValidate) Validate() error {
 	{
 		found := false
 		for _, v := range []int32{1, 2, -1} {
-			if a.IIn == v {
+			if x.IIn == v {
 				found = true
 				break
 			}
@@ -79,61 +79,61 @@ func (a *AllValidate) Validate() error {
 			return &validateruntime.ValidationError{Field: "i_in", Rule: "in", Message: validateruntime.MsgOr("", "must be one of [1, 2, -1]")}
 		}
 	}
-	if a.SUri != "" {
-		if !validateruntime.IsURI(a.SUri) {
+	if x.SUri != "" {
+		if !validateruntime.IsURI(x.SUri) {
 			return &validateruntime.ValidationError{Field: "s_uri", Rule: "uri", Message: validateruntime.MsgOr("", "must be a valid URI")}
 		}
 	}
-	if a.OStatus != nil {
-		switch *a.OStatus {
+	if x.OStatus != nil {
+		switch *x.OStatus {
 		case Status_STATUS_UNSPECIFIED, Status_STATUS_ACTIVE, Status_STATUS_INACTIVE:
 		// ok
 		default:
 			return &validateruntime.ValidationError{Field: "o_status", Rule: "defined_only", Message: validateruntime.MsgOr("", "must be a defined enum value")}
 		}
 	}
-	if a.BMinmax != nil {
-		if len(a.BMinmax) < 1 {
+	if x.BMinmax != nil {
+		if len(x.BMinmax) < 1 {
 			return &validateruntime.ValidationError{Field: "b_minmax", Rule: "min_len", Message: validateruntime.MsgOr("", "length must be >= 1")}
 		}
-		if len(a.BMinmax) > 100 {
+		if len(x.BMinmax) > 100 {
 			return &validateruntime.ValidationError{Field: "b_minmax", Rule: "max_len", Message: validateruntime.MsgOr("", "length must be <= 100")}
 		}
 	}
-	for i, v := range a.RItems {
+	for i, v := range x.RItems {
 		if v < 0 {
 			return &validateruntime.ValidationError{Field: fmt.Sprintf("r_items[%d]", i), Rule: "gte", Message: validateruntime.MsgOr("", "must be >= 0")}
 		}
 	}
-	if a.IGtLt <= -10 {
+	if x.IGtLt <= -10 {
 		return &validateruntime.ValidationError{Field: "i_gt_lt", Rule: "gt", Message: validateruntime.MsgOr("", "must be > -10")}
 	}
-	if a.IGtLt >= 10 {
+	if x.IGtLt >= 10 {
 		return &validateruntime.ValidationError{Field: "i_gt_lt", Rule: "lt", Message: validateruntime.MsgOr("", "must be < 10")}
 	}
-	if a.UGtLt <= 5 {
+	if x.UGtLt <= 5 {
 		return &validateruntime.ValidationError{Field: "u_gt_lt", Rule: "gt", Message: validateruntime.MsgOr("", "must be > 5")}
 	}
-	if a.UGtLt >= 100 {
+	if x.UGtLt >= 100 {
 		return &validateruntime.ValidationError{Field: "u_gt_lt", Rule: "lt", Message: validateruntime.MsgOr("", "must be < 100")}
 	}
-	if a.FLt >= 99.5 {
+	if x.FLt >= 99.5 {
 		return &validateruntime.ValidationError{Field: "f_lt", Rule: "lt", Message: validateruntime.MsgOr("", "must be < 99.5")}
 	}
-	if a.DGt <= -1 {
+	if x.DGt <= -1 {
 		return &validateruntime.ValidationError{Field: "d_gt", Rule: "gt", Message: validateruntime.MsgOr("", "must be > -1")}
 	}
-	if a.SPattern != "" {
-		if !validateruntime.MatchPattern(a.SPattern, "^[A-Z][a-z]+$") {
+	if x.SPattern != "" {
+		if !validateruntime.MatchPattern(x.SPattern, "^[A-Z][a-z]+$") {
 			return &validateruntime.ValidationError{Field: "s_pattern", Rule: "pattern", Message: validateruntime.MsgOr("", "must match pattern ^[A-Z][a-z]+$")}
 		}
 	}
 	return nil
 }
 
-func (t *TreeNode) Validate() error {
-	if t.Child != nil {
-		if err := t.Child.Validate(); err != nil {
+func (x *TreeNode) Validate() error {
+	if x.Child != nil {
+		if err := x.Child.Validate(); err != nil {
 			return err
 		}
 	}

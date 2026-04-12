@@ -96,7 +96,7 @@ func TestToMapGeneration(t *testing.T) {
 	s := string(src)
 
 	// ToMap method should be generated.
-	if !strings.Contains(s, "func (u *UserUpdateByID) ToMap()") {
+	if !strings.Contains(s, "func (x *UserUpdateByID) ToMap()") {
 		t.Errorf("missing ToMap method in:\n%s", s)
 	}
 	// condition field (id, non-optional) should NOT be in map.
@@ -111,7 +111,7 @@ func TestToMapGeneration(t *testing.T) {
 		t.Errorf("optional field 'email' should be in ToMap with deref in:\n%s", s)
 	}
 	// nil check for optional fields.
-	if !strings.Contains(s, "if u.Name != nil") {
+	if !strings.Contains(s, "if x.Name != nil") {
 		t.Errorf("missing nil check for Name in:\n%s", s)
 	}
 }
@@ -167,14 +167,14 @@ func TestValidateInheritance_UpdateMessage(t *testing.T) {
 	s := string(src)
 
 	// Should generate Validate() for UserUpdateByID.
-	if !strings.Contains(s, "func (u *UserUpdateByID) Validate()") {
+	if !strings.Contains(s, "func (x *UserUpdateByID) Validate()") {
 		t.Errorf("missing Validate method in:\n%s", s)
 	}
 	// Optional fields should have nil check before validation.
-	if !strings.Contains(s, "if u.Name != nil") {
+	if !strings.Contains(s, "if x.Name != nil") {
 		t.Errorf("missing nil check for optional Name field in:\n%s", s)
 	}
-	if !strings.Contains(s, "if u.Email != nil") {
+	if !strings.Contains(s, "if x.Email != nil") {
 		t.Errorf("missing nil check for optional Email field in:\n%s", s)
 	}
 	// Validate rules from source should be inherited (email check).
@@ -231,7 +231,7 @@ func TestValidateInheritance_CreateMessage(t *testing.T) {
 	s := string(src)
 
 	// Non-optional field should be validated directly (no nil check).
-	if strings.Contains(s, "if p.Sku != nil") {
+	if strings.Contains(s, "if x.Sku != nil") {
 		t.Errorf("non-optional field should not have nil check in:\n%s", s)
 	}
 	if !strings.Contains(s, "min_len") {
@@ -267,7 +267,7 @@ func TestValidateInheritance_NoSourceInIndex(t *testing.T) {
 		t.Fatalf("ValidateFile() error: %v", err)
 	}
 	// Should still generate a Validate() method (empty body).
-	if !strings.Contains(string(src), "func (u *UserUpdateByID) Validate()") {
+	if !strings.Contains(string(src), "func (x *UserUpdateByID) Validate()") {
 		t.Errorf("Validate method should still be generated when source not in index")
 	}
 }
@@ -389,10 +389,10 @@ func TestToMapRepeatedField(t *testing.T) {
 	s := string(src)
 
 	// repeated field should use len() check.
-	if !strings.Contains(s, "len(i.Tags) > 0") {
+	if !strings.Contains(s, "len(x.Tags) > 0") {
 		t.Errorf("repeated field should use len() check in:\n%s", s)
 	}
-	if !strings.Contains(s, `um["tags"] = i.Tags`) {
+	if !strings.Contains(s, `um["tags"] = x.Tags`) {
 		t.Errorf("repeated field should be written to map in:\n%s", s)
 	}
 	// condition field should not be in map.

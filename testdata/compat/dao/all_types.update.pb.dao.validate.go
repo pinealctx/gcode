@@ -3,6 +3,6 @@
 
 package dao
 
-func (a *AllScalarsUpdate) Validate() error {
+func (x *AllScalarsUpdate) Validate() error {
 	return nil
 }

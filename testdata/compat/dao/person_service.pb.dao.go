@@ -34,164 +34,164 @@ type DeletePersonResponse struct {
 }
 
 // Size returns the protobuf wire size of CreatePersonResponse.
-func (c *CreatePersonResponse) Size() int {
-	if c == nil {
+func (x *CreatePersonResponse) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if len(c.Id) > 0 {
-		n += 1 + runtime.SizeString(c.Id)
+	if len(x.Id) > 0 {
+		n += 1 + runtime.SizeString(x.Id)
 	}
 	return n
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (c *CreatePersonResponse) MarshalBinary() ([]byte, error) {
-	return c.MarshalAppend(make([]byte, 0, c.Size()))
+func (x *CreatePersonResponse) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of CreatePersonResponse to b.
-func (c *CreatePersonResponse) MarshalAppend(b []byte) ([]byte, error) {
-	if len(c.Id) > 0 {
+func (x *CreatePersonResponse) MarshalAppend(b []byte) ([]byte, error) {
+	if len(x.Id) > 0 {
 		b = runtime.AppendTag(b, 1, runtime.WireBytes)
-		b = runtime.AppendString(b, c.Id)
+		b = runtime.AppendString(b, x.Id)
 	}
 	return b, nil
 }
 
 // Size returns the protobuf wire size of GetPersonRequest.
-func (g *GetPersonRequest) Size() int {
-	if g == nil {
+func (x *GetPersonRequest) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if len(g.Id) > 0 {
-		n += 1 + runtime.SizeString(g.Id)
+	if len(x.Id) > 0 {
+		n += 1 + runtime.SizeString(x.Id)
 	}
 	return n
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (g *GetPersonRequest) MarshalBinary() ([]byte, error) {
-	return g.MarshalAppend(make([]byte, 0, g.Size()))
+func (x *GetPersonRequest) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of GetPersonRequest to b.
-func (g *GetPersonRequest) MarshalAppend(b []byte) ([]byte, error) {
-	if len(g.Id) > 0 {
+func (x *GetPersonRequest) MarshalAppend(b []byte) ([]byte, error) {
+	if len(x.Id) > 0 {
 		b = runtime.AppendTag(b, 1, runtime.WireBytes)
-		b = runtime.AppendString(b, g.Id)
+		b = runtime.AppendString(b, x.Id)
 	}
 	return b, nil
 }
 
 // Size returns the protobuf wire size of GetPersonResponse.
-func (g *GetPersonResponse) Size() int {
-	if g == nil {
+func (x *GetPersonResponse) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if len(g.Name) > 0 {
-		n += 1 + runtime.SizeString(g.Name)
+	if len(x.Name) > 0 {
+		n += 1 + runtime.SizeString(x.Name)
 	}
-	if g.Age != 0 {
-		n += 1 + runtime.SizeInt32(g.Age)
+	if x.Age != 0 {
+		n += 1 + runtime.SizeInt32(x.Age)
 	}
 	return n
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (g *GetPersonResponse) MarshalBinary() ([]byte, error) {
-	return g.MarshalAppend(make([]byte, 0, g.Size()))
+func (x *GetPersonResponse) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of GetPersonResponse to b.
-func (g *GetPersonResponse) MarshalAppend(b []byte) ([]byte, error) {
-	if len(g.Name) > 0 {
+func (x *GetPersonResponse) MarshalAppend(b []byte) ([]byte, error) {
+	if len(x.Name) > 0 {
 		b = runtime.AppendTag(b, 1, runtime.WireBytes)
-		b = runtime.AppendString(b, g.Name)
+		b = runtime.AppendString(b, x.Name)
 	}
-	if g.Age != 0 {
+	if x.Age != 0 {
 		b = runtime.AppendTag(b, 2, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(g.Age))
+		b = runtime.AppendVarint(b, uint64(x.Age))
 	}
 	return b, nil
 }
 
 // Size returns the protobuf wire size of UpdatePersonResponse.
-func (u *UpdatePersonResponse) Size() int {
-	if u == nil {
+func (x *UpdatePersonResponse) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if u.Ok {
+	if x.Ok {
 		n += 1 + 1
 	}
 	return n
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (u *UpdatePersonResponse) MarshalBinary() ([]byte, error) {
-	return u.MarshalAppend(make([]byte, 0, u.Size()))
+func (x *UpdatePersonResponse) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of UpdatePersonResponse to b.
-func (u *UpdatePersonResponse) MarshalAppend(b []byte) ([]byte, error) {
-	if u.Ok {
+func (x *UpdatePersonResponse) MarshalAppend(b []byte) ([]byte, error) {
+	if x.Ok {
 		b = runtime.AppendTag(b, 1, runtime.WireVarint)
-		b = runtime.AppendBool(b, u.Ok)
+		b = runtime.AppendBool(b, x.Ok)
 	}
 	return b, nil
 }
 
 // Size returns the protobuf wire size of DeletePersonRequest.
-func (d *DeletePersonRequest) Size() int {
-	if d == nil {
+func (x *DeletePersonRequest) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if len(d.Id) > 0 {
-		n += 1 + runtime.SizeString(d.Id)
+	if len(x.Id) > 0 {
+		n += 1 + runtime.SizeString(x.Id)
 	}
 	return n
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (d *DeletePersonRequest) MarshalBinary() ([]byte, error) {
-	return d.MarshalAppend(make([]byte, 0, d.Size()))
+func (x *DeletePersonRequest) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of DeletePersonRequest to b.
-func (d *DeletePersonRequest) MarshalAppend(b []byte) ([]byte, error) {
-	if len(d.Id) > 0 {
+func (x *DeletePersonRequest) MarshalAppend(b []byte) ([]byte, error) {
+	if len(x.Id) > 0 {
 		b = runtime.AppendTag(b, 1, runtime.WireBytes)
-		b = runtime.AppendString(b, d.Id)
+		b = runtime.AppendString(b, x.Id)
 	}
 	return b, nil
 }
 
 // Size returns the protobuf wire size of DeletePersonResponse.
-func (d *DeletePersonResponse) Size() int {
-	if d == nil {
+func (x *DeletePersonResponse) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if d.Ok {
+	if x.Ok {
 		n += 1 + 1
 	}
 	return n
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (d *DeletePersonResponse) MarshalBinary() ([]byte, error) {
-	return d.MarshalAppend(make([]byte, 0, d.Size()))
+func (x *DeletePersonResponse) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of DeletePersonResponse to b.
-func (d *DeletePersonResponse) MarshalAppend(b []byte) ([]byte, error) {
-	if d.Ok {
+func (x *DeletePersonResponse) MarshalAppend(b []byte) ([]byte, error) {
+	if x.Ok {
 		b = runtime.AppendTag(b, 1, runtime.WireVarint)
-		b = runtime.AppendBool(b, d.Ok)
+		b = runtime.AppendBool(b, x.Ok)
 	}
 	return b, nil
 }
@@ -200,7 +200,7 @@ func (d *DeletePersonResponse) MarshalAppend(b []byte) ([]byte, error) {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (c *CreatePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *CreatePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -234,7 +234,7 @@ func (c *CreatePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) 
 				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
-			c.Id = string(payload)
+			x.Id = string(payload)
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)
@@ -252,15 +252,15 @@ func (c *CreatePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) 
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (c *CreatePersonResponse) UnmarshalBinary(data []byte) error {
-	_, err := c.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *CreatePersonResponse) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (c *CreatePersonResponse) UnmarshalBinaryLenient(data []byte) error {
-	_, err := c.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *CreatePersonResponse) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
@@ -268,7 +268,7 @@ func (c *CreatePersonResponse) UnmarshalBinaryLenient(data []byte) error {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (g *GetPersonRequest) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *GetPersonRequest) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -302,7 +302,7 @@ func (g *GetPersonRequest) unmarshalFrom(b []byte, lenient bool, depth int) (int
 				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
-			g.Id = string(payload)
+			x.Id = string(payload)
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)
@@ -320,15 +320,15 @@ func (g *GetPersonRequest) unmarshalFrom(b []byte, lenient bool, depth int) (int
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (g *GetPersonRequest) UnmarshalBinary(data []byte) error {
-	_, err := g.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *GetPersonRequest) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (g *GetPersonRequest) UnmarshalBinaryLenient(data []byte) error {
-	_, err := g.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *GetPersonRequest) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
@@ -336,7 +336,7 @@ func (g *GetPersonRequest) UnmarshalBinaryLenient(data []byte) error {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *GetPersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -370,7 +370,7 @@ func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (in
 				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
-			g.Name = string(payload)
+			x.Name = string(payload)
 			off += n
 		case 2:
 			if seen[0]&2 != 0 {
@@ -389,7 +389,7 @@ func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (in
 				}
 				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
 			}
-			g.Age = int32(v)
+			x.Age = int32(v)
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)
@@ -407,15 +407,15 @@ func (g *GetPersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (in
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (g *GetPersonResponse) UnmarshalBinary(data []byte) error {
-	_, err := g.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *GetPersonResponse) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (g *GetPersonResponse) UnmarshalBinaryLenient(data []byte) error {
-	_, err := g.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *GetPersonResponse) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
@@ -423,7 +423,7 @@ func (g *GetPersonResponse) UnmarshalBinaryLenient(data []byte) error {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (u *UpdatePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *UpdatePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -457,7 +457,7 @@ func (u *UpdatePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) 
 				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
-			u.Ok = v != 0
+			x.Ok = v != 0
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)
@@ -475,15 +475,15 @@ func (u *UpdatePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) 
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (u *UpdatePersonResponse) UnmarshalBinary(data []byte) error {
-	_, err := u.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *UpdatePersonResponse) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (u *UpdatePersonResponse) UnmarshalBinaryLenient(data []byte) error {
-	_, err := u.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *UpdatePersonResponse) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
@@ -491,7 +491,7 @@ func (u *UpdatePersonResponse) UnmarshalBinaryLenient(data []byte) error {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (d *DeletePersonRequest) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *DeletePersonRequest) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -525,7 +525,7 @@ func (d *DeletePersonRequest) unmarshalFrom(b []byte, lenient bool, depth int) (
 				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
-			d.Id = string(payload)
+			x.Id = string(payload)
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)
@@ -543,15 +543,15 @@ func (d *DeletePersonRequest) unmarshalFrom(b []byte, lenient bool, depth int) (
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (d *DeletePersonRequest) UnmarshalBinary(data []byte) error {
-	_, err := d.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *DeletePersonRequest) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (d *DeletePersonRequest) UnmarshalBinaryLenient(data []byte) error {
-	_, err := d.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *DeletePersonRequest) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
@@ -559,7 +559,7 @@ func (d *DeletePersonRequest) UnmarshalBinaryLenient(data []byte) error {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (d *DeletePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *DeletePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -593,7 +593,7 @@ func (d *DeletePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) 
 				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
-			d.Ok = v != 0
+			x.Ok = v != 0
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)
@@ -611,14 +611,14 @@ func (d *DeletePersonResponse) unmarshalFrom(b []byte, lenient bool, depth int) 
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (d *DeletePersonResponse) UnmarshalBinary(data []byte) error {
-	_, err := d.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *DeletePersonResponse) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (d *DeletePersonResponse) UnmarshalBinaryLenient(data []byte) error {
-	_, err := d.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *DeletePersonResponse) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }

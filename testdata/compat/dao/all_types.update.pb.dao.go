@@ -24,97 +24,97 @@ type AllScalarsUpdate struct {
 }
 
 // Size returns the protobuf wire size of AllScalarsUpdate.
-func (a *AllScalarsUpdate) Size() int {
-	if a == nil {
+func (x *AllScalarsUpdate) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if a.FSint32 != 0 {
-		n += 1 + runtime.SizeSint32(a.FSint32)
+	if x.FSint32 != 0 {
+		n += 1 + runtime.SizeSint32(x.FSint32)
 	}
-	if a.FSint64 != nil {
-		n += 1 + runtime.SizeSint64(*a.FSint64)
+	if x.FSint64 != nil {
+		n += 1 + runtime.SizeSint64(*x.FSint64)
 	}
-	if a.FSfixed32 != nil {
+	if x.FSfixed32 != nil {
 		n += 1 + 4
 	}
-	if a.FSfixed64 != nil {
+	if x.FSfixed64 != nil {
 		n += 1 + 8
 	}
-	if a.FDouble != nil {
+	if x.FDouble != nil {
 		n += 1 + 8
 	}
-	if a.FFixed32 != nil {
+	if x.FFixed32 != nil {
 		n += 1 + 4
 	}
-	if a.FFixed64 != nil {
+	if x.FFixed64 != nil {
 		n += 1 + 8
 	}
-	if a.FUint32 != nil {
-		n += 1 + runtime.SizeUint32(*a.FUint32)
+	if x.FUint32 != nil {
+		n += 1 + runtime.SizeUint32(*x.FUint32)
 	}
-	if a.FUint64 != nil {
-		n += 1 + runtime.SizeUint64(*a.FUint64)
+	if x.FUint64 != nil {
+		n += 1 + runtime.SizeUint64(*x.FUint64)
 	}
-	if a.FFloat != nil {
+	if x.FFloat != nil {
 		n += 1 + 4
 	}
-	if a.FBytes != nil {
-		n += 1 + runtime.SizeBytes(a.FBytes)
+	if x.FBytes != nil {
+		n += 1 + runtime.SizeBytes(x.FBytes)
 	}
 	return n
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (a *AllScalarsUpdate) MarshalBinary() ([]byte, error) {
-	return a.MarshalAppend(make([]byte, 0, a.Size()))
+func (x *AllScalarsUpdate) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of AllScalarsUpdate to b.
-func (a *AllScalarsUpdate) MarshalAppend(b []byte) ([]byte, error) {
-	if a.FSint32 != 0 {
+func (x *AllScalarsUpdate) MarshalAppend(b []byte) ([]byte, error) {
+	if x.FSint32 != 0 {
 		b = runtime.AppendTag(b, 1, runtime.WireVarint)
-		b = runtime.AppendSint32(b, a.FSint32)
+		b = runtime.AppendSint32(b, x.FSint32)
 	}
-	if a.FSint64 != nil {
+	if x.FSint64 != nil {
 		b = runtime.AppendTag(b, 2, runtime.WireVarint)
-		b = runtime.AppendSint64(b, *a.FSint64)
+		b = runtime.AppendSint64(b, *x.FSint64)
 	}
-	if a.FSfixed32 != nil {
+	if x.FSfixed32 != nil {
 		b = runtime.AppendTag(b, 3, runtime.WireFixed32)
-		b = runtime.AppendFixed32(b, uint32(*a.FSfixed32))
+		b = runtime.AppendFixed32(b, uint32(*x.FSfixed32))
 	}
-	if a.FSfixed64 != nil {
+	if x.FSfixed64 != nil {
 		b = runtime.AppendTag(b, 4, runtime.WireFixed64)
-		b = runtime.AppendFixed64(b, uint64(*a.FSfixed64))
+		b = runtime.AppendFixed64(b, uint64(*x.FSfixed64))
 	}
-	if a.FDouble != nil {
+	if x.FDouble != nil {
 		b = runtime.AppendTag(b, 5, runtime.WireFixed64)
-		b = runtime.AppendDouble(b, *a.FDouble)
+		b = runtime.AppendDouble(b, *x.FDouble)
 	}
-	if a.FFixed32 != nil {
+	if x.FFixed32 != nil {
 		b = runtime.AppendTag(b, 6, runtime.WireFixed32)
-		b = runtime.AppendFixed32(b, *a.FFixed32)
+		b = runtime.AppendFixed32(b, *x.FFixed32)
 	}
-	if a.FFixed64 != nil {
+	if x.FFixed64 != nil {
 		b = runtime.AppendTag(b, 7, runtime.WireFixed64)
-		b = runtime.AppendFixed64(b, *a.FFixed64)
+		b = runtime.AppendFixed64(b, *x.FFixed64)
 	}
-	if a.FUint32 != nil {
+	if x.FUint32 != nil {
 		b = runtime.AppendTag(b, 8, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(*a.FUint32))
+		b = runtime.AppendVarint(b, uint64(*x.FUint32))
 	}
-	if a.FUint64 != nil {
+	if x.FUint64 != nil {
 		b = runtime.AppendTag(b, 9, runtime.WireVarint)
-		b = runtime.AppendVarint(b, *a.FUint64)
+		b = runtime.AppendVarint(b, *x.FUint64)
 	}
-	if a.FFloat != nil {
+	if x.FFloat != nil {
 		b = runtime.AppendTag(b, 10, runtime.WireFixed32)
-		b = runtime.AppendFloat(b, *a.FFloat)
+		b = runtime.AppendFloat(b, *x.FFloat)
 	}
-	if a.FBytes != nil {
+	if x.FBytes != nil {
 		b = runtime.AppendTag(b, 11, runtime.WireBytes)
-		b = runtime.AppendBytes(b, a.FBytes)
+		b = runtime.AppendBytes(b, x.FBytes)
 	}
 	return b, nil
 }
@@ -123,7 +123,7 @@ func (a *AllScalarsUpdate) MarshalAppend(b []byte) ([]byte, error) {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -157,7 +157,7 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 				}
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
-			a.FSint32 = runtime.DecodeZigZag32(v)
+			x.FSint32 = runtime.DecodeZigZag32(v)
 			off += n
 		case 2:
 			if seen[0]&2 != 0 {
@@ -177,7 +177,7 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
 			}
 			tmp := runtime.DecodeZigZag64(v)
-			a.FSint64 = &tmp
+			x.FSint64 = &tmp
 			off += n
 		case 3:
 			if seen[0]&4 != 0 {
@@ -194,7 +194,7 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 				return 0, fmt.Errorf("field 3: %w", runtime.ErrTruncated)
 			}
 			tmp := int32(v)
-			a.FSfixed32 = &tmp
+			x.FSfixed32 = &tmp
 			off += n
 		case 4:
 			if seen[0]&8 != 0 {
@@ -211,7 +211,7 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 				return 0, fmt.Errorf("field 4: %w", runtime.ErrTruncated)
 			}
 			tmp := int64(v)
-			a.FSfixed64 = &tmp
+			x.FSfixed64 = &tmp
 			off += n
 		case 5:
 			if seen[0]&16 != 0 {
@@ -228,7 +228,7 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 				return 0, fmt.Errorf("field 5: %w", runtime.ErrTruncated)
 			}
 			tmp := math.Float64frombits(v)
-			a.FDouble = &tmp
+			x.FDouble = &tmp
 			off += n
 		case 6:
 			if seen[0]&32 != 0 {
@@ -245,7 +245,7 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 				return 0, fmt.Errorf("field 6: %w", runtime.ErrTruncated)
 			}
 			tmp := v
-			a.FFixed32 = &tmp
+			x.FFixed32 = &tmp
 			off += n
 		case 7:
 			if seen[0]&64 != 0 {
@@ -262,7 +262,7 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 				return 0, fmt.Errorf("field 7: %w", runtime.ErrTruncated)
 			}
 			tmp := v
-			a.FFixed64 = &tmp
+			x.FFixed64 = &tmp
 			off += n
 		case 8:
 			if seen[0]&128 != 0 {
@@ -282,7 +282,7 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 				return 0, fmt.Errorf("field 8: %w", runtime.ErrTruncated)
 			}
 			tmp := uint32(v)
-			a.FUint32 = &tmp
+			x.FUint32 = &tmp
 			off += n
 		case 9:
 			if seen[0]&256 != 0 {
@@ -302,7 +302,7 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 				return 0, fmt.Errorf("field 9: %w", runtime.ErrTruncated)
 			}
 			tmp := v
-			a.FUint64 = &tmp
+			x.FUint64 = &tmp
 			off += n
 		case 10:
 			if seen[0]&512 != 0 {
@@ -319,7 +319,7 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 				return 0, fmt.Errorf("field 10: %w", runtime.ErrTruncated)
 			}
 			tmp := math.Float32frombits(v)
-			a.FFloat = &tmp
+			x.FFloat = &tmp
 			off += n
 		case 11:
 			if seen[0]&1024 != 0 {
@@ -340,7 +340,7 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 			}
 			tmp := make([]byte, len(payload))
 			copy(tmp, payload)
-			a.FBytes = tmp
+			x.FBytes = tmp
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)
@@ -358,48 +358,48 @@ func (a *AllScalarsUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (a *AllScalarsUpdate) UnmarshalBinary(data []byte) error {
-	_, err := a.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *AllScalarsUpdate) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (a *AllScalarsUpdate) UnmarshalBinaryLenient(data []byte) error {
-	_, err := a.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *AllScalarsUpdate) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // ToMap converts AllScalarsUpdate to map[string]any for partial update APIs (e.g. GORM Updates).
 // Only non-nil fields are included.
-func (a *AllScalarsUpdate) ToMap() map[string]any {
+func (x *AllScalarsUpdate) ToMap() map[string]any {
 	um := make(map[string]any)
-	if a.FSint64 != nil {
-		um["f_sint64"] = *a.FSint64
+	if x.FSint64 != nil {
+		um["f_sint64"] = *x.FSint64
 	}
-	if a.FSfixed32 != nil {
-		um["f_sfixed32"] = *a.FSfixed32
+	if x.FSfixed32 != nil {
+		um["f_sfixed32"] = *x.FSfixed32
 	}
-	if a.FSfixed64 != nil {
-		um["f_sfixed64"] = *a.FSfixed64
+	if x.FSfixed64 != nil {
+		um["f_sfixed64"] = *x.FSfixed64
 	}
-	if a.FDouble != nil {
-		um["f_double"] = *a.FDouble
+	if x.FDouble != nil {
+		um["f_double"] = *x.FDouble
 	}
-	if a.FFixed32 != nil {
-		um["f_fixed32"] = *a.FFixed32
+	if x.FFixed32 != nil {
+		um["f_fixed32"] = *x.FFixed32
 	}
-	if a.FFixed64 != nil {
-		um["f_fixed64"] = *a.FFixed64
+	if x.FFixed64 != nil {
+		um["f_fixed64"] = *x.FFixed64
 	}
-	if a.FUint32 != nil {
-		um["f_uint32"] = *a.FUint32
+	if x.FUint32 != nil {
+		um["f_uint32"] = *x.FUint32
 	}
-	if a.FUint64 != nil {
-		um["f_uint64"] = *a.FUint64
+	if x.FUint64 != nil {
+		um["f_uint64"] = *x.FUint64
 	}
-	if a.FFloat != nil {
-		um["f_float"] = *a.FFloat
+	if x.FFloat != nil {
+		um["f_float"] = *x.FFloat
 	}
 	return um
 }

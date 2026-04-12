@@ -29,118 +29,118 @@ type PersonCreate struct {
 func (PersonCreate) TableName() string { return "persons" }
 
 // Size returns the protobuf wire size of PersonCreate.
-func (p *PersonCreate) Size() int {
-	if p == nil {
+func (x *PersonCreate) Size() int {
+	if x == nil {
 		return 0
 	}
 	var n int
-	if p.Name != nil {
-		n += 1 + runtime.SizeString(*p.Name)
+	if x.Name != nil {
+		n += 1 + runtime.SizeString(*x.Name)
 	}
-	if p.Age != nil {
-		n += 1 + runtime.SizeInt32(*p.Age)
+	if x.Age != nil {
+		n += 1 + runtime.SizeInt32(*x.Age)
 	}
-	if p.Active != nil {
+	if x.Active != nil {
 		n += 1 + 1
 	}
-	if p.Status != nil {
-		n += 1 + runtime.SizeEnum(int32(*p.Status))
+	if x.Status != nil {
+		n += 1 + runtime.SizeEnum(int32(*x.Status))
 	}
-	if p.Rating != nil {
+	if x.Rating != nil {
 		n += 1 + 4
 	}
-	if len(p.Nickname) > 0 {
-		n += 1 + runtime.SizeString(p.Nickname)
+	if len(x.Nickname) > 0 {
+		n += 1 + runtime.SizeString(x.Nickname)
 	}
-	if p.Level != nil {
-		n += 1 + runtime.SizeInt32(*p.Level)
+	if x.Level != nil {
+		n += 1 + runtime.SizeInt32(*x.Level)
 	}
-	if p.Verified != nil {
+	if x.Verified != nil {
 		n += 1 + 1
 	}
-	if p.Score != nil {
+	if x.Score != nil {
 		n += 1 + 4
 	}
-	if p.UpdatedAt != nil {
-		n += 1 + runtime.SizeInt64(*p.UpdatedAt)
+	if x.UpdatedAt != nil {
+		n += 1 + runtime.SizeInt64(*x.UpdatedAt)
 	}
-	if p.PrevStatus != nil {
-		n += 1 + runtime.SizeEnum(int32(*p.PrevStatus))
+	if x.PrevStatus != nil {
+		n += 1 + runtime.SizeEnum(int32(*x.PrevStatus))
 	}
-	if p.Email != nil {
-		n += 1 + runtime.SizeString(*p.Email)
+	if x.Email != nil {
+		n += 1 + runtime.SizeString(*x.Email)
 	}
-	if p.Role != nil {
-		n += 1 + runtime.SizeString(*p.Role)
+	if x.Role != nil {
+		n += 1 + runtime.SizeString(*x.Role)
 	}
-	if p.TypeId != nil {
-		n += 1 + runtime.SizeInt32(*p.TypeId)
+	if x.TypeId != nil {
+		n += 1 + runtime.SizeInt32(*x.TypeId)
 	}
 	return n
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler.
-func (p *PersonCreate) MarshalBinary() ([]byte, error) {
-	return p.MarshalAppend(make([]byte, 0, p.Size()))
+func (x *PersonCreate) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
 }
 
 // MarshalAppend appends the protobuf wire encoding of PersonCreate to b.
-func (p *PersonCreate) MarshalAppend(b []byte) ([]byte, error) {
-	if p.Name != nil {
+func (x *PersonCreate) MarshalAppend(b []byte) ([]byte, error) {
+	if x.Name != nil {
 		b = runtime.AppendTag(b, 1, runtime.WireBytes)
-		b = runtime.AppendString(b, *p.Name)
+		b = runtime.AppendString(b, *x.Name)
 	}
-	if p.Age != nil {
+	if x.Age != nil {
 		b = runtime.AppendTag(b, 2, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(*p.Age))
+		b = runtime.AppendVarint(b, uint64(*x.Age))
 	}
-	if p.Active != nil {
+	if x.Active != nil {
 		b = runtime.AppendTag(b, 3, runtime.WireVarint)
-		b = runtime.AppendBool(b, *p.Active)
+		b = runtime.AppendBool(b, *x.Active)
 	}
-	if p.Status != nil {
+	if x.Status != nil {
 		b = runtime.AppendTag(b, 4, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(*p.Status))
+		b = runtime.AppendVarint(b, uint64(*x.Status))
 	}
-	if p.Rating != nil {
+	if x.Rating != nil {
 		b = runtime.AppendTag(b, 5, runtime.WireFixed32)
-		b = runtime.AppendFloat(b, *p.Rating)
+		b = runtime.AppendFloat(b, *x.Rating)
 	}
-	if len(p.Nickname) > 0 {
+	if len(x.Nickname) > 0 {
 		b = runtime.AppendTag(b, 6, runtime.WireBytes)
-		b = runtime.AppendString(b, p.Nickname)
+		b = runtime.AppendString(b, x.Nickname)
 	}
-	if p.Level != nil {
+	if x.Level != nil {
 		b = runtime.AppendTag(b, 7, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(*p.Level))
+		b = runtime.AppendVarint(b, uint64(*x.Level))
 	}
-	if p.Verified != nil {
+	if x.Verified != nil {
 		b = runtime.AppendTag(b, 8, runtime.WireVarint)
-		b = runtime.AppendBool(b, *p.Verified)
+		b = runtime.AppendBool(b, *x.Verified)
 	}
-	if p.Score != nil {
+	if x.Score != nil {
 		b = runtime.AppendTag(b, 9, runtime.WireFixed32)
-		b = runtime.AppendFloat(b, *p.Score)
+		b = runtime.AppendFloat(b, *x.Score)
 	}
-	if p.UpdatedAt != nil {
+	if x.UpdatedAt != nil {
 		b = runtime.AppendTag(b, 10, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(*p.UpdatedAt))
+		b = runtime.AppendVarint(b, uint64(*x.UpdatedAt))
 	}
-	if p.PrevStatus != nil {
+	if x.PrevStatus != nil {
 		b = runtime.AppendTag(b, 11, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(*p.PrevStatus))
+		b = runtime.AppendVarint(b, uint64(*x.PrevStatus))
 	}
-	if p.Email != nil {
+	if x.Email != nil {
 		b = runtime.AppendTag(b, 12, runtime.WireBytes)
-		b = runtime.AppendString(b, *p.Email)
+		b = runtime.AppendString(b, *x.Email)
 	}
-	if p.Role != nil {
+	if x.Role != nil {
 		b = runtime.AppendTag(b, 13, runtime.WireBytes)
-		b = runtime.AppendString(b, *p.Role)
+		b = runtime.AppendString(b, *x.Role)
 	}
-	if p.TypeId != nil {
+	if x.TypeId != nil {
 		b = runtime.AppendTag(b, 14, runtime.WireVarint)
-		b = runtime.AppendVarint(b, uint64(*p.TypeId))
+		b = runtime.AppendVarint(b, uint64(*x.TypeId))
 	}
 	return b, nil
 }
@@ -149,7 +149,7 @@ func (p *PersonCreate) MarshalAppend(b []byte) ([]byte, error) {
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
 // depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
-func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+func (x *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 	if depth <= 0 {
 		return 0, runtime.ErrNestingDepth
 	}
@@ -184,7 +184,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
 			}
 			tmp := string(payload)
-			p.Name = &tmp
+			x.Name = &tmp
 			off += n
 		case 2:
 			if seen[0]&2 != 0 {
@@ -204,7 +204,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
 			}
 			tmp := int32(v)
-			p.Age = &tmp
+			x.Age = &tmp
 			off += n
 		case 3:
 			if seen[0]&4 != 0 {
@@ -224,7 +224,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 3: %w", runtime.ErrTruncated)
 			}
 			tmp := v != 0
-			p.Active = &tmp
+			x.Active = &tmp
 			off += n
 		case 4:
 			if seen[0]&8 != 0 {
@@ -244,7 +244,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 4: %w", runtime.ErrTruncated)
 			}
 			tmp := Status(v)
-			p.Status = &tmp
+			x.Status = &tmp
 			off += n
 		case 5:
 			if seen[0]&16 != 0 {
@@ -261,7 +261,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 5: %w", runtime.ErrTruncated)
 			}
 			tmp := math.Float32frombits(v)
-			p.Rating = &tmp
+			x.Rating = &tmp
 			off += n
 		case 6:
 			if seen[0]&32 != 0 {
@@ -280,7 +280,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				}
 				return 0, fmt.Errorf("field 6: %w", runtime.ErrTruncated)
 			}
-			p.Nickname = string(payload)
+			x.Nickname = string(payload)
 			off += n
 		case 7:
 			if seen[0]&64 != 0 {
@@ -300,7 +300,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 7: %w", runtime.ErrTruncated)
 			}
 			tmp := int32(v)
-			p.Level = &tmp
+			x.Level = &tmp
 			off += n
 		case 8:
 			if seen[0]&128 != 0 {
@@ -320,7 +320,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 8: %w", runtime.ErrTruncated)
 			}
 			tmp := v != 0
-			p.Verified = &tmp
+			x.Verified = &tmp
 			off += n
 		case 9:
 			if seen[0]&256 != 0 {
@@ -337,7 +337,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 9: %w", runtime.ErrTruncated)
 			}
 			tmp := math.Float32frombits(v)
-			p.Score = &tmp
+			x.Score = &tmp
 			off += n
 		case 10:
 			if seen[0]&512 != 0 {
@@ -357,7 +357,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 10: %w", runtime.ErrTruncated)
 			}
 			tmp := int64(v)
-			p.UpdatedAt = &tmp
+			x.UpdatedAt = &tmp
 			off += n
 		case 11:
 			if seen[0]&1024 != 0 {
@@ -377,7 +377,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 11: %w", runtime.ErrTruncated)
 			}
 			tmp := Status(v)
-			p.PrevStatus = &tmp
+			x.PrevStatus = &tmp
 			off += n
 		case 12:
 			if seen[0]&2048 != 0 {
@@ -397,7 +397,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 12: %w", runtime.ErrTruncated)
 			}
 			tmp := string(payload)
-			p.Email = &tmp
+			x.Email = &tmp
 			off += n
 		case 13:
 			if seen[0]&4096 != 0 {
@@ -417,7 +417,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 13: %w", runtime.ErrTruncated)
 			}
 			tmp := string(payload)
-			p.Role = &tmp
+			x.Role = &tmp
 			off += n
 		case 14:
 			if seen[0]&8192 != 0 {
@@ -437,7 +437,7 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 				return 0, fmt.Errorf("field 14: %w", runtime.ErrTruncated)
 			}
 			tmp := int32(v)
-			p.TypeId = &tmp
+			x.TypeId = &tmp
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)
@@ -455,14 +455,14 @@ func (p *PersonCreate) unmarshalFrom(b []byte, lenient bool, depth int) (int, er
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler.
 // Duplicate non-repeated fields return an error.
-func (p *PersonCreate) UnmarshalBinary(data []byte) error {
-	_, err := p.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+func (x *PersonCreate) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
 	return err
 }
 
 // UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
 // duplicate non-repeated fields, keeping the last value.
-func (p *PersonCreate) UnmarshalBinaryLenient(data []byte) error {
-	_, err := p.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+func (x *PersonCreate) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
