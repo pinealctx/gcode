@@ -53,14 +53,10 @@ func writeMarshalAppend(b *strings.Builder, msg transform.GoMessage) {
 	b.WriteString("return b, nil\n}\n\n")
 }
 
-// receiverName returns a short receiver name from the type name (first lowercase letter).
-func receiverName(typeName string) string {
-	if len(typeName) == 0 {
-		return "x"
-	}
-	// Use first lowercase letter of the type name.
-	r := strings.ToLower(typeName[:1])
-	return r
+// receiverName returns "x" as the universal receiver name for generated methods,
+// matching the protobuf-go convention and avoiding conflicts with parameter names.
+func receiverName(_ string) string {
+	return "x"
 }
 
 // writeSizeField generates the size calculation for a single field with zero-value skip.

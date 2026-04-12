@@ -155,8 +155,8 @@ func TestUnmarshalPackedFixed32Assign(t *testing.T) {
 		goType string
 		want   string
 	}{
-		{"fixed32", model.ScalarFixed32, "[]uint32", "append(m.Vals, v)"},
-		{"sfixed32", model.ScalarSfixed32, "[]int32", "append(m.Vals, int32(v))"},
+		{"fixed32", model.ScalarFixed32, "[]uint32", "append(x.Vals, v)"},
+		{"sfixed32", model.ScalarSfixed32, "[]int32", "append(x.Vals, int32(v))"},
 		{"float", model.ScalarFloat, "[]float32", "Float32frombits(v)"},
 	}
 
@@ -184,8 +184,8 @@ func TestUnmarshalPackedFixed64Assign(t *testing.T) {
 		goType string
 		want   string
 	}{
-		{"fixed64", model.ScalarFixed64, "[]uint64", "append(m.Vals, v)"},
-		{"sfixed64", model.ScalarSfixed64, "[]int64", "append(m.Vals, int64(v))"},
+		{"fixed64", model.ScalarFixed64, "[]uint64", "append(x.Vals, v)"},
+		{"sfixed64", model.ScalarSfixed64, "[]int64", "append(x.Vals, int64(v))"},
 		{"double", model.ScalarDouble, "[]float64", "Float64frombits(v)"},
 	}
 
@@ -215,6 +215,6 @@ func TestUnmarshalRepeatedMessage(t *testing.T) {
 		"wire type check": "WireBytes",
 		"new element":     "new(Item)",
 		"unmarshal call":  "UnmarshalBinary",
-		"append":          "append(m.Items",
+		"append":          "append(x.Items",
 	})
 }
