@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package compat;
+
+import "buf/validate/validate.proto";
+import "gcode/options.proto";
+import "person.meta.proto";
+
+option go_package = "github.com/pinealctx/gcode/testdata/compat/dao;dao";
+option (gcode.schema) = {};
+
+// AllScalars covers every scalar wire type not present in person.proto.
+message AllScalars {
+  option (gcode.message) = {
+    gorm: { table: "all_scalars" }
+  };
+
+  sint32   f_sint32   = 1;
+  sint64   f_sint64   = 2;
+  sfixed32 f_sfixed32 = 3;
+  sfixed64 f_sfixed64 = 4;
+  double   f_double   = 5;
+  fixed32  f_fixed32  = 6;
+  fixed64  f_fixed64  = 7;
+  uint32   f_uint32   = 8;
+  uint64   f_uint64   = 9;
+  // float scalar: covers AppendFloat/IsZeroFloat/SizeFloat paths distinct from double.
+  float    f_float    = 10;
+  // bytes scalar: covers bytes two-phase generation path (bytes in update/create proto).
+  bytes    f_bytes    = 11 [(gcode.field).gorm.column = "f_bytes_col"];
+
+  option (gcode.update_message) = {
+    name: "AllScalarsUpdate"
+    condition_fields: ["f_sint32"]
+  };
+
+  option (gcode.create_message) = {
+    name: "AllScalarsCreate"
+    ignore_fields: ["f_double"]
+  };
+}
+
+// AllRepeated covers repeated field wire types not present in person.proto.
+message AllRepeated {
+  repeated sint32  r_sint32   = 1;
+  repeated sfixed32 r_sfixed32 = 2;
+  repeated double  r_double   = 3;
+  repeated bytes   r_bytes    = 4;
+  repeated Address r_message  = 5;
+  repeated Status  r_enum     = 6;
+}
+
+// TreeNode is a self-referencing message used to test recursion depth limits.
+message TreeNode {
+  string value = 1;
+  TreeNode child = 2;
+}

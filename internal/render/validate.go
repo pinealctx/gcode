@@ -53,6 +53,18 @@ func ValidateFile(gf transform.GoFile, modulePath string, ctx Context) ([]byte, 
 	return src, nil
 }
 
+// mergeEnums combines local file enums with global enum index.
+// Local file enums take precedence over global entries.
+func mergeEnums(local, global map[string]transform.GoEnum) map[string]transform.GoEnum {
+	if global == nil {
+		return local
+	}
+	merged := make(map[string]transform.GoEnum, len(local)+len(global))
+	maps.Copy(merged, global)
+	maps.Copy(merged, local) // local takes precedence
+	return merged
+}
+
 // writeValidateMethod writes the Validate() error method for a single GoMessage.
 // For update/create messages, validate rules are inherited from the source message
 // via ctx.MessageIndex: optional fields skip validation when nil.
@@ -68,14 +80,7 @@ func writeValidateMethod(b *strings.Builder, msg transform.GoMessage, enumByGoNa
 	if sourceName != "" && ctx.MessageIndex != nil {
 		// Inherited validate: look up source message and use its field validate rules.
 		if srcMsg, ok := ctx.MessageIndex[sourceName]; ok {
-			// Merge local and global enum tables so enum defined_only checks work
-			// even when the enum is defined in a different file from the derived message.
-			mergedEnums := enumByGoName
-			if ctx.EnumIndex != nil {
-				mergedEnums = make(map[string]transform.GoEnum, len(enumByGoName)+len(ctx.EnumIndex))
-				maps.Copy(mergedEnums, ctx.EnumIndex)
-				maps.Copy(mergedEnums, enumByGoName) // local file takes precedence
-			}
+			mergedEnums := mergeEnums(enumByGoName, ctx.EnumIndex)
 			writeInheritedValidation(b, recv, msg, srcMsg, mergedEnums)
 			b.WriteString("return nil\n}\n\n")
 			return
@@ -83,15 +88,7 @@ func writeValidateMethod(b *strings.Builder, msg transform.GoMessage, enumByGoNa
 	}
 
 	// Standard validate: use the message's own field validate rules.
-	// Merge ctx.EnumIndex so that defined_only checks work even when the enum
-	// is defined in a different file (e.g. Status in person.proto referenced
-	// from AllValidate in all_types.proto).
-	effectiveEnums := enumByGoName
-	if ctx.EnumIndex != nil {
-		effectiveEnums = make(map[string]transform.GoEnum, len(enumByGoName)+len(ctx.EnumIndex))
-		maps.Copy(effectiveEnums, ctx.EnumIndex)
-		maps.Copy(effectiveEnums, enumByGoName) // local file takes precedence
-	}
+	effectiveEnums := mergeEnums(enumByGoName, ctx.EnumIndex)
 	for _, f := range msg.Fields {
 		if f.ValidateOptions == nil && f.Type.Kind != model.FieldKindMessage {
 			continue
@@ -124,9 +121,21 @@ func writeInheritedValidation(b *strings.Builder, recv string, msg transform.GoM
 			// Field not in source (e.g. condition_fields added by gen-proto): no inherited rules.
 			continue
 		}
-		if sf.ValidateOptions == nil && sf.Type.Kind != model.FieldKindMessage {
+
+		// Use derived field's validate options (gen-proto copies from source to
+		// create/update proto). Fall back to source field's options for backward
+		// compatibility with proto files that embed validate annotations directly.
+		vo := f.ValidateOptions
+		if vo == nil {
+			vo = sf.ValidateOptions
+		}
+		if vo == nil && sf.Type.Kind != model.FieldKindMessage {
 			continue
 		}
+
+		// Build effective field: source type info + derived validate options.
+		ef := sf
+		ef.ValidateOptions = vo
 
 		fieldExpr := recv + "." + f.GoName
 		isRequired := requiredSet.Contains(f.Name)
@@ -134,23 +143,23 @@ func writeInheritedValidation(b *strings.Builder, recv string, msg transform.GoM
 		switch {
 		case isRequired && sf.Type.Kind == model.FieldKindMessage:
 			// Required message-type field: nil check → error, then recursive Validate().
-			writeMessageFieldValidation(b, fieldExpr, sf.Name, sf.ValidateMessage, sf.ValidateOptions)
+			writeMessageFieldValidation(b, fieldExpr, sf.Name, sf.ValidateMessage, vo)
 
 		case isRequired:
 			// Required scalar/enum field: validate with noZeroGuard so empty string
 			// is validated against min_len and other constraints.
-			writeFieldValidationExpr(b, fieldExpr, sf, enumByGoName, true)
+			writeFieldValidationExpr(b, fieldExpr, ef, enumByGoName, true)
 
 		case strings.HasPrefix(f.GoType, "*"):
 			// Optional field (pointer): dereference and validate only if non-nil.
 			fmt.Fprintf(b, "if %s != nil {\n", fieldExpr)
 			derefExpr := "*" + fieldExpr
-			writeFieldValidationExpr(b, derefExpr, sf, enumByGoName, false)
+			writeFieldValidationExpr(b, derefExpr, ef, enumByGoName, false)
 			b.WriteString("}\n")
 
 		default:
 			// Non-optional, non-required field: validate directly.
-			writeFieldValidationExpr(b, fieldExpr, sf, enumByGoName, false)
+			writeFieldValidationExpr(b, fieldExpr, ef, enumByGoName, false)
 		}
 	}
 }

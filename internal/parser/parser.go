@@ -105,6 +105,8 @@ func mapFile(file protoreflect.FileDescriptor, exts *gcodeExtensions, validateEx
 		return model.File{}, err
 	}
 
+	isSchema := readSchemaFileOption(file.Options(), exts.schemaExt)
+
 	return model.File{
 		Path:           file.Path(),
 		Syntax:         syntax,
@@ -114,6 +116,7 @@ func mapFile(file protoreflect.FileDescriptor, exts *gcodeExtensions, validateEx
 		Messages:       messages,
 		Enums:          enums,
 		Services:       services,
+		IsSchema:       isSchema,
 		LeadingComment: commentFromLocation(file.SourceLocations().ByDescriptor(file)),
 		Location:       locationFromSource(file.Path(), file.SourceLocations().ByDescriptor(file)),
 	}, nil

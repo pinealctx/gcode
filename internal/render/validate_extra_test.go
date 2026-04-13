@@ -311,3 +311,42 @@ func TestUnsignedGoType(t *testing.T) {
 		t.Errorf("unsignedGoType(fixed32) = %q, want uint32", got)
 	}
 }
+
+// TestMergeEnums verifies mergeEnums precedence and nil-global fast path.
+func TestMergeEnums(t *testing.T) {
+	t.Parallel()
+
+	local := map[string]transform.GoEnum{
+		"Status": {GoName: "Status", Values: []transform.GoEnumValue{{GoName: "ACTIVE", Number: 1}}},
+	}
+	global := map[string]transform.GoEnum{
+		"Status": {GoName: "Status", Values: []transform.GoEnumValue{{GoName: "ACTIVE_G", Number: 10}}},
+		"Role":   {GoName: "Role", Values: []transform.GoEnumValue{{GoName: "ADMIN", Number: 1}}},
+	}
+
+	// nil global returns local directly (no allocation).
+	got := mergeEnums(local, nil)
+	if len(got) != 1 || got["Status"].Values[0].Number != 1 {
+		t.Error("mergeEnums(local, nil) should return local directly")
+	}
+
+	// Non-nil global: local overrides global for overlapping keys.
+	got = mergeEnums(local, global)
+	if len(got) != 2 {
+		t.Fatalf("mergeEnums: got %d entries, want 2", len(got))
+	}
+	// Status should come from local (precedence).
+	if got["Status"].Values[0].Number != 1 {
+		t.Errorf("mergeEnums Status.Number = %d, want 1 (local)", got["Status"].Values[0].Number)
+	}
+	// Role should come from global.
+	if got["Role"].Values[0].GoName != "ADMIN" {
+		t.Errorf("mergeEnums Role.GoName = %q, want ADMIN (global)", got["Role"].Values[0].GoName)
+	}
+
+	// Empty local with non-nil global returns all global entries.
+	got = mergeEnums(map[string]transform.GoEnum{}, global)
+	if len(got) != 2 {
+		t.Errorf("mergeEnums(empty local, global): got %d entries, want 2", len(got))
+	}
+}

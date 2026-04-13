@@ -6,6 +6,7 @@ import "buf/validate/validate.proto";
 import "gcode/options.proto";
 
 option go_package = "github.com/pinealctx/gcode/testdata/compat/dao;dao";
+option (gcode.schema) = {};
 
 // Status represents the lifecycle state of a person record.
 // See also: https://example.com/docs/status */ for details.

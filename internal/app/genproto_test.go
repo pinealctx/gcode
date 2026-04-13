@@ -25,18 +25,41 @@ func writeFile(t *testing.T, path, content string) {
 	}
 }
 
-// compileProtoDir verifies that all .proto files in dir can be compiled by protocompile.
+// compileProtoDir verifies that all generated .proto files in dir can be compiled
+// by protocompile. Source proto files (those that have a corresponding .entity.proto)
+// are excluded since entity protos duplicate their type definitions.
 func compileProtoDir(t *testing.T, dir string) {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatalf("read dir %q: %v", dir, err)
 	}
+
+	// Find all base names that have entity protos generated.
+	entityBases := make(map[string]bool)
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasSuffix(name, ".entity.proto") {
+			base := strings.TrimSuffix(name, ".entity.proto") + ".proto"
+			entityBases[base] = true
+		}
+	}
+
 	var files []string
 	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), ".proto") {
-			files = append(files, e.Name())
+		name := e.Name()
+		if !strings.HasSuffix(name, ".proto") {
+			continue
 		}
+		// Skip source proto files that have entity proto duplicates.
+		if entityBases[name] {
+			continue
+		}
+		// Skip source meta proto files.
+		if strings.HasSuffix(name, ".meta.proto") {
+			continue
+		}
+		files = append(files, name)
 	}
 	if len(files) == 0 {
 		return
@@ -55,6 +78,8 @@ func TestRunGenProto_UpdateMessage(t *testing.T) {
 	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
+
+option (gcode.schema) = {};
 
 message User {
   int64           id         = 1;
@@ -106,6 +131,11 @@ message User {
 		t.Errorf("user.create.proto should not be generated")
 	}
 
+	// Entity proto should be generated.
+	if _, err := os.Stat(filepath.Join(inDir, "user.entity.proto")); err != nil {
+		t.Errorf("user.entity.proto should be generated: %v", err)
+	}
+
 	compileProtoDir(t, inDir)
 }
 
@@ -117,6 +147,8 @@ func TestRunGenProto_CreateMessage(t *testing.T) {
 	writeFile(t, filepath.Join(inDir, "product.proto"), `syntax = "proto3";
 package test.product;
 import "gcode/options.proto";
+
+option (gcode.schema) = {};
 
 message Product {
   int64           id         = 1;
@@ -161,7 +193,7 @@ message Product {
 		t.Errorf("title should be optional in:\n%s", s)
 	}
 	// id and created_at are ignored
-	if strings.Contains(s, "id") || strings.Contains(s, "created_at") {
+	if strings.Contains(s, "int64 id") || strings.Contains(s, "int64 created_at") {
 		t.Errorf("id/created_at should be ignored in:\n%s", s)
 	}
 
@@ -176,6 +208,8 @@ func TestRunGenProto_MultipleOptions(t *testing.T) {
 	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
+
+option (gcode.schema) = {};
 
 message User {
   int64           id    = 1;
@@ -242,12 +276,15 @@ message Plain {
 		t.Fatalf("RunGenProto returned error: %v", err)
 	}
 
-	// No intermediate protos generated.
+	// No intermediate protos generated (file lacks gcode.schema option).
 	if _, err := os.Stat(filepath.Join(inDir, "plain.update.proto")); err == nil {
 		t.Errorf("plain.update.proto should not be generated")
 	}
 	if _, err := os.Stat(filepath.Join(inDir, "plain.create.proto")); err == nil {
 		t.Errorf("plain.create.proto should not be generated")
+	}
+	if _, err := os.Stat(filepath.Join(inDir, "plain.entity.proto")); err == nil {
+		t.Errorf("plain.entity.proto should not be generated")
 	}
 }
 
@@ -259,6 +296,8 @@ func TestRunGenProto_MessageTypeFieldAllowed(t *testing.T) {
 	writeFile(t, filepath.Join(inDir, "order.proto"), `syntax = "proto3";
 package test;
 import "gcode/options.proto";
+
+option (gcode.schema) = {};
 
 message Address {
   string city = 1;
@@ -304,6 +343,8 @@ func TestRunGenProto_EnumField(t *testing.T) {
 package test.item;
 import "gcode/options.proto";
 
+option (gcode.schema) = {};
+
 enum Status {
   STATUS_UNSPECIFIED = 0;
   STATUS_ACTIVE = 1;
@@ -335,9 +376,9 @@ message Item {
 	if !strings.Contains(s, "optional Status status") {
 		t.Errorf("enum field should be optional Status in:\n%s", s)
 	}
-	// Original proto should be imported.
-	if !strings.Contains(s, `import "item.proto"`) {
-		t.Errorf("missing import of item.proto in:\n%s", s)
+	// Entity proto should be imported.
+	if !strings.Contains(s, `import "item.entity.proto"`) {
+		t.Errorf("missing import of item.entity.proto in:\n%s", s)
 	}
 
 	compileProtoDir(t, inDir)
@@ -363,6 +404,8 @@ enum Status {
 package test.item;
 import "common.proto";
 import "gcode/options.proto";
+
+option (gcode.schema) = {};
 
 message Item {
   int64  id     = 1;
@@ -390,9 +433,9 @@ message Item {
 	if !strings.Contains(s, `import "common.proto"`) {
 		t.Errorf("missing cross-file import of common.proto in:\n%s", s)
 	}
-	// Must still import the original file and gcode options.
-	if !strings.Contains(s, `import "item.proto"`) {
-		t.Errorf("missing import of item.proto in:\n%s", s)
+	// Must import entity proto and gcode options.
+	if !strings.Contains(s, `import "item.entity.proto"`) {
+		t.Errorf("missing import of item.entity.proto in:\n%s", s)
 	}
 	if !strings.Contains(s, `import "gcode/options.proto"`) {
 		t.Errorf("missing import of gcode/options.proto in:\n%s", s)
@@ -421,6 +464,8 @@ message Address {
 package test.order;
 import "address.proto";
 import "gcode/options.proto";
+
+option (gcode.schema) = {};
 
 message Order {
   int64  id      = 1;
@@ -699,6 +744,8 @@ func TestRunGenProto_StaleIntermediateProtosCleaned(t *testing.T) {
 package test.user;
 import "gcode/options.proto";
 
+option (gcode.schema) = {};
+
 message User {
   int64  id   = 1;
   string name = 2;
@@ -718,9 +765,12 @@ message User {
 		t.Fatalf("user.update.proto not generated on first run: %v", err)
 	}
 
-	// Overwrite with a proto that has no options.
+	// Overwrite with a proto that has no update_message (but keeps schema).
 	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
 package test.user;
+import "gcode/options.proto";
+
+option (gcode.schema) = {};
 
 message User {
   int64  id   = 1;
@@ -747,6 +797,8 @@ func TestRunGenProto_StaleCreateProtosCleaned(t *testing.T) {
 package test.product;
 import "gcode/options.proto";
 
+option (gcode.schema) = {};
+
 message Product {
   int64  id    = 1;
   string title = 2;
@@ -766,9 +818,12 @@ message Product {
 		t.Fatalf("product.create.proto not generated on first run: %v", err)
 	}
 
-	// Overwrite with a proto that has no options.
+	// Overwrite with a proto that has no create_message (but keeps schema).
 	writeFile(t, filepath.Join(inDir, "product.proto"), `syntax = "proto3";
 package test.product;
+import "gcode/options.proto";
+
+option (gcode.schema) = {};
 
 message Product {
   int64  id    = 1;
@@ -794,6 +849,8 @@ func TestRunGenProto_StaleCleanupPartial(t *testing.T) {
 	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
+
+option (gcode.schema) = {};
 
 message User {
   int64  id    = 1;
@@ -824,6 +881,8 @@ message User {
 	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
+
+option (gcode.schema) = {};
 
 message User {
   int64  id    = 1;
@@ -862,6 +921,8 @@ func TestRunGenProto_RemoveFailureReturnsError(t *testing.T) {
 	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
+
+option (gcode.schema) = {};
 
 message User {
   int64  id   = 1;

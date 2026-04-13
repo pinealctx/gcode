@@ -44,7 +44,7 @@ func main() {
 			},
 			{
 				Name:  "gen-proto",
-				Usage: "generate intermediate proto files (update/create)",
+				Usage: "generate entity/create/update proto files from schema (.meta.proto) files",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "in",

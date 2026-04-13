@@ -42,7 +42,12 @@ func Run(ctx context.Context, args []string) error {
 		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, source.ErrNoProtoFiles)
 	}
 
-	files, err := parser.Parse(ctx, []string{scanResult.ImportPath}, scanResult.Files)
+	// Exclude schema source files (.meta.proto) from gen-dao processing.
+	// These are only consumed by gen-proto; their entity/create/update products
+	// are what gen-dao reads.
+	inputFiles := filterMetaProtoSources(scanResult.Files)
+
+	files, err := parser.Parse(ctx, []string{scanResult.ImportPath}, inputFiles)
 	if err != nil {
 		return fmt.Errorf("parse proto files: %w", err)
 	}
@@ -146,6 +151,19 @@ func Run(ctx context.Context, args []string) error {
 	}
 
 	return nil
+}
+
+// filterMetaProtoSources excludes schema source files (.meta.proto) from the
+// input list. These are only consumed by gen-proto; their generated entity/create/update
+// products are what gen-dao and gen-ts read.
+func filterMetaProtoSources(files []string) []string {
+	var result []string
+	for _, f := range files {
+		if !strings.HasSuffix(f, ".meta.proto") {
+			result = append(result, f)
+		}
+	}
+	return result
 }
 
 // outputFileName derives the .pb.dao.go output filename from a proto file path.

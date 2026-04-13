@@ -7,10 +7,10 @@ import {
   StatusName,
   type Address,
   type Person,
-  PersonRules,
-} from "../ts/person.pb.ts";
+} from "../ts/person.entity.pb.ts";
 
 import { type PersonCreate, PersonCreateRules } from "../ts/person.create.pb.ts";
+// PersonCreateRules now generated with validate rules from create proto.
 
 import { type PersonUpdateByName, PersonUpdateByNameRules } from "../ts/person.update.pb.ts";
 
@@ -28,10 +28,13 @@ import {
 import {
   type AllScalars,
   type AllRepeated,
-  type AllValidate,
   type TreeNode,
+} from "../ts/all_types.entity.pb.ts";
+
+import {
+  type AllValidate,
   AllValidateRules,
-} from "../ts/all_types.pb.ts";
+} from "../ts/all_validate.pb.ts";
 
 import { type AllScalarsCreate } from "../ts/all_types.create.pb.ts";
 
@@ -74,27 +77,11 @@ assertEqual(StatusName[Status.STATUS_UNSPECIFIED], "STATUS_UNSPECIFIED", "Status
 assertEqual(StatusName[Status.STATUS_ACTIVE], "STATUS_ACTIVE", "StatusName[1] === STATUS_ACTIVE");
 assertEqual(StatusName[Status.STATUS_INACTIVE], "STATUS_INACTIVE", "StatusName[2] === STATUS_INACTIVE");
 
-// --- Validation rules (person.pb.ts) ---
+// --- Validation rules (person.entity.pb.ts) ---
+// Entity proto does not carry validate annotations; rules are in create/update variants.
 
-assertEqual(PersonRules.name.minLength, 1, "PersonRules.name.minLength === 1");
-assertEqual(PersonRules.name.maxLength, 100, "PersonRules.name.maxLength === 100");
-assertEqual(PersonRules.age.minimum, 0, "PersonRules.age.minimum === 0");
-assertEqual(PersonRules.age.maximum, 150, "PersonRules.age.maximum === 150");
-assertEqual(PersonRules.status.definedOnly, true, "PersonRules.status.definedOnly === true");
-assertEqual(PersonRules.address.required, true, "PersonRules.address.required === true");
-assertEqual(PersonRules.scores.minItems, 1, "PersonRules.scores.minItems === 1");
-assertEqual(PersonRules.scores.maxItems, 100, "PersonRules.scores.maxItems === 100");
-assertEqual(PersonRules.tags.minItems, 1, "PersonRules.tags.minItems === 1");
-assertEqual(PersonRules.email.format, "email", "PersonRules.email.format === email");
-
-// enum constraint
-assert((PersonRules.role as { enum: readonly string[] }).enum.includes("admin"), "PersonRules.role.enum includes admin");
-assert((PersonRules.role as { enum: readonly string[] }).enum.includes("user"), "PersonRules.role.enum includes user");
-assert((PersonRules.role as { enum: readonly string[] }).enum.includes("guest"), "PersonRules.role.enum includes guest");
-
-// notIn constraint
-assert((PersonRules.typeId as { notIn: readonly number[] }).notIn.includes(0), "PersonRules.typeId.notIn includes 0");
-assert((PersonRules.typeId as { notIn: readonly number[] }).notIn.includes(-1), "PersonRules.typeId.notIn includes -1");
+// --- Validation rules (person.create.pb.ts) ---
+// PersonCreateRules inherits constraints from source Person.
 
 // --- Validation rules (person_service.pb.ts) ---
 
@@ -157,7 +144,7 @@ assertEqual(personPartial.nickname, undefined, "Person.nickname omitted === unde
 const create: PersonCreate = {
   nickname: "Al",
 };
-// status field uses imported Status type from person.pb.ts
+// status field uses imported Status type from person.entity.pb.ts
 const createWithStatus: PersonCreate = {
   nickname: "Bob",
   status: Status.STATUS_ACTIVE,
@@ -380,7 +367,7 @@ assertEqual(treeLeaf.child.child.value, "deepest", "TreeNode.child.child.value d
 
 // --- summary ---
 
-assertEqual(passed, 118, "expected exactly 118 assertions before count guard");
+assertEqual(passed, 103, "expected exactly 103 assertions before count guard");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {

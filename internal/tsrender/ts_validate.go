@@ -165,7 +165,13 @@ func writeTSInheritedValidationRules(b *strings.Builder, msg transform.GoMessage
 		if !ok {
 			continue
 		}
-		if sf.ValidateOptions == nil && sf.Type.Kind != model.FieldKindMessage {
+		// Use derived field's validate options (gen-proto copies from source),
+		// fall back to source field's options for backward compatibility.
+		vo := f.ValidateOptions
+		if vo == nil {
+			vo = sf.ValidateOptions
+		}
+		if vo == nil && sf.Type.Kind != model.FieldKindMessage {
 			continue
 		}
 		entries = append(entries, fieldEntry{
@@ -196,7 +202,12 @@ func writeTSInheritedValidationRules(b *strings.Builder, msg transform.GoMessage
 // message's ValidateOptions); presence (required) is determined by the derived
 // message's context.
 func writeTSInheritedFieldRules(b *strings.Builder, jsonName string, srcField transform.GoField, dstField transform.GoField, required bool, indent string) {
-	vo := srcField.ValidateOptions
+	// Use derived field's validate options (gen-proto copies from source),
+	// fall back to source field's options for backward compatibility.
+	vo := dstField.ValidateOptions
+	if vo == nil {
+		vo = srcField.ValidateOptions
+	}
 
 	var parts []string
 	parts = append(parts, fmt.Sprintf("required: %t", required))
