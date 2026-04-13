@@ -466,3 +466,49 @@ func (x *PersonCreate) UnmarshalBinaryLenient(data []byte) error {
 	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
+
+// ToEntity converts PersonCreate to Person.
+func (x *PersonCreate) ToEntity() Person {
+	var p Person
+	if x.Name != nil {
+		p.Name = *x.Name
+	}
+	if x.Age != nil {
+		p.Age = *x.Age
+	}
+	if x.Active != nil {
+		p.Active = *x.Active
+	}
+	if x.Status != nil {
+		p.Status = *x.Status
+	}
+	if x.Rating != nil {
+		p.Rating = *x.Rating
+	}
+	p.Nickname = &x.Nickname
+	if x.Level != nil {
+		p.Level = x.Level
+	}
+	if x.Verified != nil {
+		p.Verified = x.Verified
+	}
+	if x.Score != nil {
+		p.Score = x.Score
+	}
+	if x.UpdatedAt != nil {
+		p.UpdatedAt = x.UpdatedAt
+	}
+	if x.PrevStatus != nil {
+		p.PrevStatus = x.PrevStatus
+	}
+	if x.Email != nil {
+		p.Email = *x.Email
+	}
+	if x.Role != nil {
+		p.Role = *x.Role
+	}
+	if x.TypeId != nil {
+		p.TypeId = *x.TypeId
+	}
+	return p
+}

@@ -431,6 +431,226 @@ func TestToMapNoConditionFields(t *testing.T) {
 	}
 }
 
+func TestToEntityGeneration(t *testing.T) {
+	t.Parallel()
+
+	// Source: User with id (int64), name (string), nickname (*string), tags ([]string).
+	srcMsg := transform.GoMessage{
+		GoName: "User",
+		Fields: []transform.GoField{
+			{Field: model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}}, GoName: "Id", GoType: "int64"},
+			{Field: model.Field{Name: "name", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Name", GoType: "string"},
+			{Field: model.Field{Name: "nickname", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Nickname", GoType: "*string"},
+			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string"},
+		},
+	}
+	// Create: id is required (non-pointer), name/nickname are optional (*T), tags is repeated.
+	createMsg := transform.GoMessage{
+		GoName:       "UserCreate",
+		CreateSource: "User",
+		Fields: []transform.GoField{
+			{Field: model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}}, GoName: "Id", GoType: "int64"},
+			{Field: model.Field{Name: "name", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Name", GoType: "*string"},
+			{Field: model.Field{Name: "nickname", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Nickname", GoType: "*string"},
+			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string"},
+		},
+	}
+	msgIndex := map[string]*transform.GoMessage{"User": &srcMsg}
+	ctx := Context{MessageIndex: msgIndex}
+
+	gf := transform.GoFile{
+		Source:   "user.create.proto",
+		Package:  "testpkg",
+		Messages: []transform.GoMessage{createMsg},
+	}
+
+	src, err := File(gf, testModulePhase4, ctx)
+	if err != nil {
+		t.Fatalf("File() error: %v", err)
+	}
+	s := string(src)
+
+	// ToEntity method should exist.
+	if !strings.Contains(s, "func (x *UserCreate) ToEntity() User {") {
+		t.Errorf("missing ToEntity method in:\n%s", s)
+	}
+	// Required field (id): non-ptr→non-ptr, direct assign.
+	if !strings.Contains(s, "p.Id = x.Id\n") {
+		t.Errorf("required field id should be direct assign in:\n%s", s)
+	}
+	// Optional field (name): ptr→non-ptr, nil-guard + deref.
+	if !strings.Contains(s, "p.Name = *x.Name") {
+		t.Errorf("optional field name should have deref assign in:\n%s", s)
+	}
+	if !strings.Contains(s, "if x.Name != nil") {
+		t.Errorf("optional field name should have nil-guard in:\n%s", s)
+	}
+	// Optional ptr→ptr (nickname): nil-guard + pointer assign (no deref).
+	if !strings.Contains(s, "p.Nickname = x.Nickname") {
+		t.Errorf("optional ptr→ptr field nickname should have pointer assign in:\n%s", s)
+	}
+	if strings.Contains(s, "p.Nickname = *x.Nickname") {
+		t.Errorf("optional ptr→ptr field nickname should NOT deref in:\n%s", s)
+	}
+	// Repeated field (tags): direct assign.
+	if !strings.Contains(s, "p.Tags = x.Tags\n") {
+		t.Errorf("repeated field tags should be direct assign in:\n%s", s)
+	}
+}
+
+func TestToEntityRequiredToPointer(t *testing.T) {
+	t.Parallel()
+
+	// Edge case: required non-pointer in create → pointer in source.
+	srcMsg := transform.GoMessage{
+		GoName: "Item",
+		Fields: []transform.GoField{
+			{Field: model.Field{Name: "label", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Label", GoType: "*string"},
+		},
+	}
+	createMsg := transform.GoMessage{
+		GoName:       "ItemCreate",
+		CreateSource: "Item",
+		Fields: []transform.GoField{
+			{Field: model.Field{Name: "label", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Label", GoType: "string"},
+		},
+	}
+	msgIndex := map[string]*transform.GoMessage{"Item": &srcMsg}
+	ctx := Context{MessageIndex: msgIndex}
+
+	gf := transform.GoFile{Source: "item.create.proto", Package: "testpkg", Messages: []transform.GoMessage{createMsg}}
+	src, err := File(gf, testModulePhase4, ctx)
+	if err != nil {
+		t.Fatalf("File() error: %v", err)
+	}
+	s := string(src)
+
+	// Non-ptr→ptr: take address.
+	if !strings.Contains(s, "p.Label = &x.Label\n") {
+		t.Errorf("required non-ptr to ptr should take address in:\n%s", s)
+	}
+}
+
+func TestToEntityNotGeneratedForNonCreate(t *testing.T) {
+	t.Parallel()
+
+	msg := transform.GoMessage{
+		GoName: "User",
+		Fields: []transform.GoField{
+			{Field: model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}}, GoName: "Id", GoType: "int64"},
+		},
+	}
+	gf := transform.GoFile{Source: "user.proto", Package: "testpkg", Messages: []transform.GoMessage{msg}}
+
+	src, err := File(gf, testModulePhase4, Context{})
+	if err != nil {
+		t.Fatalf("File() error: %v", err)
+	}
+	if strings.Contains(string(src), "ToEntity") {
+		t.Errorf("ToEntity should not be generated for non-create message")
+	}
+}
+
+func TestApplyToGeneration(t *testing.T) {
+	t.Parallel()
+
+	srcMsg := transform.GoMessage{
+		GoName: "User",
+		Fields: []transform.GoField{
+			{Field: model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}}, GoName: "Id", GoType: "int64"},
+			{Field: model.Field{Name: "name", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Name", GoType: "string"},
+			{Field: model.Field{Name: "nickname", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Nickname", GoType: "*string"},
+			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string"},
+		},
+	}
+	updateMsg := transform.GoMessage{
+		GoName:          "UserUpdateByID",
+		UpdateSource:    "User",
+		ConditionFields: []string{"id"},
+		Fields: []transform.GoField{
+			{Field: model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}}, GoName: "Id", GoType: "int64"},
+			{Field: model.Field{Name: "name", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Name", GoType: "*string"},
+			{Field: model.Field{Name: "nickname", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Nickname", GoType: "*string"},
+			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string"},
+		},
+	}
+	msgIndex := map[string]*transform.GoMessage{"User": &srcMsg}
+	ctx := Context{MessageIndex: msgIndex}
+
+	gf := transform.GoFile{Source: "user.update.proto", Package: "testpkg", Messages: []transform.GoMessage{updateMsg}}
+	src, err := File(gf, testModulePhase4, ctx)
+	if err != nil {
+		t.Fatalf("File() error: %v", err)
+	}
+	s := string(src)
+
+	// ApplyTo method should exist.
+	if !strings.Contains(s, "func (x *UserUpdateByID) ApplyTo(p *User) {") {
+		t.Errorf("missing ApplyTo method in:\n%s", s)
+	}
+	// Condition field (id) should be skipped — no assignment to p.Id.
+	if strings.Contains(s, "p.Id =") {
+		t.Errorf("condition field id should be skipped in:\n%s", s)
+	}
+	// Optional ptr→non-ptr (name): nil-guard + deref.
+	if !strings.Contains(s, "p.Name = *x.Name") {
+		t.Errorf("optional field name should have deref assign in:\n%s", s)
+	}
+	if !strings.Contains(s, "if x.Name != nil") {
+		t.Errorf("optional field name should have nil-guard in:\n%s", s)
+	}
+	// Optional ptr→ptr (nickname): nil-guard + pointer assign.
+	if !strings.Contains(s, "p.Nickname = x.Nickname") {
+		t.Errorf("optional ptr→ptr field nickname should have pointer assign in:\n%s", s)
+	}
+	// Repeated field (tags): nil-guard.
+	if !strings.Contains(s, "p.Tags = x.Tags") {
+		t.Errorf("repeated field tags should be assigned in:\n%s", s)
+	}
+}
+
+func TestApplyToNotGeneratedForNonUpdate(t *testing.T) {
+	t.Parallel()
+
+	msg := transform.GoMessage{
+		GoName: "User",
+		Fields: []transform.GoField{
+			{Field: model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}}, GoName: "Id", GoType: "int64"},
+		},
+	}
+	gf := transform.GoFile{Source: "user.proto", Package: "testpkg", Messages: []transform.GoMessage{msg}}
+
+	src, err := File(gf, testModulePhase4, Context{})
+	if err != nil {
+		t.Fatalf("File() error: %v", err)
+	}
+	if strings.Contains(string(src), "ApplyTo") {
+		t.Errorf("ApplyTo should not be generated for non-update message")
+	}
+}
+
+func TestApplyToNoContext(t *testing.T) {
+	t.Parallel()
+
+	// Update message without context — ApplyTo should not be generated.
+	updateMsg := transform.GoMessage{
+		GoName:       "UserUpdateByID",
+		UpdateSource: "User",
+		Fields: []transform.GoField{
+			{Field: model.Field{Name: "name", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Name", GoType: "*string"},
+		},
+	}
+	gf := transform.GoFile{Source: "user.update.proto", Package: "testpkg", Messages: []transform.GoMessage{updateMsg}}
+
+	src, err := File(gf, testModulePhase4, Context{})
+	if err != nil {
+		t.Fatalf("File() error: %v", err)
+	}
+	if strings.Contains(string(src), "ApplyTo") {
+		t.Errorf("ApplyTo should not be generated without MessageIndex context")
+	}
+}
+
 func TestConditionFieldsPopulatedByFlatten(t *testing.T) {
 	t.Parallel()
 

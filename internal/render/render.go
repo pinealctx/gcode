@@ -78,6 +78,20 @@ func File(gf transform.GoFile, modulePath string, ctx Context) ([]byte, error) {
 			writeToMapMethod(&body, msg)
 		}
 	}
+	for _, msg := range gf.Messages {
+		if msg.CreateSource != "" && ctx.MessageIndex != nil {
+			if src, ok := ctx.MessageIndex[msg.CreateSource]; ok {
+				writeToEntityMethod(&body, msg, src)
+			}
+		}
+	}
+	for _, msg := range gf.Messages {
+		if msg.UpdateSource != "" && ctx.MessageIndex != nil {
+			if src, ok := ctx.MessageIndex[msg.UpdateSource]; ok {
+				writeApplyToMethod(&body, msg, src)
+			}
+		}
+	}
 	for _, enum := range gf.Enums {
 		writeEnum(&body, enum)
 	}

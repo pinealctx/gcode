@@ -541,3 +541,50 @@ func (x *PersonUpdateByName) ToMap() map[string]any {
 	}
 	return um
 }
+
+// ApplyTo merges non-nil fields from PersonUpdateByName into p.
+// Condition fields are skipped.
+func (x *PersonUpdateByName) ApplyTo(p *Person) {
+	if x.Age != nil {
+		p.Age = *x.Age
+	}
+	if x.Active != nil {
+		p.Active = *x.Active
+	}
+	if x.Status != nil {
+		p.Status = *x.Status
+	}
+	if x.Rating != nil {
+		p.Rating = *x.Rating
+	}
+	if x.CreatedAt != nil {
+		p.CreatedAt = *x.CreatedAt
+	}
+	if x.Nickname != nil {
+		p.Nickname = x.Nickname
+	}
+	if x.Level != nil {
+		p.Level = x.Level
+	}
+	if x.Verified != nil {
+		p.Verified = x.Verified
+	}
+	if x.Score != nil {
+		p.Score = x.Score
+	}
+	if x.UpdatedAt != nil {
+		p.UpdatedAt = x.UpdatedAt
+	}
+	if x.PrevStatus != nil {
+		p.PrevStatus = x.PrevStatus
+	}
+	if x.Email != nil {
+		p.Email = *x.Email
+	}
+	if x.Role != nil {
+		p.Role = *x.Role
+	}
+	if x.TypeId != nil {
+		p.TypeId = *x.TypeId
+	}
+}

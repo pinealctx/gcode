@@ -347,3 +347,37 @@ func (x *AllScalarsCreate) UnmarshalBinaryLenient(data []byte) error {
 	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
 	return err
 }
+
+// ToEntity converts AllScalarsCreate to AllScalars.
+func (x *AllScalarsCreate) ToEntity() AllScalars {
+	var p AllScalars
+	if x.FSint32 != nil {
+		p.FSint32 = *x.FSint32
+	}
+	if x.FSint64 != nil {
+		p.FSint64 = *x.FSint64
+	}
+	if x.FSfixed32 != nil {
+		p.FSfixed32 = *x.FSfixed32
+	}
+	if x.FSfixed64 != nil {
+		p.FSfixed64 = *x.FSfixed64
+	}
+	if x.FFixed32 != nil {
+		p.FFixed32 = *x.FFixed32
+	}
+	if x.FFixed64 != nil {
+		p.FFixed64 = *x.FFixed64
+	}
+	if x.FUint32 != nil {
+		p.FUint32 = *x.FUint32
+	}
+	if x.FUint64 != nil {
+		p.FUint64 = *x.FUint64
+	}
+	if x.FFloat != nil {
+		p.FFloat = *x.FFloat
+	}
+	p.FBytes = x.FBytes
+	return p
+}

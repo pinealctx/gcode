@@ -403,3 +403,35 @@ func (x *AllScalarsUpdate) ToMap() map[string]any {
 	}
 	return um
 }
+
+// ApplyTo merges non-nil fields from AllScalarsUpdate into p.
+// Condition fields are skipped.
+func (x *AllScalarsUpdate) ApplyTo(p *AllScalars) {
+	if x.FSint64 != nil {
+		p.FSint64 = *x.FSint64
+	}
+	if x.FSfixed32 != nil {
+		p.FSfixed32 = *x.FSfixed32
+	}
+	if x.FSfixed64 != nil {
+		p.FSfixed64 = *x.FSfixed64
+	}
+	if x.FDouble != nil {
+		p.FDouble = *x.FDouble
+	}
+	if x.FFixed32 != nil {
+		p.FFixed32 = *x.FFixed32
+	}
+	if x.FFixed64 != nil {
+		p.FFixed64 = *x.FFixed64
+	}
+	if x.FUint32 != nil {
+		p.FUint32 = *x.FUint32
+	}
+	if x.FUint64 != nil {
+		p.FUint64 = *x.FUint64
+	}
+	if x.FFloat != nil {
+		p.FFloat = *x.FFloat
+	}
+}
