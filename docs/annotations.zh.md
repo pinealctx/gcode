@@ -9,6 +9,7 @@
 - [使用前提](#使用前提)
 - [message 级注解](#message-级注解)
   - [(gcode.message).gorm.table](#gcodeMessagegormtable)
+  - [原始 message 设计原则](#原始-message-设计原则)
   - [(gcode.update_message)](#gcodeupdate_message)
   - [(gcode.create_message)](#gcodecreate_message)
 - [field 级注解](#field-级注解)
@@ -92,6 +93,57 @@ db.Model(&dao.Person{}).Where("name = ?", req.Name).Updates(req.ToMap())
 
 ---
 
+### 原始 message 设计原则
+
+原始 message（如 `Person`）既是结构体定义，又是 schema 定义。为 `create_message` 和 `update_message` 设计原始 message 时，遵循以下原则：
+
+**原始 message 不使用 `optional`。** 字段的可选语义由衍生 message 决定，而非原始定义。原始 message 定义"有哪些字段"，create/update 注解决定"每个字段是必填还是选填"。
+
+```proto
+// ❌ 避免：在原始 message 中使用 optional
+message Person {
+  optional string nickname = 1;
+  optional int32  level    = 2;
+}
+
+// ✅ 推荐：原始 message 使用普通字段
+message Person {
+  string nickname = 1;
+  int32  level    = 2;
+}
+```
+
+**原始 message 不对 scalar/enum 字段使用 `(buf.validate.field).required = true`。** 原始 message 只定义值约束（如 `min_len`、`gte`、`defined_only`），不定义字段是否"必须提供"。字段的存在性是正交的关注点，由 `required_fields`（create）和 `condition_fields`（update）处理：
+
+| 关注点 | 定义位置 | 示例 |
+|--------|---------|------|
+| **约束**（WHAT） | 原始 message 的 validate 规则 | `min_len = 1`、`gte = 0`、`defined_only` |
+| **存在性**（WHETHER） | create/update 注解 | `required_fields`、`condition_fields` |
+
+```proto
+// ❌ 避免：在原始 scalar 字段上使用 required
+message Person {
+  string email = 1 [(buf.validate.field).string.min_len = 1,
+                     (buf.validate.field).required = true];  // 多余
+}
+
+// ✅ 推荐：原始 message 只写约束，衍生 message 控制存在性
+message Person {
+  string email = 1 [(buf.validate.field).string.min_len = 1];  // 仅约束
+  option (gcode.create_message) = {
+    required_fields: ["email"]  // 存在性在此强制
+  };
+}
+```
+
+> **例外**：对于 message 类型字段（如 `Address address = 1`），在原始 message 上使用 `(buf.validate.field).message.required = true` 是合理的——它约束嵌套 message 在提供时不能为 nil，这是值约束，不是存在性检查。
+
+**message 类型字段天然 nullable。** proto3 的 message 字段总是有存在性语义（nil = 未设置）。`gcode gen-proto` 和 Go render 层正确处理 message 类型字段：
+- 生成的 proto 中：message 类型字段不写 `optional` 关键字
+- Go validate 中：required 的 message 字段会做 nil 检查（nil → 报错），非 nil 时递归调用 `Validate()`
+
+---
+
 ### (gcode.update_message)
 
 从当前 message 生成一个 update 派生 message，用于部分更新场景。
@@ -170,26 +222,25 @@ db.Model(&dao.Person{}).Where("name = ?", req.Name).Updates(req.ToMap())
 
 > **建议**：始终使用 `gcode gen-proto` 生成 `*.update.proto` 文件，不要手动编写。
 
-#### 跨包枚举限制
+#### 跨包引用
 
-`gcode gen-proto` 不支持派生 proto 文件中的跨包枚举引用。如果字段的枚举类型定义在另一个 proto 文件（不同包）中，生成的 `*.update.proto` 或 `*.create.proto` 会缺少必要的 `import` 语句，导致编译失败。
-
-**解决方案**：将枚举定义在与使用它的 message 相同的 proto 文件中，或同一包内的 proto 文件中。
+`gcode gen-proto` 自动解析跨文件的 enum 和 message 引用。如果字段类型定义在另一个 proto 文件中，生成的 `*.update.proto` 或 `*.create.proto` 会自动包含所需的 `import` 语句。
 
 ```proto
-// ✅ 可以：枚举和 message 在同一文件
-enum Status { ... }
+// ✅ 枚举定义在单独的 proto 文件中
+// common.proto:
+enum Status { STATUS_UNSPECIFIED = 0; STATUS_ACTIVE = 1; STATUS_INACTIVE = 2; }
+
+// user.proto:
+import "common.proto";
 message User {
   Status status = 1;
-  option (gcode.update_message) = { name: "UserUpdate" ... };
+  option (gcode.update_message) = { name: "UserUpdate" condition_fields: ["status"] };
 }
-
-// ❌ 不支持：枚举定义在另一个包
-// import "other_package/types.proto";
-// message User {
-//   other_package.Status status = 1;  // gen-proto 无法解析此 import
-// }
+// 生成的 user.update.proto 自动包含：import "common.proto";
 ```
+
+衍生 proto 文件无需手动管理 import。
 
 update 派生 message 的 `Validate()` 自动继承源 message 的 validate 规则，但行为有以下差异：
 
@@ -205,6 +256,26 @@ req := &dao.PersonUpdateByName{
 err := req.Validate()
 // err: field=name rule=min_len msg=length must be >= 1
 ```
+
+#### ApplyTo() 方法
+
+update 衍生 message 会生成 `ApplyTo()` 方法，将非 nil 字段合并到已有的原始实体中。适用于内存/缓存场景下的部分更新：
+
+```go
+// 从缓存或 DB 加载已有实体
+person := cache.Get(key)  // *dao.Person
+
+// 应用部分更新 — 仅覆盖非 nil 字段
+req.ApplyTo(person)  // condition 字段 "name" 不会被应用
+
+// person 的字段已更新；req 中为 nil 的字段保持不变
+cache.Set(key, person)
+```
+
+`ApplyTo()` 处理 update 和原始 struct 之间的指针类型差异：
+- **可选 scalar/enum**（`*T` → `T`）：nil 守卫 + 解引用 — 仅在提供时设置
+- **可选指针**（`*T` → `*T`）：nil 守卫 + 指针赋值 — 共享引用
+- **Repeated/bytes**（`[]T`）：nil 守卫 — 区分"未提供"（nil）和"设置为空"
 
 ---
 
@@ -266,6 +337,31 @@ req := &dao.PersonCreate{
     Name:     nil, // 可选字段，nil → 跳过校验
 }
 ```
+
+#### ToEntity() 方法
+
+create 衍生 message 会生成 `ToEntity()` 方法，将 create struct 转换为原始实体类型。适用于在持久化之前在内存中构建实体：
+
+```go
+req := &dao.PersonCreate{
+    Nickname: "alice",
+    Email:    strPtr("alice@example.com"),
+}
+
+person := req.ToEntity()  // 返回 dao.Person
+person.CreatedAt = time.Now().Unix()  // 填充系统生成的字段
+
+db.Create(&person)
+cache.Set(key, person)
+```
+
+`ToEntity()` 处理 create 和原始 struct 之间的指针类型差异：
+- **必填字段**（`T` → `*T`）：取地址 — 必填字段总有值
+- **可选 scalar/enum**（`*T` → `T`）：nil 守卫 + 解引用 — 未提供时为零值
+- **可选指针**（`*T` → `*T`）：nil 守卫 + 指针赋值 — 共享引用
+- **Repeated/bytes**（`[]T`）：直接赋值
+
+被 `ignore_fields` 排除的字段在返回的实体中保持零值。
 
 ---
 
