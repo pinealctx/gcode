@@ -7,8 +7,8 @@ import (
 )
 
 // ValidateCreateOptions checks that each required_field listed in a create_message annotation
-// refers to an existing field that is optional in the source message.
-// A non-optional field is already required, so listing it in required_fields is an error.
+// refers to an existing field in the source message. A non-optional field listed in
+// required_fields is silently accepted (it is already required — listing it is a confirmation).
 // Call this after parsing, before rendering.
 func ValidateCreateOptions(files []model.File) error {
 	for _, file := range files {
@@ -23,21 +23,19 @@ func ValidateCreateOptions(files []model.File) error {
 
 func validateMessageCreateOptions(msg model.Message) error {
 	if len(msg.CreateOptions) > 0 {
-		optionalSet := make(map[string]bool, len(msg.Fields))
+		fieldSet := make(map[string]struct{}, len(msg.Fields))
 		for _, f := range msg.Fields {
-			optionalSet[f.Name] = f.Optional
+			fieldSet[f.Name] = struct{}{}
 		}
 		for _, co := range msg.CreateOptions {
 			for _, rf := range co.RequiredFields {
-				isOpt, exists := optionalSet[rf]
+				_, exists := fieldSet[rf]
 				if !exists {
 					return errorx.NewSentinelf[transformTag]("message %q: create_message %q required_fields: field %q not found in message",
 						msg.FullName, co.Name, rf)
 				}
-				if !isOpt {
-					return errorx.NewSentinelf[transformTag]("message %q: create_message %q required_fields: field %q is already non-optional",
-						msg.FullName, co.Name, rf)
-				}
+				// Non-optional field listed in required_fields: silently accepted.
+				// It is already required — listing it is a semantic confirmation.
 			}
 		}
 	}

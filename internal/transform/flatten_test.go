@@ -551,8 +551,8 @@ func TestFlattenOptionalGoType(t *testing.T) {
 	}
 }
 
-// TestValidateCreateOptions_Errors verifies that required_fields referencing a non-optional
-// or non-existent field is rejected by the transform layer.
+// TestValidateCreateOptions_Errors verifies that required_fields referencing a
+// non-existent field is rejected by the transform layer.
 func TestValidateCreateOptions_Errors(t *testing.T) {
 	t.Parallel()
 
@@ -560,21 +560,6 @@ func TestValidateCreateOptions_Errors(t *testing.T) {
 		name  string
 		files []model.File
 	}{
-		{
-			name: "required_fields non-optional field",
-			files: []model.File{{
-				Messages: []model.Message{{
-					FullName: "test.M",
-					Fields: []model.Field{
-						{Name: "name", Optional: false},
-					},
-					CreateOptions: []model.CreateMessageOptions{{
-						Name:           "MCreate",
-						RequiredFields: []string{"name"},
-					}},
-				}},
-			}},
-		},
 		{
 			name: "required_fields unknown field",
 			files: []model.File{{
@@ -586,23 +571,6 @@ func TestValidateCreateOptions_Errors(t *testing.T) {
 					CreateOptions: []model.CreateMessageOptions{{
 						Name:           "MCreate",
 						RequiredFields: []string{"nonexistent"},
-					}},
-				}},
-			}},
-		},
-		{
-			name: "required_fields in nested message",
-			files: []model.File{{
-				Messages: []model.Message{{
-					FullName: "test.Outer",
-					Fields:   []model.Field{{Name: "x", Optional: false}},
-					Messages: []model.Message{{
-						FullName: "test.Outer.Inner",
-						Fields:   []model.Field{{Name: "val", Optional: false}},
-						CreateOptions: []model.CreateMessageOptions{{
-							Name:           "InnerCreate",
-							RequiredFields: []string{"val"},
-						}},
 					}},
 				}},
 			}},
@@ -646,6 +614,59 @@ func TestValidateCreateOptions_Valid(t *testing.T) {
 
 	if err := ValidateCreateOptions(files); err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestValidateCreateOptions_NonOptionalRequiredField verifies that listing an already
+// non-optional field in required_fields is silently accepted (semantic confirmation).
+func TestValidateCreateOptions_NonOptionalRequiredField(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		files []model.File
+	}{
+		{
+			name: "top-level non-optional field",
+			files: []model.File{{
+				Messages: []model.Message{{
+					FullName: "test.M",
+					Fields: []model.Field{
+						{Name: "name", Optional: false},
+					},
+					CreateOptions: []model.CreateMessageOptions{{
+						Name:           "MCreate",
+						RequiredFields: []string{"name"},
+					}},
+				}},
+			}},
+		},
+		{
+			name: "nested message non-optional field",
+			files: []model.File{{
+				Messages: []model.Message{{
+					FullName: "test.Outer",
+					Fields:   []model.Field{{Name: "x", Optional: false}},
+					Messages: []model.Message{{
+						FullName: "test.Outer.Inner",
+						Fields:   []model.Field{{Name: "val", Optional: false}},
+						CreateOptions: []model.CreateMessageOptions{{
+							Name:           "InnerCreate",
+							RequiredFields: []string{"val"},
+						}},
+					}},
+				}},
+			}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if err := ValidateCreateOptions(tc.files); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 
