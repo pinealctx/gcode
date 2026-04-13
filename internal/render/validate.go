@@ -6,6 +6,8 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/pinealctx/x/ds"
+
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/transform"
 )
@@ -101,8 +103,15 @@ func writeValidateMethod(b *strings.Builder, msg transform.GoMessage, enumByGoNa
 
 // writeInheritedValidation generates validate checks for an update/create message
 // by inheriting rules from the source message's fields.
-// Optional fields (pointer types) are skipped when nil.
+// Fields in the required set (ConditionFields + RequiredFields) are validated
+// unconditionally; optional fields are skipped when nil.
 func writeInheritedValidation(b *strings.Builder, recv string, msg transform.GoMessage, srcMsg *transform.GoMessage, enumByGoName map[string]transform.GoEnum) {
+	// Build required set: condition fields (update) + required fields (create).
+	requiredSet := ds.NewSet(msg.ConditionFields...)
+	for _, rf := range msg.RequiredFields {
+		requiredSet.Add(rf)
+	}
+
 	// Build a map from field name to source field for O(1) lookup.
 	srcFieldByName := make(map[string]transform.GoField, len(srcMsg.Fields))
 	for _, sf := range srcMsg.Fields {
@@ -119,27 +128,29 @@ func writeInheritedValidation(b *strings.Builder, recv string, msg transform.GoM
 			continue
 		}
 
-		// For optional fields in the derived message, wrap validation in nil check.
-		// A field is optional in the derived message if its GoType starts with "*".
-		isOptional := strings.HasPrefix(f.GoType, "*")
 		fieldExpr := recv + "." + f.GoName
+		isRequired := requiredSet.Contains(f.Name)
 
-		if isOptional {
-			// Dereference pointer for validation; skip if nil.
+		switch {
+		case isRequired && sf.Type.Kind == model.FieldKindMessage:
+			// Required message-type field: nil check → error, then recursive Validate().
+			writeMessageFieldValidation(b, fieldExpr, sf.Name, sf.ValidateMessage, sf.ValidateOptions)
+
+		case isRequired:
+			// Required scalar/enum field: validate with noZeroGuard so empty string
+			// is validated against min_len and other constraints.
+			writeFieldValidationExpr(b, fieldExpr, sf, enumByGoName, true)
+
+		case strings.HasPrefix(f.GoType, "*"):
+			// Optional field (pointer): dereference and validate only if non-nil.
 			fmt.Fprintf(b, "if %s != nil {\n", fieldExpr)
-			// Use dereferenced value for scalar/enum checks.
-			// Known limitation: message-type fields in derived messages are not
-			// expected to be optional (gen-proto rejects message-type fields), so
-			// passing a dereferenced expression to writeMessageFieldValidation is
-			// safe in practice. If that constraint is ever relaxed, this path
-			// would need to handle the message case separately.
 			derefExpr := "*" + fieldExpr
 			writeFieldValidationExpr(b, derefExpr, sf, enumByGoName, false)
 			b.WriteString("}\n")
-		} else {
-			// Non-optional (condition) field: disable zero-value guard so empty
-			// string is validated against min_len and other constraints.
-			writeFieldValidationExpr(b, fieldExpr, sf, enumByGoName, true)
+
+		default:
+			// Non-optional, non-required field: validate directly.
+			writeFieldValidationExpr(b, fieldExpr, sf, enumByGoName, false)
 		}
 	}
 }

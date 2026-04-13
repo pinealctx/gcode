@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/pinealctx/x/ds"
+
 	"github.com/pinealctx/gcode/internal/config"
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/parser"
@@ -176,8 +178,8 @@ func buildUpdateMessage(msg model.Message, opt model.UpdateMessageOptions) (stri
 	if !isProtoIdentifier(opt.Name) {
 		return "", fmt.Errorf("update_message annotation on %q: name %q: %w", msg.FullName, opt.Name, ErrInvalidName)
 	}
-	ignoreSet := stringSet(opt.IgnoreFields)
-	conditionSet := stringSet(opt.ConditionFields)
+	ignoreSet := ds.NewSet(opt.IgnoreFields...)
+	conditionSet := ds.NewSet(opt.ConditionFields...)
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "message %s {\n", opt.Name)
@@ -185,10 +187,10 @@ func buildUpdateMessage(msg model.Message, opt model.UpdateMessageOptions) (stri
 
 	fieldNum := 1
 	for _, f := range msg.Fields {
-		if ignoreSet[f.Name] {
+		if ignoreSet.Contains(f.Name) {
 			continue
 		}
-		line, err := protoFieldLine(f, !conditionSet[f.Name], fieldNum)
+		line, err := protoFieldLine(f, !conditionSet.Contains(f.Name), fieldNum)
 		if err != nil {
 			return "", fmt.Errorf("field %q: %w", f.Name, err)
 		}
@@ -207,8 +209,8 @@ func buildCreateMessage(msg model.Message, opt model.CreateMessageOptions) (stri
 	if !isProtoIdentifier(opt.Name) {
 		return "", fmt.Errorf("create_message annotation on %q: name %q: %w", msg.FullName, opt.Name, ErrInvalidName)
 	}
-	ignoreSet := stringSet(opt.IgnoreFields)
-	requiredSet := stringSet(opt.RequiredFields)
+	ignoreSet := ds.NewSet(opt.IgnoreFields...)
+	requiredSet := ds.NewSet(opt.RequiredFields...)
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "message %s {\n", opt.Name)
@@ -216,11 +218,11 @@ func buildCreateMessage(msg model.Message, opt model.CreateMessageOptions) (stri
 
 	fieldNum := 1
 	for _, f := range msg.Fields {
-		if ignoreSet[f.Name] {
+		if ignoreSet.Contains(f.Name) {
 			continue
 		}
 		// required_fields forces non-optional; otherwise use original optionality.
-		makeOptional := !requiredSet[f.Name]
+		makeOptional := !requiredSet.Contains(f.Name)
 		line, err := protoFieldLine(f, makeOptional, fieldNum)
 		if err != nil {
 			return "", fmt.Errorf("field %q: %w", f.Name, err)
@@ -339,15 +341,6 @@ func collectExternalImports(msgs []model.Message, typeIdx map[string]string, sel
 		}
 	}
 	return imports
-}
-
-// stringSet converts a slice to a set for O(1) lookup.
-func stringSet(ss []string) map[string]bool {
-	m := make(map[string]bool, len(ss))
-	for _, s := range ss {
-		m[s] = true
-	}
-	return m
 }
 
 // protoBaseName strips the .proto suffix from a relative path and returns

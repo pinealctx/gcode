@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pinealctx/x/ds"
+
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/transform"
 )
@@ -18,10 +20,10 @@ func writeToMapMethod(b *strings.Builder, msg transform.GoMessage) {
 	fmt.Fprintf(b, "func (%s *%s) ToMap() map[string]any {\n", recv, msg.GoName)
 	b.WriteString("um := make(map[string]any)\n")
 
-	conditionFields := conditionFieldSet(msg)
+	conditionFields := ds.NewSet(msg.ConditionFields...)
 
 	for _, f := range msg.Fields {
-		if conditionFields[f.Name] {
+		if conditionFields.Contains(f.Name) {
 			// condition_fields are WHERE conditions, not SET values.
 			continue
 		}
@@ -50,18 +52,4 @@ func writeToMapMethod(b *strings.Builder, msg transform.GoMessage) {
 	}
 
 	b.WriteString("return um\n}\n\n")
-}
-
-// conditionFieldSet returns the set of condition field names for an update message,
-// read directly from msg.ConditionFields (populated by the transform layer).
-// Returns nil if the message has no condition fields.
-func conditionFieldSet(msg transform.GoMessage) map[string]bool {
-	if len(msg.ConditionFields) == 0 {
-		return nil
-	}
-	result := make(map[string]bool, len(msg.ConditionFields))
-	for _, name := range msg.ConditionFields {
-		result[name] = true
-	}
-	return result
 }

@@ -45,6 +45,12 @@ type GoMessage struct {
 	// These are WHERE-condition fields and must not appear in ToMap() output.
 	// Only populated when UpdateSource is non-empty.
 	ConditionFields []string
+	// RequiredFields lists the required_fields declared in the create_message annotation,
+	// excluding message-type fields (which are inherently nullable in proto and therefore
+	// cannot be detected via the non-optional heuristic). Used by validate inheritance
+	// to determine which scalar/enum fields must be present.
+	// Only populated when CreateSource is non-empty.
+	RequiredFields []string
 	// GormMessageOptions carries the message-level GORM annotation.
 	// Used by render to generate TableName() and decide whether to emit gorm struct tags.
 	// Nil means no GORM annotation is present.
@@ -181,6 +187,7 @@ func flattenMessages(msgs []model.Message, pkgName string, outMsgs *[]GoMessage,
 			UpdateSource:       msg.UpdateSource,
 			CreateSource:       msg.CreateSource,
 			ConditionFields:    conditionFieldsFor(msg),
+			RequiredFields:     requiredFieldsFor(msg),
 			GormMessageOptions: msg.GormOptions,
 		})
 
@@ -206,6 +213,25 @@ func conditionFieldsFor(msg model.Message) []string {
 	var result []string
 	for _, f := range msg.Fields {
 		if !f.Optional && f.Cardinality != model.CardinalityRepeated {
+			result = append(result, f.Name)
+		}
+	}
+	return result
+}
+
+// requiredFieldsFor returns the required field names for a create message.
+// In the generated create proto, required_fields are rendered as non-optional
+// scalar/enum fields. Message-type fields are excluded because they are
+// inherently nullable (always *T in Go, no optional keyword needed) and
+// cannot be reliably detected as required via the non-optional heuristic.
+// Returns nil for non-create messages (CreateSource == "").
+func requiredFieldsFor(msg model.Message) []string {
+	if msg.CreateSource == "" {
+		return nil
+	}
+	var result []string
+	for _, f := range msg.Fields {
+		if !f.Optional && f.Cardinality != model.CardinalityRepeated && f.Type.Kind != model.FieldKindMessage {
 			result = append(result, f.Name)
 		}
 	}

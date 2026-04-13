@@ -10,9 +10,9 @@ import {
   PersonRules,
 } from "../ts/person.pb.ts";
 
-import { type PersonCreate } from "../ts/person.create.pb.ts";
+import { type PersonCreate, PersonCreateRules } from "../ts/person.create.pb.ts";
 
-import { type PersonUpdateByName } from "../ts/person.update.pb.ts";
+import { type PersonUpdateByName, PersonUpdateByNameRules } from "../ts/person.update.pb.ts";
 
 import {
   type CreatePersonResponse,
@@ -311,6 +311,39 @@ const updateAll: AllScalarsUpdate = { fSint32: 42 };
 assertEqual(updateAll.fSint32, 42, "AllScalarsUpdate.fSint32 (condition field) is required and assigned");
 assertEqual(updateAll.fSint64, undefined, "AllScalarsUpdate.fSint64 optional — omitted === undefined");
 
+// --- Create/Update validate rule inheritance ---
+
+// PersonCreateRules: nickname is required (in required_fields)
+assertEqual(PersonCreateRules.nickname.required, true, "PersonCreateRules.nickname.required === true");
+assertEqual(PersonCreateRules.nickname.minLength, 1, "PersonCreateRules.nickname.minLength === 1");
+assertEqual(PersonCreateRules.nickname.maxLength, 10, "PersonCreateRules.nickname.maxLength === 10");
+// name is optional in create, but inherits constraints from source
+assertEqual(PersonCreateRules.name.required, false, "PersonCreateRules.name.required === false");
+assertEqual(PersonCreateRules.name.minLength, 1, "PersonCreateRules.name.minLength === 1");
+assertEqual(PersonCreateRules.name.maxLength, 100, "PersonCreateRules.name.maxLength === 100");
+// age is optional in create
+assertEqual(PersonCreateRules.age.required, false, "PersonCreateRules.age.required === false");
+assertEqual(PersonCreateRules.age.minimum, 0, "PersonCreateRules.age.minimum === 0");
+assertEqual(PersonCreateRules.age.maximum, 150, "PersonCreateRules.age.maximum === 150");
+// status is optional in create
+assertEqual(PersonCreateRules.status.required, false, "PersonCreateRules.status.required === false");
+assertEqual(PersonCreateRules.status.definedOnly, true, "PersonCreateRules.status.definedOnly === true");
+// email is optional in create
+assertEqual(PersonCreateRules.email.required, false, "PersonCreateRules.email.required === false");
+assertEqual(PersonCreateRules.email.format, "email", "PersonCreateRules.email.format === email");
+// role is optional in create
+assertEqual(PersonCreateRules.role.required, false, "PersonCreateRules.role.required === false");
+assert((PersonCreateRules.role as { enum: readonly string[] }).enum.includes("admin"), "PersonCreateRules.role.enum includes admin");
+
+// PersonUpdateByNameRules: name is required (condition field)
+assertEqual(PersonUpdateByNameRules.name.required, true, "PersonUpdateByNameRules.name.required === true");
+assertEqual(PersonUpdateByNameRules.name.minLength, 1, "PersonUpdateByNameRules.name.minLength === 1");
+assertEqual(PersonUpdateByNameRules.name.maxLength, 100, "PersonUpdateByNameRules.name.maxLength === 100");
+// nickname is optional in update
+assertEqual(PersonUpdateByNameRules.nickname.required, false, "PersonUpdateByNameRules.nickname.required === false");
+assertEqual(PersonUpdateByNameRules.nickname.minLength, 1, "PersonUpdateByNameRules.nickname.minLength === 1");
+assertEqual(PersonUpdateByNameRules.nickname.maxLength, 10, "PersonUpdateByNameRules.nickname.maxLength === 10");
+
 // --- AllValidate: interface type safety ---
 
 const av: AllValidate = {
@@ -347,7 +380,7 @@ assertEqual(treeLeaf.child.child.value, "deepest", "TreeNode.child.child.value d
 
 // --- summary ---
 
-assertEqual(passed, 97, "expected exactly 97 assertions before count guard");
+assertEqual(passed, 118, "expected exactly 118 assertions before count guard");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {

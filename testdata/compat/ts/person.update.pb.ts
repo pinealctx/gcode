@@ -21,3 +21,13 @@ export interface PersonUpdateByName {
   typeId?: number
 }
 
+export const PersonUpdateByNameRules = {
+  name: { required: true, type: "string", minLength: 1, maxLength: 100 },
+  age: { required: false, type: "integer", minimum: 0, maximum: 150 },
+  status: { required: false, type: "enum", definedOnly: true },
+  nickname: { required: false, type: "string", minLength: 1, maxLength: 10 },
+  email: { required: false, type: "string", format: "email" },
+  role: { required: false, type: "string", enum: ["admin", "user", "guest"] },
+  typeId: { required: false, type: "integer", notIn: [0, -1] }
+} as const
+
