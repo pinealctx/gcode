@@ -1,5 +1,30 @@
 # gcode 开箱即用指南
 
+## gcode 是什么
+
+gcode 是一个以 proto 文件为输入的代码生成工具，输出 Go struct、序列化方法、校验逻辑、HTTP handler 以及 TypeScript 类型定义。它面向使用 protobuf 作为 schema 语言、但不需要完整 gRPC 栈的后端服务。
+
+**gcode 生成什么：**
+
+| 输入 | 输出 |
+|---|---|
+| 任意 `.proto` 文件 | Go struct + `MarshalBinary` / `UnmarshalBinary` + `Validate()` |
+| `.meta.proto` schema 文件 | 三个派生 proto 文件（entity / create / update），由 `gen-proto` 生成 |
+| `.entity.proto` | 带 GORM tag 的 Go struct + `TableName()` + `DeepClone()` |
+| `.create.proto` | Go struct + `Validate()` + `ToEntity()` + `DeepClone()` |
+| `.update.proto` | Go struct + `Validate()` + `ToMap()` + `ApplyTo()` + `DeepClone()` |
+| service 定义 | Go interface + gin HTTP handler 工厂函数 |
+| 任意 `.proto` 文件 | TypeScript interface + enum + 验证元数据 |
+
+**适用范围与约束：**
+
+- 仅支持 proto3，不支持 proto2。
+- 生成的 Go 代码面向 GORM 持久化和 gin HTTP 服务，不支持其他 ORM 或 HTTP 框架。
+- 不生成 gRPC stub，生成的 Go interface 是普通 Go interface，不是 gRPC service。
+- 不支持的 proto 特性（streaming RPC、`map<K,V>`、`oneof`、well-known types）会在生成阶段报错退出，不会静默生成错误代码。详见[已知限制](#已知限制)。
+
+---
+
 ## 安装
 
 ```bash
@@ -120,6 +145,9 @@ import "gcode/options.proto";
 // person.entity.proto、person.create.proto 和 person.update.proto。
 option (gcode.schema) = {};
 
+// 原始 message：字段不使用 optional。
+// 字段的可选语义由派生 message 的注解决定，而非原始定义。
+// 所有字段均为普通字段（非 optional）——gen-proto 控制派生 proto 中的指针语义。
 message Person {
   string name = 1 [
     (buf.validate.field).string.min_len = 1,
@@ -130,13 +158,13 @@ message Person {
     (buf.validate.field).int32.lte = 150
   ];
   string email = 3 [(buf.validate.field).string.email = true];
-  optional string nickname = 4 [
+  string nickname = 4 [
     (buf.validate.field).string.min_len = 1,
     (buf.validate.field).string.max_len = 10
   ];
 
   // 生成 update 派生 message：PersonUpdateByName
-  // condition_fields 是 WHERE 条件字段，不写入 ToMap()
+  // condition_fields 是 WHERE 条件字段，在派生 struct 中为非指针类型，不写入 ToMap()
   option (gcode.update_message) = {
     name: "PersonUpdateByName"
     condition_fields: ["name"]
@@ -144,7 +172,8 @@ message Person {
   };
 
   // 生成 create 派生 message：PersonCreate
-  // required_fields 在派生 message 中为非指针类型（必填）
+  // 派生 struct 中所有字段默认为指针类型（可选）。
+  // required_fields 强制指定字段为非指针类型（必填）。
   option (gcode.create_message) = {
     name: "PersonCreate"
     ignore_fields: []
@@ -224,7 +253,7 @@ gcode -in proto/ -out dao/
 dao/
   person.entity.pb.dao.go           ← Person struct + 序列化方法
   person.entity.pb.dao.validate.go  ← Person.Validate()（返回 nil，无 validate 注解）
-  person.update.pb.dao.go           ← PersonUpdateByName struct + ToMap()
+  person.update.pb.dao.go           ← PersonUpdateByName struct + ToMap() + ApplyTo()
   person.update.pb.dao.validate.go  ← PersonUpdateByName.Validate()
   person.create.pb.dao.go           ← PersonCreate struct + ToEntity()
   person.create.pb.dao.validate.go  ← PersonCreate.Validate()
@@ -233,6 +262,15 @@ dao/
   person_service.pb.rpc.go          ← PersonService interface
   person_service.pb.http.go         ← gin handler 工厂函数
 ```
+
+**派生 struct 的字段指针规则：**
+
+| Struct | 字段类型 | Go 类型 | 说明 |
+|---|---|---|---|
+| `PersonCreate` | `required_fields` 中的字段 | `T`（非指针） | 调用方必须提供值 |
+| `PersonCreate` | 其余字段 | `*T`（指针） | nil = 未提供，跳过校验 |
+| `PersonUpdateByName` | `condition_fields` 中的字段 | `T`（非指针） | WHERE 条件，不写入 `ToMap()` |
+| `PersonUpdateByName` | 其余字段 | `*T`（指针） | nil = 不更新此字段 |
 
 ---
 
@@ -400,7 +438,31 @@ db.Model(&dao.Person{}).Where("name = ?", req.Name).Updates(req.ToMap())
 
 ---
 
-### 第七步：实现 RPC interface
+### 第七步：使用 DeepClone()
+
+每个生成的 struct 都有 `DeepClone()` 方法，返回一个完全独立的副本，克隆体与原对象之间不共享任何内存。适用于需要在应用变更前保留原始状态的场景：
+
+```go
+// 在应用更新前保留原始状态
+original := entity.DeepClone()
+updateMsg.ApplyTo(entity)
+
+// 对比 original 与 entity 的差异，用于 diff、审计日志或乐观锁冲突检测
+if original.Age != entity.Age {
+    log.Printf("age changed: %d → %d", original.Age, entity.Age)
+}
+```
+
+`DeepClone()` 正确处理所有字段类型：
+- scalar 和 enum 字段：按值复制
+- optional 字段（`*T`）：分配新指针，修改克隆体的字段不影响原对象
+- bytes 和 repeated 字段：分配新 slice 并复制内容
+- 嵌套 message 字段：递归克隆
+- nil 接收者：返回 nil
+
+---
+
+### 第八步：实现 RPC interface
 
 生成的 `PersonService` interface：
 
@@ -433,7 +495,7 @@ func (s *personServiceImpl) CreatePerson(ctx context.Context, req *dao.PersonCre
 
 ---
 
-### 第八步：注册 gin 路由（完整 HTTP 服务）
+### 第九步：注册 gin 路由（完整 HTTP 服务）
 
 > **gin 依赖**：生成的 `*.pb.http.go` 文件会导入 [gin](https://github.com/gin-gonic/gin)，需要在项目中安装：
 > ```bash

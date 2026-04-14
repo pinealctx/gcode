@@ -1,5 +1,30 @@
 # gcode Getting Started
 
+## What is gcode
+
+gcode is a code generator that takes proto files as input and produces Go structs, serialization methods, validation logic, HTTP handlers, and TypeScript type definitions. It is designed for backend services that use protobuf as a schema language but do not need the full gRPC stack.
+
+**What gcode generates:**
+
+| Input | Output |
+|---|---|
+| Any `.proto` file | Go struct + `MarshalBinary` / `UnmarshalBinary` + `Validate()` |
+| `.meta.proto` schema file | Three derived proto files (entity / create / update) via `gen-proto` |
+| `.entity.proto` | Go struct with GORM tags + `TableName()` + `DeepClone()` |
+| `.create.proto` | Go struct with `Validate()` + `ToEntity()` + `DeepClone()` |
+| `.update.proto` | Go struct with `Validate()` + `ToMap()` + `ApplyTo()` + `DeepClone()` |
+| Service definition | Go interface + gin HTTP handler factory functions |
+| Any `.proto` file | TypeScript interfaces + enums + validation metadata |
+
+**Scope and constraints:**
+
+- Targets proto3 only. proto2 is not supported.
+- Generates Go code for GORM-based persistence and gin-based HTTP services. Other ORMs or HTTP frameworks are not supported.
+- Does not generate gRPC stubs. The generated Go interface is a plain Go interface, not a gRPC service.
+- Unsupported proto features (streaming RPC, `map<K,V>`, `oneof`, well-known types) cause a generation-time error rather than silently producing incorrect code. See [Known Limitations](#known-limitations).
+
+---
+
 ## Installation
 
 ```bash
@@ -118,6 +143,9 @@ import "gcode/options.proto";
 // person.entity.proto, person.create.proto, and person.update.proto.
 option (gcode.schema) = {};
 
+// Source message: do NOT use optional on fields here.
+// Optionality is determined by the derived message annotations, not the source.
+// All fields are plain (non-optional) — gen-proto controls pointer semantics in derived protos.
 message Person {
   string name = 1 [
     (buf.validate.field).string.min_len = 1,
@@ -128,13 +156,13 @@ message Person {
     (buf.validate.field).int32.lte = 150
   ];
   string email = 3 [(buf.validate.field).string.email = true];
-  optional string nickname = 4 [
+  string nickname = 4 [
     (buf.validate.field).string.min_len = 1,
     (buf.validate.field).string.max_len = 10
   ];
 
   // Generate update derived message: PersonUpdateByName
-  // condition_fields are WHERE clause fields, excluded from ToMap()
+  // condition_fields are WHERE clause fields, non-pointer in derived struct, excluded from ToMap()
   option (gcode.update_message) = {
     name: "PersonUpdateByName"
     condition_fields: ["name"]
@@ -142,7 +170,8 @@ message Person {
   };
 
   // Generate create derived message: PersonCreate
-  // required_fields become non-pointer types (required) in the derived message
+  // All fields default to pointer (optional) in the derived struct.
+  // required_fields forces specific fields to non-pointer (required).
   option (gcode.create_message) = {
     name: "PersonCreate"
     ignore_fields: []
@@ -222,7 +251,7 @@ Result:
 dao/
   person.entity.pb.dao.go           ← Person struct + serialization methods
   person.entity.pb.dao.validate.go  ← Person.Validate() — returns nil (no validate annotations)
-  person.update.pb.dao.go           ← PersonUpdateByName struct + ToMap()
+  person.update.pb.dao.go           ← PersonUpdateByName struct + ToMap() + ApplyTo()
   person.update.pb.dao.validate.go  ← PersonUpdateByName.Validate()
   person.create.pb.dao.go           ← PersonCreate struct + ToEntity()
   person.create.pb.dao.validate.go  ← PersonCreate.Validate()
@@ -231,6 +260,15 @@ dao/
   person_service.pb.rpc.go          ← PersonService interface
   person_service.pb.http.go         ← gin handler factory functions
 ```
+
+**Field pointer rules in derived structs:**
+
+| Struct | Field kind | Go type | Notes |
+|---|---|---|---|
+| `PersonCreate` | in `required_fields` | `T` (non-pointer) | caller must provide a value |
+| `PersonCreate` | all other fields | `*T` (pointer) | nil = not provided, skips validation |
+| `PersonUpdateByName` | in `condition_fields` | `T` (non-pointer) | WHERE clause, excluded from `ToMap()` |
+| `PersonUpdateByName` | all other fields | `*T` (pointer) | nil = not updating this field |
 
 ---
 
@@ -398,7 +436,31 @@ db.Model(&dao.Person{}).Where("name = ?", req.Name).Updates(req.ToMap())
 
 ---
 
-### Step 7: Implement the RPC interface
+### Step 7: Use DeepClone()
+
+Every generated struct has a `DeepClone()` method that returns a fully independent copy with no shared memory. This is useful when you need to preserve the original state before applying a mutation:
+
+```go
+// Preserve the original before applying an update
+original := entity.DeepClone()
+updateMsg.ApplyTo(entity)
+
+// Compare original vs entity for diff, audit log, or optimistic-lock conflict detection
+if original.Age != entity.Age {
+    log.Printf("age changed: %d → %d", original.Age, entity.Age)
+}
+```
+
+`DeepClone()` handles all field kinds correctly:
+- Scalar and enum fields: copied by value
+- Optional fields (`*T`): a new pointer is allocated — mutating the clone's field does not affect the original
+- Bytes and repeated fields: new slices are allocated and contents are copied
+- Nested message fields: recursively cloned
+- Nil receiver: returns nil
+
+---
+
+### Step 8: Implement the RPC interface
 
 Generated `PersonService` interface:
 
@@ -431,7 +493,7 @@ func (s *personServiceImpl) CreatePerson(ctx context.Context, req *dao.PersonCre
 
 ---
 
-### Step 8: Register gin routes (full HTTP service)
+### Step 9: Register gin routes (full HTTP service)
 
 > **gin dependency**: The generated `*.pb.http.go` files import [gin](https://github.com/gin-gonic/gin). Add it to your project:
 > ```bash
