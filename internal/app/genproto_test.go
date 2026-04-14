@@ -75,7 +75,7 @@ func TestRunGenProto_UpdateMessage(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -144,7 +144,7 @@ func TestRunGenProto_CreateMessage(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	writeFile(t, filepath.Join(inDir, "product.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "product.meta.proto"), `syntax = "proto3";
 package test.product;
 import "gcode/options.proto";
 
@@ -205,7 +205,7 @@ func TestRunGenProto_MultipleOptions(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -276,7 +276,8 @@ message Plain {
 		t.Fatalf("RunGenProto returned error: %v", err)
 	}
 
-	// No intermediate protos generated (file lacks gcode.schema option).
+	// No intermediate protos generated: plain.proto is not a .meta.proto file,
+	// so filterMetaProtos returns empty and RunGenProto returns nil immediately.
 	if _, err := os.Stat(filepath.Join(inDir, "plain.update.proto")); err == nil {
 		t.Errorf("plain.update.proto should not be generated")
 	}
@@ -293,7 +294,7 @@ func TestRunGenProto_MessageTypeFieldAllowed(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	writeFile(t, filepath.Join(inDir, "order.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "order.meta.proto"), `syntax = "proto3";
 package test;
 import "gcode/options.proto";
 
@@ -339,7 +340,7 @@ func TestRunGenProto_EnumField(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	writeFile(t, filepath.Join(inDir, "item.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "item.meta.proto"), `syntax = "proto3";
 package test.item;
 import "gcode/options.proto";
 
@@ -400,7 +401,7 @@ enum Status {
 `)
 
 	// item.proto uses Status and has an update_message annotation.
-	writeFile(t, filepath.Join(inDir, "item.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "item.meta.proto"), `syntax = "proto3";
 package test.item;
 import "common.proto";
 import "gcode/options.proto";
@@ -460,7 +461,7 @@ message Address {
 `)
 
 	// order.proto uses Address and has a create_message annotation.
-	writeFile(t, filepath.Join(inDir, "order.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "order.meta.proto"), `syntax = "proto3";
 package test.order;
 import "address.proto";
 import "gcode/options.proto";
@@ -627,104 +628,6 @@ func TestProtoBaseName_Subdirectory(t *testing.T) {
 	}
 }
 
-func TestTypeSourceIndex(t *testing.T) {
-	t.Parallel()
-
-	files := []model.File{
-		{
-			Path: "common.proto",
-			Enums: []model.Enum{
-				{Name: "Status", FullName: "test.Status"},
-			},
-			Messages: []model.Message{
-				{Name: "Address", FullName: "test.Address"},
-			},
-		},
-		{
-			Path: "item.proto",
-			Messages: []model.Message{
-				{Name: "Item", FullName: "test.Item",
-					Enums: []model.Enum{
-						{Name: "Kind", FullName: "test.Item.Kind"},
-					},
-				},
-			},
-		},
-	}
-
-	idx := typeSourceIndex(files)
-
-	if idx["test.Status"] != "common.proto" {
-		t.Errorf("test.Status → %q, want %q", idx["test.Status"], "common.proto")
-	}
-	if idx["test.Address"] != "common.proto" {
-		t.Errorf("test.Address → %q, want %q", idx["test.Address"], "common.proto")
-	}
-	if idx["test.Item"] != "item.proto" {
-		t.Errorf("test.Item → %q, want %q", idx["test.Item"], "item.proto")
-	}
-	if idx["test.Item.Kind"] != "item.proto" {
-		t.Errorf("test.Item.Kind → %q, want %q", idx["test.Item.Kind"], "item.proto")
-	}
-}
-
-func TestCollectExternalImports(t *testing.T) {
-	t.Parallel()
-
-	typeIdx := map[string]string{
-		"test.Status":  "common.proto",
-		"test.Address": "address.proto",
-		"test.Item":    "item.proto",
-	}
-
-	msgs := []model.Message{
-		{
-			Name: "Item",
-			Fields: []model.Field{
-				{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}},
-				{Name: "status", Type: model.FieldType{Kind: model.FieldKindEnum, FullName: "test.Status", Name: "Status"}},
-				{Name: "addr", Type: model.FieldType{Kind: model.FieldKindMessage, FullName: "test.Address", Name: "Address"}},
-			},
-		},
-	}
-
-	imports := collectExternalImports(msgs, typeIdx, "item.proto")
-
-	if len(imports) != 2 {
-		t.Fatalf("got %d imports, want 2: %v", len(imports), imports)
-	}
-	got := map[string]bool{}
-	for _, imp := range imports {
-		got[imp] = true
-	}
-	if !got["common.proto"] || !got["address.proto"] {
-		t.Errorf("expected common.proto and address.proto, got %v", imports)
-	}
-}
-
-func TestCollectExternalImports_SameFile(t *testing.T) {
-	t.Parallel()
-
-	typeIdx := map[string]string{
-		"test.Status": "item.proto",
-	}
-
-	msgs := []model.Message{
-		{
-			Name: "Item",
-			Fields: []model.Field{
-				{Name: "status", Type: model.FieldType{Kind: model.FieldKindEnum, FullName: "test.Status", Name: "Status"}},
-			},
-		},
-	}
-
-	// Status is defined in the same file — should NOT produce extra imports.
-	imports := collectExternalImports(msgs, typeIdx, "item.proto")
-	if len(imports) != 0 {
-		t.Errorf("expected no imports for same-file types, got %v", imports)
-	}
-}
-
 func TestRunGenProto_NonExistentDirectory(t *testing.T) {
 	t.Parallel()
 
@@ -740,7 +643,7 @@ func TestRunGenProto_StaleIntermediateProtosCleaned(t *testing.T) {
 	inDir := t.TempDir()
 
 	// Write a proto with update_message option.
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -766,7 +669,7 @@ message User {
 	}
 
 	// Overwrite with a proto that has no update_message (but keeps schema).
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -793,7 +696,7 @@ func TestRunGenProto_StaleCreateProtosCleaned(t *testing.T) {
 	inDir := t.TempDir()
 
 	// Write a proto with create_message option.
-	writeFile(t, filepath.Join(inDir, "product.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "product.meta.proto"), `syntax = "proto3";
 package test.product;
 import "gcode/options.proto";
 
@@ -819,7 +722,7 @@ message Product {
 	}
 
 	// Overwrite with a proto that has no create_message (but keeps schema).
-	writeFile(t, filepath.Join(inDir, "product.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "product.meta.proto"), `syntax = "proto3";
 package test.product;
 import "gcode/options.proto";
 
@@ -846,7 +749,7 @@ func TestRunGenProto_StaleCleanupPartial(t *testing.T) {
 	inDir := t.TempDir()
 
 	// First run: proto has both update and create options.
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -878,7 +781,7 @@ message User {
 	}
 
 	// Second run: remove only create_message option, keep update_message.
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -918,7 +821,7 @@ func TestRunGenProto_RemoveFailureReturnsError(t *testing.T) {
 	inDir := t.TempDir()
 
 	// First run: generate user.update.proto.
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 

@@ -222,12 +222,17 @@ service PersonService {
 gcode gen-proto -in proto/
 ```
 
+> **schema 文件命名约束**：`gen-proto` 以 `.meta.proto` 后缀作为识别 schema 文件的唯一依据。不带此后缀的文件——包括 `common.proto`、service proto 及其他共享定义文件——不会被 `gen-proto` 直接处理，而是在 protocompile 解析 `.meta.proto` 时作为依赖自动解析。
+>
+> 如果 `.meta.proto` 文件 import 了 `common.proto`，生成的 `*.create.proto` 和 `*.update.proto` 会自动包含 `import "common.proto"`，无需手动管理 import。
+
 生成结果：
 
 ```
 proto/
   person.meta.proto         ← schema 源文件（不变）
-  person_service.proto      ← 原始文件（不变）
+  common.proto              ← 共享定义文件（不变，gen-proto 不处理）
+  person_service.proto      ← service 定义文件（不变，gen-proto 不处理）
   person.entity.proto       ← 生成：Person message（无 validate，有 gorm）
   person.update.proto       ← 生成：PersonUpdateByName message（含 validate）
   person.create.proto       ← 生成：PersonCreate message（含 validate）

@@ -37,34 +37,25 @@ func RunGenProto(ctx context.Context, args []string) error {
 		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, source.ErrNoProtoFiles)
 	}
 
-	// Exclude previously generated intermediate protos from parsing to avoid
-	// symbol conflicts with their source schema files.
-	inputFiles := filterSourceProtos(scanResult.Files)
-
-	// Parse source files to discover schema files. Non-schema files that import
-	// generated files not yet on disk will cause parse failures; in that case
-	// fall back to parsing only .meta.proto files.
-	firstPass, err := parser.Parse(ctx, []string{scanResult.ImportPath}, inputFiles)
-	if err != nil {
-		firstErr := err
-		metaFiles := filterMetaProtos(inputFiles)
-		if len(metaFiles) == 0 {
-			return fmt.Errorf("parse proto files: %w", firstErr)
-		}
-		firstPass, err = parser.Parse(ctx, []string{scanResult.ImportPath}, metaFiles)
-		if err != nil {
-			return fmt.Errorf("full parse failed (%v); meta-only parse also failed: %w", firstErr, err)
-		}
+	// Parse only .meta.proto schema files. protocompile resolves their imports
+	// (e.g. common.proto) automatically. Non-schema files (service protos, etc.)
+	// are intentionally excluded: they may import generated files that do not
+	// exist yet, and gen-proto does not need them.
+	metaFiles := filterMetaProtos(scanResult.Files)
+	if len(metaFiles) == 0 {
+		return nil // no schema files — nothing to generate
 	}
 
-	// Build type index and generate only from schema files.
-	typeIdx := typeSourceIndex(firstPass)
+	parsed, err := parser.Parse(ctx, []string{scanResult.ImportPath}, metaFiles)
+	if err != nil {
+		return fmt.Errorf("parse schema files: %w", err)
+	}
 
-	for _, f := range firstPass {
+	for _, f := range parsed {
 		if !f.IsSchema {
 			continue
 		}
-		if err := generateIntermediateProtos(f, scanResult.ImportPath, typeIdx); err != nil {
+		if err := generateIntermediateProtos(f, scanResult.ImportPath); err != nil {
 			return fmt.Errorf("generate intermediate protos for %q: %w", f.Path, err)
 		}
 	}
@@ -76,7 +67,7 @@ func RunGenProto(ctx context.Context, args []string) error {
 // *.update.proto for a schema file. Any previously generated intermediate proto
 // files for this base name are removed first, so that deleting an option from
 // the source proto does not leave stale generated files behind.
-func generateIntermediateProtos(f model.File, outputDir string, typeIdx map[string]string) error {
+func generateIntermediateProtos(f model.File, outputDir string) error {
 	// Collect all messages with options (including nested).
 	var updateMsgs []model.Message
 	var createMsgs []model.Message
@@ -104,7 +95,7 @@ func generateIntermediateProtos(f model.File, outputDir string, typeIdx map[stri
 	}
 
 	if len(updateMsgs) > 0 {
-		extImports := collectExternalImports(updateMsgs, typeIdx, f.Path)
+		extImports := schemaExternalImports(f)
 		content, err := buildUpdateProto(f, baseName, updateMsgs, extImports)
 		if err != nil {
 			return fmt.Errorf("build update proto: %w", err)
@@ -115,7 +106,7 @@ func generateIntermediateProtos(f model.File, outputDir string, typeIdx map[stri
 	}
 
 	if len(createMsgs) > 0 {
-		extImports := collectExternalImports(createMsgs, typeIdx, f.Path)
+		extImports := schemaExternalImports(f)
 		content, err := buildCreateProto(f, baseName, createMsgs, extImports)
 		if err != nil {
 			return fmt.Errorf("build create proto: %w", err)
@@ -269,6 +260,28 @@ func gormFieldOpts(f model.Field) string {
 		return " [(gcode.field).gorm.column = " + strconv.Quote(f.GormOptions.Column) + "]"
 	}
 	return ""
+}
+
+// schemaExternalImports returns the import paths from a schema file that should
+// be propagated to generated create/update proto files. System imports
+// (buf/validate, gcode/options) and other .meta.proto files are excluded:
+// system imports are added explicitly by the builders, and .meta.proto types
+// are already present in the generated .entity.proto.
+// Generated files (*.entity.proto, *.create.proto, *.update.proto) are not
+// filtered here because schema files must not import them — entity protos are
+// outputs of gen-proto, not inputs.
+func schemaExternalImports(f model.File) []string {
+	var result []string
+	for _, imp := range f.Imports {
+		if imp.Path == "buf/validate/validate.proto" || imp.Path == "gcode/options.proto" {
+			continue
+		}
+		if strings.HasSuffix(imp.Path, ".meta.proto") {
+			continue
+		}
+		result = append(result, imp.Path)
+	}
+	return result
 }
 
 // buildUpdateProto generates the content of a *.update.proto file.
@@ -594,58 +607,22 @@ func protoTypeName(f model.Field) string {
 	switch f.Type.Kind {
 	case model.FieldKindScalar:
 		return string(f.Type.Scalar)
-	case model.FieldKindEnum:
+	case model.FieldKindEnum, model.FieldKindMessage:
 		return f.Type.Name
 	default:
-		return f.Type.Name
+		panic(fmt.Sprintf("protoTypeName: unknown field kind %v", f.Type.Kind))
 	}
 }
 
-// typeSourceIndex builds a FullName → source proto file path mapping from all
-// parsed files. Used by collectExternalImports to resolve cross-file type
-// references in derived messages.
-func typeSourceIndex(files []model.File) map[string]string {
-	idx := make(map[string]string)
+// filterMetaProtos returns only files ending in .meta.proto.
+func filterMetaProtos(files []string) []string {
+	var result []string
 	for _, f := range files {
-		collectTypeSources(f.Messages, f.Enums, f.Path, idx)
-	}
-	return idx
-}
-
-// collectTypeSources recursively maps message and enum FullNames to their
-// source proto file path.
-func collectTypeSources(msgs []model.Message, enums []model.Enum, filePath string, idx map[string]string) {
-	for _, msg := range msgs {
-		idx[msg.FullName] = filePath
-		collectTypeSources(msg.Messages, msg.Enums, filePath, idx)
-	}
-	for _, enum := range enums {
-		idx[enum.FullName] = filePath
-	}
-}
-
-// collectExternalImports scans the fields of derived messages and returns
-// the import paths of proto files that define referenced enum or message types
-// from other files.
-func collectExternalImports(msgs []model.Message, typeIdx map[string]string, selfPath string) []string {
-	seen := make(map[string]bool)
-	var imports []string
-	for _, msg := range msgs {
-		for _, f := range msg.Fields {
-			if f.Type.Kind != model.FieldKindEnum && f.Type.Kind != model.FieldKindMessage {
-				continue
-			}
-			srcFile, ok := typeIdx[f.Type.FullName]
-			if !ok || srcFile == selfPath {
-				continue
-			}
-			if !seen[srcFile] {
-				seen[srcFile] = true
-				imports = append(imports, srcFile)
-			}
+		if strings.HasSuffix(f, ".meta.proto") {
+			result = append(result, f)
 		}
 	}
-	return imports
+	return result
 }
 
 // protoBaseName strips the .proto (and optional .meta) suffix from a relative
@@ -666,45 +643,6 @@ var protoIdentifierRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // into generated proto source.
 func isProtoIdentifier(s string) bool {
 	return protoIdentifierRe.MatchString(s)
-}
-
-// generatedProtoSuffixes lists filename suffixes of intermediate protos generated
-// by gen-proto. These are excluded from the parser input to avoid symbol conflicts
-// with their source schema files.
-var generatedProtoSuffixes = []string{
-	".entity.proto",
-	".create.proto",
-	".update.proto",
-}
-
-// filterSourceProtos removes previously generated intermediate proto files
-// from the input list, keeping only source proto files for parsing.
-func filterSourceProtos(files []string) []string {
-	var result []string
-	for _, f := range files {
-		excluded := false
-		for _, suffix := range generatedProtoSuffixes {
-			if strings.HasSuffix(f, suffix) {
-				excluded = true
-				break
-			}
-		}
-		if !excluded {
-			result = append(result, f)
-		}
-	}
-	return result
-}
-
-// filterMetaProtos returns only files ending in .meta.proto.
-func filterMetaProtos(files []string) []string {
-	var result []string
-	for _, f := range files {
-		if strings.HasSuffix(f, ".meta.proto") {
-			result = append(result, f)
-		}
-	}
-	return result
 }
 
 // metaToEntityImport rewrites a .meta.proto import path to .entity.proto.

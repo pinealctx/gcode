@@ -35,15 +35,6 @@ func writeDeepCloneField(b *strings.Builder, recv string, f transform.GoField) {
 		return
 	}
 
-	// HasPresence bytes (optional []byte, nil = absent): deep copy the slice.
-	if f.HasPresence && f.Type.Kind == model.FieldKindScalar && f.Type.Scalar == model.ScalarBytes {
-		fmt.Fprintf(b, "if %s != nil {\n", accessor)
-		fmt.Fprintf(b, "clone.%s = make([]byte, len(%s))\n", f.GoName, accessor)
-		fmt.Fprintf(b, "copy(clone.%s, %s)\n", f.GoName, accessor)
-		b.WriteString("}\n")
-		return
-	}
-
 	// Optional pointer fields: allocate a new pointer.
 	// Note: Optional only applies to scalar and enum fields; message fields are
 	// always pointers and handled by the FieldKindMessage branch below.
@@ -69,9 +60,10 @@ func writeDeepCloneField(b *strings.Builder, recv string, f transform.GoField) {
 		return
 	}
 
-	// Singular scalar (non-pointer, non-bytes-presence) and singular enum:
-	// already handled by the shallow copy — no extra code needed.
-	// Exception: singular bytes ([]byte) shares the backing array and must be copied.
+	// Singular scalar (non-optional) and singular enum: already handled by the
+	// shallow copy — no extra code needed.
+	// Exception: singular bytes ([]byte, with or without HasPresence) shares the
+	// backing array and must be deep-copied.
 	if f.Type.Kind == model.FieldKindScalar && f.Type.Scalar == model.ScalarBytes {
 		fmt.Fprintf(b, "if %s != nil {\n", accessor)
 		fmt.Fprintf(b, "clone.%s = make([]byte, len(%s))\n", f.GoName, accessor)

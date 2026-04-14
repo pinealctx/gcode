@@ -231,14 +231,13 @@ db.Model(&dao.Person{}).Where("name = ?", req.Name).Updates(req.ToMap())
 
 #### 跨包引用
 
-`gcode gen-proto` 自动解析跨文件的 enum 和 message 引用。如果字段类型定义在另一个 proto 文件中，生成的 `*.update.proto` 或 `*.create.proto` 会自动包含所需的 `import` 语句。
+`gcode gen-proto` 将 schema 文件的 import 传递给生成的 `*.create.proto` 和 `*.update.proto`。如果 schema 文件 import 了 `common.proto`，两个派生文件也会自动包含 `import "common.proto"`，无需手动管理 import。
 
 ```proto
-// ✅ 枚举定义在单独的 proto 文件中
-// common.proto:
+// common.proto — 共享枚举定义
 enum Status { STATUS_UNSPECIFIED = 0; STATUS_ACTIVE = 1; STATUS_INACTIVE = 2; }
 
-// user.proto:
+// user.meta.proto — schema 文件
 import "common.proto";
 message User {
   Status status = 1;
@@ -247,7 +246,7 @@ message User {
 // 生成的 user.update.proto 自动包含：import "common.proto";
 ```
 
-衍生 proto 文件无需手动管理 import。
+机制很直接：`gen-proto` 只解析 `.meta.proto` 文件，schema 文件 import 的其他文件（如 `common.proto`）由 protocompile 作为依赖自动解析。生成的 create/update proto 直接继承 schema 文件中所有非系统 import。
 
 update 派生 message 的 `Validate()` 使用由 `gen-proto` 从 schema 拷贝的 validate 规则，直接从派生 message 自身的 proto 字段读取，无需跨文件反查。行为如下：
 
@@ -281,8 +280,10 @@ cache.Set(key, person)
 
 `ApplyTo()` 处理 update 和原始 struct 之间的指针类型差异：
 - **可选 scalar/enum**（`*T` → `T`）：nil 守卫 + 解引用 — 仅在提供时设置
-- **可选指针**（`*T` → `*T`）：nil 守卫 + 指针赋值 — 共享引用
+- **可选指针**（`*T` → `*T`）：nil 守卫 + 指针赋值 — 共享引用（修改一方会影响另一方）
 - **Repeated/bytes**（`[]T`）：nil 守卫 — 区分"未提供"（nil）和"设置为空"
+
+> **内存语义**：与 `ToEntity()` 类似，`ApplyTo()` 不是深拷贝。ptr-to-ptr 字段和 repeated/bytes 字段通过引用赋值，update struct 与 entity 之间共享内存。
 
 ---
 
@@ -363,10 +364,12 @@ cache.Set(key, person)
 ```
 
 `ToEntity()` 处理 create 和原始 struct 之间的指针类型差异：
-- **必填字段**（`T` → `*T`）：取地址 — 必填字段总有值
+- **必填字段**（`T` → `*T`）：复制后取地址 — 与 create struct 内存隔离
 - **可选 scalar/enum**（`*T` → `T`）：nil 守卫 + 解引用 — 未提供时为零值
-- **可选指针**（`*T` → `*T`）：nil 守卫 + 指针赋值 — 共享引用
-- **Repeated/bytes**（`[]T`）：直接赋值
+- **可选指针**（`*T` → `*T`）：nil 守卫 + 指针赋值 — 共享引用（修改一方会影响另一方）
+- **Repeated/bytes**（`[]T`）：直接赋值 — 共享底层数组
+
+> **内存语义**：`ToEntity()` 是类型转换，不是深拷贝。repeated/bytes 字段与 create struct 共享底层数组，ptr-to-ptr 字段共享指针目标。如需完全隔离，使用 `entity := req.ToEntity(); clone := entity.DeepClone()`。
 
 被 `ignore_fields` 排除的字段在返回的实体中保持零值。
 

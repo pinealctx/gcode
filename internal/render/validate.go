@@ -125,9 +125,15 @@ func writeDerivedValidation(b *strings.Builder, recv string, msg transform.GoMes
 			writeFieldValidationExpr(b, fieldExpr, f, enumByGoName, true)
 
 		case strings.HasPrefix(f.GoType, "*"):
-			fmt.Fprintf(b, "if %s != nil {\n", fieldExpr)
-			writeFieldValidationExpr(b, "*"+fieldExpr, f, enumByGoName, false)
-			b.WriteString("}\n")
+			if f.Type.Kind == model.FieldKindMessage {
+				// Optional message field (*Message): writeMessageFieldValidation already
+				// handles the nil guard and recursive Validate(). Do not dereference.
+				writeMessageFieldValidation(b, fieldExpr, f.Name, f.ValidateMessage, vo)
+			} else {
+				fmt.Fprintf(b, "if %s != nil {\n", fieldExpr)
+				writeFieldValidationExpr(b, "*"+fieldExpr, f, enumByGoName, false)
+				b.WriteString("}\n")
+			}
 
 		default:
 			// Non-required, non-pointer field (e.g. repeated, or a create field not in

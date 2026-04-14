@@ -24,6 +24,9 @@ var _genProtoGoldenFiles = []string{
 	"all_types.entity.proto",
 	"all_types.update.proto",
 	"all_types.create.proto",
+	"item.entity.proto",
+	"item.update.proto",
+	"item.create.proto",
 }
 
 // TestGenProtoSnapshot verifies that RunGenProto output matches committed golden files.
@@ -106,6 +109,7 @@ func TestGenProtoValidateNotInEntity(t *testing.T) {
 	entityFiles := []string{
 		"proto/person.entity.proto",
 		"proto/all_types.entity.proto",
+		"proto/item.entity.proto",
 	}
 
 	for _, name := range entityFiles {
