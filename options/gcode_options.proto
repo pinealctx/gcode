@@ -74,6 +74,16 @@ message CreateMessageOptions {
   repeated string required_fields = 3;
 }
 
+// UpdateSourceOptions is written by gcode gen-proto into generated *.update.proto files.
+// It carries the source message name and condition_fields together as a single semantic unit.
+// Internal: written by gcode gen-proto; do not set manually.
+message UpdateSourceOptions {
+  // source is the source message name (e.g. "Item").
+  string source = 1;
+  // condition_fields are the WHERE-condition fields from the original update_message annotation.
+  repeated string condition_fields = 2;
+}
+
 extend google.protobuf.MessageOptions {
   // update_message declares a partial-update message to generate from this message.
   // May be repeated to generate multiple update messages.
@@ -81,10 +91,11 @@ extend google.protobuf.MessageOptions {
   // create_message declares a create (insert) message to generate from this message.
   // May be repeated to generate multiple create messages.
   repeated CreateMessageOptions create_message = 50004;
-  // update_source is written by gcode gen-proto into generated *.update.proto files.
-  // It records the source message name and triggers ToMap() generation in stage 2.
+  // update_source_opts is written by gcode gen-proto into generated *.update.proto files.
+  // It carries the source message name and condition_fields, used by stage 2 to generate
+  // ApplyTo(), ToMap(), and inherit validate rules.
   // Internal: written by gcode gen-proto; do not set manually.
-  string update_source = 50005;
+  UpdateSourceOptions update_source_opts = 50007;
   // create_source is written by gcode gen-proto into generated *.create.proto files.
   // It records the source message name for stage 2 validate inheritance.
   // Internal: written by gcode gen-proto; do not set manually.

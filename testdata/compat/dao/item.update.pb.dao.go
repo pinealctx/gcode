@@ -230,6 +230,9 @@ func (x *ItemUpdate) ToMap() map[string]any {
 	if x.Kind != nil {
 		um["kind"] = *x.Kind
 	}
+	if x.Dimensions != nil {
+		um["dimensions"] = *x.Dimensions
+	}
 	return um
 }
 
@@ -241,5 +244,8 @@ func (x *ItemUpdate) ApplyTo(p *Item) {
 	}
 	if x.Kind != nil {
 		p.Kind = *x.Kind
+	}
+	if x.Dimensions != nil {
+		p.Dimensions = x.Dimensions
 	}
 }

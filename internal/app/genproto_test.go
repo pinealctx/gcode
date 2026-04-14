@@ -110,8 +110,8 @@ message User {
 	if !strings.Contains(s, "message UserUpdateByID") {
 		t.Errorf("missing message UserUpdateByID in:\n%s", s)
 	}
-	if !strings.Contains(s, `(gcode.update_source) = "User"`) {
-		t.Errorf("missing update_source annotation in:\n%s", s)
+	if !strings.Contains(s, `option (gcode.update_source_opts) = { source: "User", condition_fields: ["id"] }`) {
+		t.Errorf("missing update_source_opts annotation in:\n%s", s)
 	}
 	// id is condition field → non-optional
 	if !strings.Contains(s, "int64 id = 1") {
@@ -134,6 +134,53 @@ message User {
 	// Entity proto should be generated.
 	if _, err := os.Stat(filepath.Join(inDir, "user.entity.proto")); err != nil {
 		t.Errorf("user.entity.proto should be generated: %v", err)
+	}
+
+	compileProtoDir(t, inDir)
+}
+
+func TestRunGenProto_UpdateMessage_NoConditionFields(t *testing.T) {
+	t.Parallel()
+
+	inDir := t.TempDir()
+
+	writeFile(t, filepath.Join(inDir, "log.meta.proto"), `syntax = "proto3";
+package test.log;
+import "gcode/options.proto";
+
+option (gcode.schema) = {};
+
+message LogEntry {
+  string message = 1;
+  int32  level   = 2;
+
+  option (gcode.update_message) = {
+    name: "LogEntryUpdate"
+  };
+}
+`)
+
+	if err := RunGenProto(t.Context(), []string{"-in", inDir}); err != nil {
+		t.Fatalf("RunGenProto returned error: %v", err)
+	}
+
+	updatePath := filepath.Join(inDir, "log.update.proto")
+	content, err := os.ReadFile(updatePath)
+	if err != nil {
+		t.Fatalf("log.update.proto not generated: %v", err)
+	}
+	s := string(content)
+
+	// No condition_fields → update_source_opts should omit condition_fields.
+	if !strings.Contains(s, `option (gcode.update_source_opts) = { source: "LogEntry" }`) {
+		t.Errorf("missing update_source_opts (no condition_fields) in:\n%s", s)
+	}
+	// All fields should be optional when there are no condition_fields.
+	if !strings.Contains(s, "optional string message") {
+		t.Errorf("message should be optional in:\n%s", s)
+	}
+	if !strings.Contains(s, "optional int32 level") {
+		t.Errorf("level should be optional in:\n%s", s)
 	}
 
 	compileProtoDir(t, inDir)

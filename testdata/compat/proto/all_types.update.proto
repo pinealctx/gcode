@@ -11,7 +11,7 @@ import "buf/validate/validate.proto";
 import "gcode/options.proto";
 
 message AllScalarsUpdate {
-  option (gcode.update_source) = "AllScalars";
+  option (gcode.update_source_opts) = { source: "AllScalars", condition_fields: ["f_sint32"] };
 
   sint32 f_sint32 = 1;
   optional sint64 f_sint64 = 2;

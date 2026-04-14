@@ -348,7 +348,17 @@ func buildUpdateMessage(msg model.Message, opt model.UpdateMessageOptions) (stri
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "message %s {\n", opt.Name)
-	fmt.Fprintf(&sb, "  option (gcode.update_source) = %q;\n\n", msg.Name)
+	// Write update_source_opts with source and condition_fields.
+	if len(opt.ConditionFields) > 0 {
+		quotedFields := make([]string, len(opt.ConditionFields))
+		for i, cf := range opt.ConditionFields {
+			quotedFields[i] = strconv.Quote(cf)
+		}
+		fmt.Fprintf(&sb, "  option (gcode.update_source_opts) = { source: %q, condition_fields: [%s] };\n\n",
+			msg.Name, strings.Join(quotedFields, ", "))
+	} else {
+		fmt.Fprintf(&sb, "  option (gcode.update_source_opts) = { source: %q };\n\n", msg.Name)
+	}
 
 	fieldNum := 1
 	for _, f := range msg.Fields {

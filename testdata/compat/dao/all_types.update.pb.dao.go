@@ -450,6 +450,9 @@ func (x *AllScalarsUpdate) ToMap() map[string]any {
 	if x.FFloat != nil {
 		um["f_float"] = *x.FFloat
 	}
+	if x.FBytes != nil {
+		um["f_bytes_col"] = x.FBytes
+	}
 	return um
 }
 
@@ -482,5 +485,8 @@ func (x *AllScalarsUpdate) ApplyTo(p *AllScalars) {
 	}
 	if x.FFloat != nil {
 		p.FFloat = *x.FFloat
+	}
+	if x.FBytes != nil {
+		p.FBytes = x.FBytes
 	}
 }

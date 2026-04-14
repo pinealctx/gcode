@@ -89,6 +89,11 @@ type Message struct {
 	// Its value is the source message name (e.g. "User"), used by stage 2 to generate ToMap()
 	// and inherit validate rules. Written by the gen-proto pipeline; parser does not set this.
 	UpdateSource string
+	// ConditionFields lists the condition_fields from the update_source_opts annotation.
+	// These are the WHERE-condition fields carried from the original update_message annotation.
+	// Only populated when UpdateSource is non-empty. When nil/empty, no fields are treated
+	// as condition fields, meaning all fields appear in ToMap() output and ApplyTo().
+	ConditionFields []string
 	// CreateSource is non-empty when this message was generated from a create_message annotation.
 	// Its value is the source message name (e.g. "User"), used by stage 2 to inherit validate rules.
 	// Written by the gen-proto pipeline; parser does not set this.

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `update_source` option (field 50005, scalar string) replaced by `update_source_opts` (field 50007, `UpdateSourceOptions` message) carrying both `source` and `condition_fields`. This fixes `ApplyTo` / `ToMap` skipping message-type fields that were incorrectly inferred as condition fields. The old field 50005 is retired and no longer recognized. Since both options are internal (written only by `gcode gen-proto`), user impact is limited to re-running `gen-proto` to regenerate intermediate proto files.
+
+### Fixed
+
+- `ApplyTo` and `ToMap` now correctly handle message-type fields (e.g. `Dimensions`) in update-derived messages.
+- `ToMap` now correctly handles optional bytes fields (`[]byte` with `HasPresence`) with nil-guard.
+
 ## [0.1.0] — 2026-03-31
 
 ### Added

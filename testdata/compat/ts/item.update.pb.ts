@@ -13,6 +13,6 @@ export interface ItemUpdate {
 export const ItemUpdateRules = {
   name: { required: false, type: "string", minLength: 1, maxLength: 200 },
   kind: { required: false, type: "enum", definedOnly: true },
-  dimensions: { required: true, type: "object" }
+  dimensions: { required: false, type: "object" }
 } as const
 

@@ -345,11 +345,35 @@ func TestItemUpdate_ApplyTo_WithDimensions(t *testing.T) {
 	entity := &Item{Name: "old", Dimensions: original}
 	update.ApplyTo(entity)
 
-	// NOTE: ApplyTo currently does not apply message-type fields (Dimensions).
-	// This is a known limitation of the current render/convert.go generator.
-	// The entity's Dimensions remains unchanged.
-	if entity.Dimensions != original {
-		t.Errorf("Dimensions was unexpectedly changed")
+	if entity.Dimensions != dims {
+		t.Errorf("Dimensions = %v, want %v", entity.Dimensions, dims)
+	}
+}
+
+func TestItemUpdate_ToMap_WithDimensions(t *testing.T) {
+	dims := &Dimensions{Width: 20.0, Height: 8.0}
+	update := &ItemUpdate{
+		Id:         1,
+		Dimensions: dims,
+	}
+
+	m := update.ToMap()
+	if v, ok := m["dimensions"]; !ok {
+		t.Error("dimensions missing from ToMap()")
+	} else if v != *dims {
+		t.Errorf("dimensions = %v, want %v", v, *dims)
+	}
+}
+
+func TestItemUpdate_ToMap_NilDimensions_Omitted(t *testing.T) {
+	update := &ItemUpdate{
+		Id:         1,
+		Dimensions: nil,
+	}
+
+	m := update.ToMap()
+	if _, ok := m["dimensions"]; ok {
+		t.Error("dimensions should be omitted from ToMap() when nil")
 	}
 }
 

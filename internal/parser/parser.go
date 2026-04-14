@@ -216,22 +216,23 @@ func mapMessage(message protoreflect.MessageDescriptor, filePath string, locatio
 		return model.Message{}, fmt.Errorf("message %q: %w", message.FullName(), err)
 	}
 
-	updateSource := readStringMessageOption(message.Options(), exts.updateSourceExt)
+	updateSource, conditionFields := readUpdateSourceOptions(message.Options(), exts.updateSourceOptsExt)
 	createSource := readStringMessageOption(message.Options(), exts.createSourceExt)
 
 	return model.Message{
-		Name:           string(message.Name()),
-		FullName:       string(message.FullName()),
-		Fields:         fields,
-		Messages:       nestedMessages,
-		Enums:          nestedEnums,
-		GormOptions:    gormOpts,
-		UpdateOptions:  updateOpts,
-		CreateOptions:  createOpts,
-		UpdateSource:   updateSource,
-		CreateSource:   createSource,
-		LeadingComment: commentFromLocation(locations.ByDescriptor(message)),
-		Location:       locationFromSource(filePath, locations.ByDescriptor(message)),
+		Name:            string(message.Name()),
+		FullName:        string(message.FullName()),
+		Fields:          fields,
+		Messages:        nestedMessages,
+		Enums:           nestedEnums,
+		GormOptions:     gormOpts,
+		UpdateOptions:   updateOpts,
+		CreateOptions:   createOpts,
+		UpdateSource:    updateSource,
+		ConditionFields: conditionFields,
+		CreateSource:    createSource,
+		LeadingComment:  commentFromLocation(locations.ByDescriptor(message)),
+		Location:        locationFromSource(filePath, locations.ByDescriptor(message)),
 	}, nil
 }
 
