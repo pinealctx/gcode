@@ -326,11 +326,11 @@ func TestFileMarshalRepeatedPacked(t *testing.T) {
 				Fields: []transform.GoField{
 					{
 						Field:  model.Field{Name: "ids", Number: 1, Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt32}, JSONName: "ids"},
-						GoName: "Ids", GoType: "[]int32",
+						GoName: "Ids", GoType: "[]int32", ElemGoType: "int32",
 					},
 					{
 						Field:  model.Field{Name: "names", Number: 2, Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}, JSONName: "names"},
-						GoName: "Names", GoType: "[]string",
+						GoName: "Names", GoType: "[]string", ElemGoType: "string",
 					},
 				},
 			},
@@ -473,11 +473,11 @@ func TestFileUnmarshalRepeatedPacked(t *testing.T) {
 				Fields: []transform.GoField{
 					{
 						Field:  model.Field{Name: "ids", Number: 1, Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt32}, JSONName: "ids"},
-						GoName: "Ids", GoType: "[]int32",
+						GoName: "Ids", GoType: "[]int32", ElemGoType: "int32",
 					},
 					{
 						Field:  model.Field{Name: "names", Number: 2, Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}, JSONName: "names"},
-						GoName: "Names", GoType: "[]string",
+						GoName: "Names", GoType: "[]string", ElemGoType: "string",
 					},
 				},
 			},
@@ -560,7 +560,7 @@ func TestDeviationPackedOnlyEnforced(t *testing.T) {
 				Fields: []transform.GoField{
 					{
 						Field:  model.Field{Name: "ids", Number: 1, Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt32}, JSONName: "ids"},
-						GoName: "Ids", GoType: "[]int32",
+						GoName: "Ids", GoType: "[]int32", ElemGoType: "int32",
 					},
 				},
 			},
@@ -1227,7 +1227,7 @@ func TestValidateFileRepeatedConstraints(t *testing.T) {
 								Items:    &model.ValidateFieldOptions{MinLen: ptr(uint64(1))},
 							},
 						},
-						GoName: "Tags", GoType: "[]string",
+						GoName: "Tags", GoType: "[]string", ElemGoType: "string",
 					},
 				},
 			},

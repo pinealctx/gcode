@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/pinealctx/gcode/internal/model"
-	"github.com/pinealctx/gcode/internal/naming"
 	"github.com/pinealctx/gcode/internal/transform"
 )
 
@@ -99,9 +98,7 @@ func writeDeepCloneRepeated(b *strings.Builder, accessor string, f transform.GoF
 			b.WriteString("}\n")
 		} else {
 			// repeated scalar (string, numeric): make + copy.
-			// Use naming.GoScalarType directly from f.Type.Scalar — scalar type names
-			// do not require package context and are always available without ElemGoType.
-			fmt.Fprintf(b, "clone.%s = make([]%s, len(%s))\n", f.GoName, naming.GoScalarType(f.Type.Scalar), accessor)
+			fmt.Fprintf(b, "clone.%s = make([]%s, len(%s))\n", f.GoName, f.ElemGoType, accessor)
 			fmt.Fprintf(b, "copy(clone.%s, %s)\n", f.GoName, accessor)
 		}
 	case model.FieldKindEnum:

@@ -333,7 +333,7 @@ func TestToMapRepeatedField(t *testing.T) {
 			},
 			{
 				Field:  model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}, JSONName: "tags"},
-				GoName: "Tags", GoType: "[]string",
+				GoName: "Tags", GoType: "[]string", ElemGoType: "string",
 			},
 		},
 	}
@@ -402,7 +402,7 @@ func TestToEntityGeneration(t *testing.T) {
 			{Field: model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}}, GoName: "Id", GoType: "int64"},
 			{Field: model.Field{Name: "name", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Name", GoType: "string"},
 			{Field: model.Field{Name: "nickname", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Nickname", GoType: "*string"},
-			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string"},
+			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string", ElemGoType: "string"},
 		},
 	}
 	// Create: id is required (non-pointer), name/nickname are optional (*T), tags is repeated.
@@ -413,7 +413,7 @@ func TestToEntityGeneration(t *testing.T) {
 			{Field: model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}}, GoName: "Id", GoType: "int64"},
 			{Field: model.Field{Name: "name", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Name", GoType: "*string"},
 			{Field: model.Field{Name: "nickname", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Nickname", GoType: "*string"},
-			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string"},
+			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string", ElemGoType: "string"},
 		},
 	}
 	msgIndex := map[string]*transform.GoMessage{"User": &srcMsg}
@@ -521,7 +521,7 @@ func TestApplyToGeneration(t *testing.T) {
 			{Field: model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}}, GoName: "Id", GoType: "int64"},
 			{Field: model.Field{Name: "name", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Name", GoType: "string"},
 			{Field: model.Field{Name: "nickname", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Nickname", GoType: "*string"},
-			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string"},
+			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string", ElemGoType: "string"},
 		},
 	}
 	updateMsg := transform.GoMessage{
@@ -532,7 +532,7 @@ func TestApplyToGeneration(t *testing.T) {
 			{Field: model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}}, GoName: "Id", GoType: "int64"},
 			{Field: model.Field{Name: "name", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Name", GoType: "*string"},
 			{Field: model.Field{Name: "nickname", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Nickname", GoType: "*string"},
-			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string"},
+			{Field: model.Field{Name: "tags", Cardinality: model.CardinalityRepeated, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}}, GoName: "Tags", GoType: "[]string", ElemGoType: "string"},
 		},
 	}
 	msgIndex := map[string]*transform.GoMessage{"User": &srcMsg}

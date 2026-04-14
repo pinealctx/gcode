@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/pinealctx/gcode/internal/model"
+	"github.com/pinealctx/gcode/internal/naming"
 	"github.com/pinealctx/gcode/internal/transform"
 )
 
@@ -18,8 +19,9 @@ func buildRepeatedField(name string, number int, scalar model.ScalarKind, goType
 			Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: scalar},
 			JSONName:    name,
 		},
-		GoName: strings.ToUpper(name[:1]) + name[1:],
-		GoType: goType,
+		GoName:     strings.ToUpper(name[:1]) + name[1:],
+		GoType:     goType,
+		ElemGoType: naming.GoScalarType(scalar),
 	}
 }
 
