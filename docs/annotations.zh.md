@@ -24,6 +24,7 @@
   - [repeated 类型](#repeated-类型)
   - [enum 类型](#enum-类型)
   - [message 类型](#message-类型)
+- [DeepClone](#deepclone)
 
 ---
 
@@ -354,10 +355,10 @@ req := &dao.PersonCreate{
     Email:    strPtr("alice@example.com"),
 }
 
-person := req.ToEntity()  // 返回 dao.Person
+person := req.ToEntity()  // 返回 *dao.Person
 person.CreatedAt = time.Now().Unix()  // 填充系统生成的字段
 
-db.Create(&person)
+db.Create(person)
 cache.Set(key, person)
 ```
 
@@ -703,3 +704,41 @@ message Order {
 触发条件：`shipping_address == nil`（未设置嵌套 message）。
 
 > **注意**：`(buf.validate.field).required` 和 `(buf.validate.field).message.required` 对 message 类型字段效果相同，两者均检查字段是否为 nil。
+
+---
+
+## DeepClone
+
+每个生成的 message 结构体都有 `DeepClone()` 方法，返回一个完全独立的副本，克隆体与原对象之间不共享任何内存。
+
+### 签名
+
+```go
+func (x *Msg) DeepClone() *Msg
+```
+
+- 对 `nil` 接收者调用时返回 `nil`。
+- 所有指针、slice 和嵌套 message 字段均递归复制，修改克隆体不会影响原对象。
+
+### 字段处理方式
+
+| 字段类型 | Go 类型示例 | 克隆方式 |
+|---|---|---|
+| scalar | `string`, `int32`, `bool` | 浅拷贝即独立（值类型） |
+| enum | `Status` | 浅拷贝即独立（int32 别名） |
+| bytes（singular） | `[]byte` | `make` + `copy` |
+| bytes（HasPresence） | `[]byte`（nil 表示缺席） | 非 nil 时 `make` + `copy` |
+| optional scalar/enum | `*string`, `*int32`, `*Status` | 分配新指针：`v := *p.F; clone.F = &v` |
+| message | `*Address` | 递归 `DeepClone()`，nil 保持 nil |
+| repeated scalar/enum | `[]int32`, `[]Status` | `make` + `copy` |
+| repeated bytes | `[][]byte` | 外层 `make`；每个元素 `make` + `copy` |
+| repeated message | `[]*Address` | 外层 `make`；每个元素递归 `DeepClone()` |
+
+### 典型用法
+
+```go
+// 在应用更新前保留原始 entity 状态。
+original := entity.DeepClone()
+updateMsg.ApplyTo(entity)
+// 对比 original 与 entity 的差异，用于 diff、审计日志或乐观锁冲突检测。
+```

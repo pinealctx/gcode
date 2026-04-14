@@ -24,6 +24,7 @@ This document provides detailed documentation for all annotations supported by g
   - [repeated](#repeated)
   - [enum](#enum)
   - [message](#message)
+- [DeepClone](#deepclone)
 
 ---
 
@@ -353,10 +354,10 @@ req := &dao.PersonCreate{
     Email:    strPtr("alice@example.com"),
 }
 
-person := req.ToEntity()  // returns dao.Person
+person := req.ToEntity()  // returns *dao.Person
 person.CreatedAt = time.Now().Unix()  // fill server-generated fields
 
-db.Create(&person)
+db.Create(person)
 cache.Set(key, person)
 ```
 
@@ -702,3 +703,41 @@ message Order {
 Triggered when: `shipping_address == nil` (nested message not set).
 
 > **Note**: `(buf.validate.field).required` and `(buf.validate.field).message.required` have the same effect on message-type fields — both check whether the field is nil.
+
+---
+
+## DeepClone
+
+Every generated message struct has a `DeepClone()` method that returns a fully independent copy with no shared memory between the clone and the original.
+
+### Signature
+
+```go
+func (x *Msg) DeepClone() *Msg
+```
+
+- Returns `nil` when called on a `nil` receiver.
+- All pointer, slice, and nested message fields are recursively copied so that mutating the clone never affects the original.
+
+### Field handling
+
+| Field type | Go type example | How it is cloned |
+|---|---|---|
+| scalar | `string`, `int32`, `bool` | shallow copy is sufficient (value type) |
+| enum | `Status` | shallow copy is sufficient (int32 alias) |
+| bytes (singular) | `[]byte` | `make` + `copy` |
+| bytes (HasPresence) | `[]byte` (nil = absent) | `make` + `copy` when non-nil |
+| optional scalar/enum | `*string`, `*int32`, `*Status` | allocate new pointer: `v := *p.F; clone.F = &v` |
+| message | `*Address` | recursive `DeepClone()`, nil is preserved |
+| repeated scalar/enum | `[]int32`, `[]Status` | `make` + `copy` |
+| repeated bytes | `[][]byte` | `make` outer slice; `make` + `copy` each element |
+| repeated message | `[]*Address` | `make` outer slice; recursive `DeepClone()` per element |
+
+### Typical usage
+
+```go
+// Preserve the original entity before applying an update.
+original := entity.DeepClone()
+updateMsg.ApplyTo(entity)
+// Compare original vs entity for diff, audit log, or optimistic-lock conflict detection.
+```

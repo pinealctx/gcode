@@ -70,6 +70,9 @@ func File(gf transform.GoFile, modulePath string, ctx Context) ([]byte, error) {
 		writeMarshalMethods(&body, msg)
 	}
 	for _, msg := range gf.Messages {
+		writeDeepCloneMethod(&body, msg)
+	}
+	for _, msg := range gf.Messages {
 		if err := writeUnmarshalMethods(&body, msg); err != nil {
 			return nil, err
 		}

@@ -68,6 +68,10 @@ type GoField struct {
 	GoName string
 	// GoType is the fully resolved Go type string (e.g. "int32", "[]byte", "*Person").
 	GoType string
+	// ElemGoType is the Go type name of the element for repeated fields
+	// (e.g. "Status" for []Status, "Address" for []*Address).
+	// Empty for non-repeated fields.
+	ElemGoType string
 	// GormMessageOptions is copied from the owning message's GormOptions.
 	// Nil means the message has no GORM annotation and no gorm tag should be generated.
 	GormMessageOptions *model.GormMessageOptions
@@ -176,6 +180,7 @@ func flattenMessages(msgs []model.Message, pkgName string, outMsgs *[]GoMessage,
 				Field:              f,
 				GoName:             resolvedNames[i],
 				GoType:             resolveGoType(f, pkgName),
+				ElemGoType:         resolveElemGoType(f, pkgName),
 				GormMessageOptions: msg.GormOptions,
 			}
 		}
@@ -316,4 +321,23 @@ func resolveGoType(f model.Field, pkgName string) string {
 		return "*" + base
 	}
 	return base
+}
+
+// resolveElemGoType returns the Go element type name for repeated fields
+// (e.g. "Status" for []Status, "Address" for []*Address).
+// Returns empty string for non-repeated fields.
+func resolveElemGoType(f model.Field, pkgName string) string {
+	if f.Cardinality != model.CardinalityRepeated {
+		return ""
+	}
+	switch f.Type.Kind {
+	case model.FieldKindScalar:
+		return naming.GoScalarType(f.Type.Scalar)
+	case model.FieldKindEnum:
+		return naming.GoTypeName(f.Type.FullName, pkgName)
+	case model.FieldKindMessage:
+		return naming.GoTypeName(f.Type.FullName, pkgName)
+	default:
+		panic(fmt.Sprintf("resolveElemGoType: unexpected FieldKind %v for field %q", f.Type.Kind, f.Name))
+	}
 }

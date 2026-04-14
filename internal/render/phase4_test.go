@@ -432,7 +432,7 @@ func TestToEntityGeneration(t *testing.T) {
 	s := string(src)
 
 	// ToEntity method should exist.
-	if !strings.Contains(s, "func (x *UserCreate) ToEntity() User {") {
+	if !strings.Contains(s, "func (x *UserCreate) ToEntity() *User {") {
 		t.Errorf("missing ToEntity method in:\n%s", s)
 	}
 	// Required field (id): non-ptr→non-ptr, direct assign.
@@ -486,9 +486,9 @@ func TestToEntityRequiredToPointer(t *testing.T) {
 	}
 	s := string(src)
 
-	// Non-ptr→ptr: take address.
-	if !strings.Contains(s, "p.Label = &x.Label\n") {
-		t.Errorf("required non-ptr to ptr should take address in:\n%s", s)
+	// Non-ptr→ptr: copy value then take address (avoids sharing memory with create message).
+	if !strings.Contains(s, "tmpLabel := x.Label\n") || !strings.Contains(s, "p.Label = &tmpLabel\n") {
+		t.Errorf("required non-ptr to ptr should copy then take address in:\n%s", s)
 	}
 }
 

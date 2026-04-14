@@ -33,8 +33,9 @@ func buildRepeatedEnumField(name string, number int, goType string) transform.Go
 			Type:        model.FieldType{Kind: model.FieldKindEnum},
 			JSONName:    name,
 		},
-		GoName: strings.ToUpper(name[:1]) + name[1:],
-		GoType: goType,
+		GoName:     strings.ToUpper(name[:1]) + name[1:],
+		GoType:     goType,
+		ElemGoType: goType[2:], // strip "[]"
 	}
 }
 
@@ -48,8 +49,9 @@ func buildRepeatedMessageField(name string, number int, goType string) transform
 			Type:        model.FieldType{Kind: model.FieldKindMessage},
 			JSONName:    name,
 		},
-		GoName: strings.ToUpper(name[:1]) + name[1:],
-		GoType: goType,
+		GoName:     strings.ToUpper(name[:1]) + name[1:],
+		GoType:     goType,
+		ElemGoType: goType[3:], // strip "[]*"
 	}
 }
 

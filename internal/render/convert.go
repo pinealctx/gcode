@@ -22,7 +22,7 @@ func writeToEntityMethod(b *strings.Builder, msg transform.GoMessage, srcMsg *tr
 	}
 
 	fmt.Fprintf(b, "// ToEntity converts %s to %s.\n", msg.GoName, srcMsg.GoName)
-	fmt.Fprintf(b, "func (%s *%s) ToEntity() %s {\n", recv, msg.GoName, srcMsg.GoName)
+	fmt.Fprintf(b, "func (%s *%s) ToEntity() *%s {\n", recv, msg.GoName, srcMsg.GoName)
 	fmt.Fprintf(b, "var p %s\n", srcMsg.GoName)
 
 	for _, f := range msg.Fields {
@@ -47,15 +47,16 @@ func writeToEntityMethod(b *strings.Builder, msg transform.GoMessage, srcMsg *tr
 			// Pointer to pointer: nil-guard + pointer assign.
 			fmt.Fprintf(b, "if %s != nil {\n%s = %s\n}\n", srcExpr, dstField, srcExpr)
 		case !fromPtr && toPtr:
-			// Non-pointer (required) to pointer: take address.
-			fmt.Fprintf(b, "%s = &%s\n", dstField, srcExpr)
+			// Non-pointer (required) to pointer: copy value then take address,
+			// so the entity field does not share memory with the create message.
+			fmt.Fprintf(b, "tmp%s := %s\n%s = &tmp%s\n", src.GoName, srcExpr, dstField, src.GoName)
 		default:
 			// Non-pointer to non-pointer: direct assign.
 			fmt.Fprintf(b, "%s = %s\n", dstField, srcExpr)
 		}
 	}
 
-	b.WriteString("return p\n}\n\n")
+	b.WriteString("return &p\n}\n\n")
 }
 
 // writeApplyToMethod generates the ApplyTo() method for update-derived messages.
@@ -100,8 +101,9 @@ func writeApplyToMethod(b *strings.Builder, msg transform.GoMessage, srcMsg *tra
 			// Pointer to pointer: nil-guard + pointer assign.
 			fmt.Fprintf(b, "if %s != nil {\n%s = %s\n}\n", srcExpr, dstField, srcExpr)
 		case !fromPtr && toPtr:
-			// Non-pointer to pointer: take address.
-			fmt.Fprintf(b, "%s = &%s\n", dstField, srcExpr)
+			// Non-pointer to pointer: copy value then take address,
+			// so the entity field does not share memory with the update message.
+			fmt.Fprintf(b, "tmp%s := %s\n%s = &tmp%s\n", src.GoName, srcExpr, dstField, src.GoName)
 		default:
 			// Non-pointer to non-pointer: direct assign.
 			fmt.Fprintf(b, "%s = %s\n", dstField, srcExpr)

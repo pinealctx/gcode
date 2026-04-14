@@ -192,6 +192,27 @@ func (x *AllValidate) MarshalAppend(b []byte) ([]byte, error) {
 	return b, nil
 }
 
+// DeepClone returns a deep copy of AllValidate with no shared memory.
+func (x *AllValidate) DeepClone() *AllValidate {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	if x.OStatus != nil {
+		v := *x.OStatus
+		clone.OStatus = &v
+	}
+	if x.BMinmax != nil {
+		clone.BMinmax = make([]byte, len(x.BMinmax))
+		copy(clone.BMinmax, x.BMinmax)
+	}
+	if x.RItems != nil {
+		clone.RItems = make([]int32, len(x.RItems))
+		copy(clone.RItems, x.RItems)
+	}
+	return &clone
+}
+
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.

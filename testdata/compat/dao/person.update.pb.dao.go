@@ -151,6 +151,71 @@ func (x *PersonUpdateByName) MarshalAppend(b []byte) ([]byte, error) {
 	return b, nil
 }
 
+// DeepClone returns a deep copy of PersonUpdateByName with no shared memory.
+func (x *PersonUpdateByName) DeepClone() *PersonUpdateByName {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	if x.Age != nil {
+		v := *x.Age
+		clone.Age = &v
+	}
+	if x.Active != nil {
+		v := *x.Active
+		clone.Active = &v
+	}
+	if x.Status != nil {
+		v := *x.Status
+		clone.Status = &v
+	}
+	if x.Rating != nil {
+		v := *x.Rating
+		clone.Rating = &v
+	}
+	if x.CreatedAt != nil {
+		v := *x.CreatedAt
+		clone.CreatedAt = &v
+	}
+	if x.Nickname != nil {
+		v := *x.Nickname
+		clone.Nickname = &v
+	}
+	if x.Level != nil {
+		v := *x.Level
+		clone.Level = &v
+	}
+	if x.Verified != nil {
+		v := *x.Verified
+		clone.Verified = &v
+	}
+	if x.Score != nil {
+		v := *x.Score
+		clone.Score = &v
+	}
+	if x.UpdatedAt != nil {
+		v := *x.UpdatedAt
+		clone.UpdatedAt = &v
+	}
+	if x.PrevStatus != nil {
+		v := *x.PrevStatus
+		clone.PrevStatus = &v
+	}
+	if x.Email != nil {
+		v := *x.Email
+		clone.Email = &v
+	}
+	if x.Role != nil {
+		v := *x.Role
+		clone.Role = &v
+	}
+	if x.TypeId != nil {
+		v := *x.TypeId
+		clone.TypeId = &v
+	}
+	return &clone
+}
+
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.

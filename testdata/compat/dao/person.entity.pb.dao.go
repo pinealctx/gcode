@@ -252,6 +252,67 @@ func (x *Person) MarshalAppend(b []byte) ([]byte, error) {
 	return b, nil
 }
 
+// DeepClone returns a deep copy of Address with no shared memory.
+func (x *Address) DeepClone() *Address {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	return &clone
+}
+
+// DeepClone returns a deep copy of Person with no shared memory.
+func (x *Person) DeepClone() *Person {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	if x.Address != nil {
+		clone.Address = x.Address.DeepClone()
+	}
+	if x.Scores != nil {
+		clone.Scores = make([]int32, len(x.Scores))
+		copy(clone.Scores, x.Scores)
+	}
+	if x.Tags != nil {
+		clone.Tags = make([]string, len(x.Tags))
+		copy(clone.Tags, x.Tags)
+	}
+	if x.Avatar != nil {
+		clone.Avatar = make([]byte, len(x.Avatar))
+		copy(clone.Avatar, x.Avatar)
+	}
+	if x.Nickname != nil {
+		v := *x.Nickname
+		clone.Nickname = &v
+	}
+	if x.Level != nil {
+		v := *x.Level
+		clone.Level = &v
+	}
+	if x.Verified != nil {
+		v := *x.Verified
+		clone.Verified = &v
+	}
+	if x.Score != nil {
+		v := *x.Score
+		clone.Score = &v
+	}
+	if x.UpdatedAt != nil {
+		v := *x.UpdatedAt
+		clone.UpdatedAt = &v
+	}
+	if x.PrevStatus != nil {
+		v := *x.PrevStatus
+		clone.PrevStatus = &v
+	}
+	if x.Fingerprint != nil {
+		clone.Fingerprint = make([]byte, len(x.Fingerprint))
+		copy(clone.Fingerprint, x.Fingerprint)
+	}
+	return &clone
+}
+
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.

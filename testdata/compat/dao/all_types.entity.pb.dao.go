@@ -279,6 +279,72 @@ func (x *TreeNode) MarshalAppend(b []byte) ([]byte, error) {
 	return b, nil
 }
 
+// DeepClone returns a deep copy of AllScalars with no shared memory.
+func (x *AllScalars) DeepClone() *AllScalars {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	if x.FBytes != nil {
+		clone.FBytes = make([]byte, len(x.FBytes))
+		copy(clone.FBytes, x.FBytes)
+	}
+	return &clone
+}
+
+// DeepClone returns a deep copy of AllRepeated with no shared memory.
+func (x *AllRepeated) DeepClone() *AllRepeated {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	if x.RSint32 != nil {
+		clone.RSint32 = make([]int32, len(x.RSint32))
+		copy(clone.RSint32, x.RSint32)
+	}
+	if x.RSfixed32 != nil {
+		clone.RSfixed32 = make([]int32, len(x.RSfixed32))
+		copy(clone.RSfixed32, x.RSfixed32)
+	}
+	if x.RDouble != nil {
+		clone.RDouble = make([]float64, len(x.RDouble))
+		copy(clone.RDouble, x.RDouble)
+	}
+	if x.RBytes != nil {
+		clone.RBytes = make([][]byte, len(x.RBytes))
+		for i, v := range x.RBytes {
+			if v != nil {
+				tmp := make([]byte, len(v))
+				copy(tmp, v)
+				clone.RBytes[i] = tmp
+			}
+		}
+	}
+	if x.RMessage != nil {
+		clone.RMessage = make([]*Address, len(x.RMessage))
+		for i, v := range x.RMessage {
+			clone.RMessage[i] = v.DeepClone()
+		}
+	}
+	if x.REnum != nil {
+		clone.REnum = make([]Status, len(x.REnum))
+		copy(clone.REnum, x.REnum)
+	}
+	return &clone
+}
+
+// DeepClone returns a deep copy of TreeNode with no shared memory.
+func (x *TreeNode) DeepClone() *TreeNode {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	if x.Child != nil {
+		clone.Child = x.Child.DeepClone()
+	}
+	return &clone
+}
+
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
