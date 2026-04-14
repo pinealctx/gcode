@@ -15,7 +15,7 @@
 - **JSON tag 内置** — 默认生成 `json:"camelCase"` tag，支持 `omitempty`/`ignore` 注解
 - **GORM 支持** — 通过 `(gcode.message).gorm` 注解生成 gorm struct tag 和 `TableName()` 方法
 - **validate 内置** — 复用 `buf/validate` 注解语法，生成 `Validate() error` 方法，无需额外工具
-- **派生 message 自动生成** — 通过注解声明 update/create 派生 message，自动继承 validate 规则
+- **派生 message 自动生成** — 在 `.meta.proto` schema 文件中通过注解声明 update/create 派生 message；`gen-proto` 生成 entity/create/update proto 文件，validate 注解显式拷贝
 - **gin HTTP adapter** — 生成 handler 工厂函数，与 service interface 解耦，路由完全由用户控制
 - **TypeScript 生成** — 通过 `gcode gen-ts` 从 proto 文件生成 TypeScript interface、enum 和验证元数据
 - **注释透传** — proto leading comment 全部透传到生成代码（struct、field、enum、service、handler）
@@ -116,7 +116,7 @@ func main() {
 }
 ```
 
-> **派生 message**：使用 `gcode.update_message` 或 `gcode.create_message` 注解时，需先运行 `gcode gen-proto -in proto/` 生成中间 proto 文件，再运行 `gcode -in proto/ -out dao/`。详见 [开箱即用指南 — 第二步](docs/getting-started.zh.md#第二步生成派生-proto)。
+> **派生 message**：使用 `gcode.update_message` 或 `gcode.create_message` 注解时，需将它们写在带有 `option (gcode.schema) = {}` 的 `.meta.proto` schema 文件中。然后运行 `gcode gen-proto -in proto/` 生成 `*.entity.proto`、`*.create.proto` 和 `*.update.proto`，再运行 `gcode -in proto/ -out dao/`。详见 [开箱即用指南 — 第二步](docs/getting-started.zh.md#第二步生成派生-proto)。
 
 **5. 生成 TypeScript 类型（可选）**
 

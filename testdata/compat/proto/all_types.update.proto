@@ -6,7 +6,8 @@ package compat;
 
 option go_package = "github.com/pinealctx/gcode/testdata/compat/dao;dao";
 
-import "all_types.proto";
+import "all_types.entity.proto";
+import "buf/validate/validate.proto";
 import "gcode/options.proto";
 
 message AllScalarsUpdate {

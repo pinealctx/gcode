@@ -31,7 +31,10 @@ func RunGenTS(ctx context.Context, args []string) error {
 		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, source.ErrNoProtoFiles)
 	}
 
-	files, err := parser.Parse(ctx, []string{scanResult.ImportPath}, scanResult.Files)
+	// Exclude schema source files (.meta.proto) — only entity/create/update products are used.
+	inputFiles := filterMetaProtoSources(scanResult.Files)
+
+	files, err := parser.Parse(ctx, []string{scanResult.ImportPath}, inputFiles)
 	if err != nil {
 		return fmt.Errorf("parse proto files: %w", err)
 	}

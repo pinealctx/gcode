@@ -95,29 +95,32 @@ This document records the key architectural decisions for gcode, using ADR (Arch
 **Consequences**:
 - Users check nil to determine whether a field is set
 - nil pointer fields are skipped during marshal (not written to wire)
-- nil pointer fields skip validation during validate inheritance
+- nil pointer fields skip validation
 
 ---
 
-## D6: Validate inheritance mechanism
+## D6: Validate rules explicit in generated proto files
 
-**Problem**: How should create/update derived messages reuse validate rules from the source message?
+**Problem**: How should create/update derived messages carry validate rules?
 
 **Constraints**:
-- Derived message fields are a subset of source message fields; validate rules should be inherited automatically
+- Derived message fields are a subset of source message fields; validate rules should be visible in the generated proto files
 - Optional fields (pointer types) in derived messages should not trigger validation when nil
 - condition_fields (WHERE clause fields) are required in update scenarios and should not have zero-value guards
 - required_fields (forced non-optional in create scenarios) also have no nil guard and are validated directly
+- Validate rules should be readable from the proto file itself — no hidden cross-file lookup
 
 **Decision**:
-- The render layer tracks source messages via `create_source`/`update_source` annotations
-- Locates source message validate rules in the global `MessageIndex`
+- `gen-proto` copies validate annotations from the schema (`.meta.proto`) directly into the generated `*.create.proto` / `*.update.proto` fields
+- The render layer reads validate rules directly from the derived message's own fields — no `MessageIndex` lookup
 - Optional fields (pointer types): generate `if p.Field != nil { ... }` guard
 - condition_fields: disable zero-value guard (`name != ""`), validate directly
+- `update_source`/`create_source` annotations are retained for ToEntity/ApplyTo/ToMap/GormMessageOptions — they declare derivation identity, not validate rules
 
 **Consequences**:
-- Validate rules are written once in the source message; derived messages inherit automatically
-- Derived message `Validate()` methods are semantically consistent with the source message
+- Validate rules are visible in the generated proto files — users can read `*.create.proto` / `*.update.proto` to understand all constraints
+- The render layer has no implicit dependency on a source message index for validation
+- Derived message `Validate()` methods are semantically consistent with the schema definition
 
 ---
 
@@ -129,15 +132,20 @@ This document records the key architectural decisions for gcode, using ADR (Arch
 - Derived messages must exist as independent proto messages to be referenced by service RPCs
 - Generated intermediate proto files can be reused by other tools (e.g. protoc-gen-go, buf), maintaining proto ecosystem compatibility
 - CLI maintains single responsibility: gen-proto handles proto generation, gcode handles Go generation
+- The schema source (`.meta.proto`) should be the single source of truth for validate rules
 
 **Decision**: Two-stage pipeline:
-1. `gcode gen-proto`: reads `gcode.update_message`/`gcode.create_message` annotations, generates intermediate proto files (`*.update.proto`/`*.create.proto`)
-2. `gcode`: processes all proto files (including generated intermediate protos) uniformly to generate Go code
+1. `gcode gen-proto`: reads `.meta.proto` schema files, generates three types of proto files per schema:
+   - `*.entity.proto` — struct definition (no validate annotations, with gorm)
+   - `*.create.proto` — create message (validate annotations copied from schema)
+   - `*.update.proto` — update message (validate annotations copied from schema)
+2. `gcode`: processes entity/create/update/service proto files to generate Go code; skips `.meta.proto` files
 
 **Consequences**:
 - Derived messages are real proto messages, directly referenceable by service RPCs
 - Two-stage decoupling: gen-proto only cares about proto generation, gcode only cares about Go generation
-- Intermediate proto files record their source via `update_source`/`create_source` annotations for validate inheritance
+- Validate rules are explicit in the generated proto files — no hidden cross-file lookup in the render layer
+- `update_source`/`create_source` annotations in generated files record derivation identity for ToEntity/ApplyTo/ToMap
 
 ---
 
@@ -329,3 +337,21 @@ Two-layer error code mechanism:
 - No configuration needed for the common case
 - If the module is forked or renamed, the generated import paths must be updated manually — this is intentional: a module rename is a breaking change and warrants explicit action
 - Customizable import paths are deferred to a future major version if the need arises
+
+---
+
+## D17: Retain update_source / create_source annotations in generated proto files
+
+**Problem**: Should `update_source` (field 50005) and `create_source` (field 50006) annotations be removed from generated `*.update.proto` / `*.create.proto` files now that validate rules are copied explicitly?
+
+**Constraints**:
+- `ToEntity()`, `ApplyTo()`, `ToMap()`, and `GormMessageOptions` propagation all depend on these annotations to identify the source entity and locate it in `MessageIndex`
+- Removing them would require an alternative mechanism for the render layer to find the source message
+- The original motivation for removal was to eliminate the "implicit validate lookup" — that concern is resolved by D6 (validate rules are now explicit in the proto fields)
+
+**Decision**: Retain `update_source`/`create_source` annotations in generated files. They serve a different purpose from validate: they declare derivation identity (which entity this message derives from), not validation rules. This is explicit, not implicit.
+
+**Consequences**:
+- `ToEntity()`, `ApplyTo()`, `ToMap()`, and `GormMessageOptions` continue to work without changes
+- The render layer has two distinct concerns: derivation identity (via `update_source`/`create_source`) and validate rules (via field annotations) — both are explicit
+- Future removal of these annotations is possible if a better mechanism for derivation identity is designed, but is deferred until then

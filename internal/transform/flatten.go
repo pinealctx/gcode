@@ -45,6 +45,12 @@ type GoMessage struct {
 	// These are WHERE-condition fields and must not appear in ToMap() output.
 	// Only populated when UpdateSource is non-empty.
 	ConditionFields []string
+	// RequiredFields lists the required_fields declared in the create_message annotation,
+	// excluding message-type fields (which are inherently nullable in proto and therefore
+	// cannot be detected via the non-optional heuristic). Used by validate inheritance
+	// to determine which scalar/enum fields must be present.
+	// Only populated when CreateSource is non-empty.
+	RequiredFields []string
 	// GormMessageOptions carries the message-level GORM annotation.
 	// Used by render to generate TableName() and decide whether to emit gorm struct tags.
 	// Nil means no GORM annotation is present.
@@ -62,6 +68,10 @@ type GoField struct {
 	GoName string
 	// GoType is the fully resolved Go type string (e.g. "int32", "[]byte", "*Person").
 	GoType string
+	// ElemGoType is the Go type name of the element for repeated fields
+	// (e.g. "Status" for []Status, "Address" for []*Address).
+	// Empty for non-repeated fields.
+	ElemGoType string
 	// GormMessageOptions is copied from the owning message's GormOptions.
 	// Nil means the message has no GORM annotation and no gorm tag should be generated.
 	GormMessageOptions *model.GormMessageOptions
@@ -170,6 +180,7 @@ func flattenMessages(msgs []model.Message, pkgName string, outMsgs *[]GoMessage,
 				Field:              f,
 				GoName:             resolvedNames[i],
 				GoType:             resolveGoType(f, pkgName),
+				ElemGoType:         resolveElemGoType(f, pkgName),
 				GormMessageOptions: msg.GormOptions,
 			}
 		}
@@ -181,6 +192,7 @@ func flattenMessages(msgs []model.Message, pkgName string, outMsgs *[]GoMessage,
 			UpdateSource:       msg.UpdateSource,
 			CreateSource:       msg.CreateSource,
 			ConditionFields:    conditionFieldsFor(msg),
+			RequiredFields:     requiredFieldsFor(msg),
 			GormMessageOptions: msg.GormOptions,
 		})
 
@@ -206,6 +218,25 @@ func conditionFieldsFor(msg model.Message) []string {
 	var result []string
 	for _, f := range msg.Fields {
 		if !f.Optional && f.Cardinality != model.CardinalityRepeated {
+			result = append(result, f.Name)
+		}
+	}
+	return result
+}
+
+// requiredFieldsFor returns the required field names for a create message.
+// In the generated create proto, required_fields are rendered as non-optional
+// scalar/enum fields. Message-type fields are excluded because they are
+// inherently nullable (always *T in Go, no optional keyword needed) and
+// cannot be reliably detected as required via the non-optional heuristic.
+// Returns nil for non-create messages (CreateSource == "").
+func requiredFieldsFor(msg model.Message) []string {
+	if msg.CreateSource == "" {
+		return nil
+	}
+	var result []string
+	for _, f := range msg.Fields {
+		if !f.Optional && f.Cardinality != model.CardinalityRepeated && f.Type.Kind != model.FieldKindMessage {
 			result = append(result, f.Name)
 		}
 	}
@@ -290,4 +321,23 @@ func resolveGoType(f model.Field, pkgName string) string {
 		return "*" + base
 	}
 	return base
+}
+
+// resolveElemGoType returns the Go element type name for repeated fields
+// (e.g. "Status" for []Status, "Address" for []*Address).
+// Returns empty string for non-repeated fields.
+func resolveElemGoType(f model.Field, pkgName string) string {
+	if f.Cardinality != model.CardinalityRepeated {
+		return ""
+	}
+	switch f.Type.Kind {
+	case model.FieldKindScalar:
+		return naming.GoScalarType(f.Type.Scalar)
+	case model.FieldKindEnum:
+		return naming.GoTypeName(f.Type.FullName, pkgName)
+	case model.FieldKindMessage:
+		return naming.GoTypeName(f.Type.FullName, pkgName)
+	default:
+		panic(fmt.Sprintf("resolveElemGoType: unexpected FieldKind %v for field %q", f.Type.Kind, f.Name))
+	}
 }

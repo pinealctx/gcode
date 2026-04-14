@@ -1,5 +1,30 @@
 # gcode 开箱即用指南
 
+## gcode 是什么
+
+gcode 是一个以 proto 文件为输入的代码生成工具，输出 Go struct、序列化方法、校验逻辑、HTTP handler 以及 TypeScript 类型定义。它面向使用 protobuf 作为 schema 语言、但不需要完整 gRPC 栈的后端服务。
+
+**gcode 生成什么：**
+
+| 输入 | 输出 |
+|---|---|
+| 任意 `.proto` 文件 | Go struct + `MarshalBinary` / `UnmarshalBinary` + `Validate()` |
+| `.meta.proto` schema 文件 | 三个派生 proto 文件（entity / create / update），由 `gen-proto` 生成 |
+| `.entity.proto` | 带 GORM tag 的 Go struct + `TableName()` + `DeepClone()` |
+| `.create.proto` | Go struct + `Validate()` + `ToEntity()` + `DeepClone()` |
+| `.update.proto` | Go struct + `Validate()` + `ToMap()` + `ApplyTo()` + `DeepClone()` |
+| service 定义 | Go interface + gin HTTP handler 工厂函数 |
+| 任意 `.proto` 文件 | TypeScript interface + enum + 验证元数据 |
+
+**适用范围与约束：**
+
+- 仅支持 proto3，不支持 proto2。
+- 生成的 Go 代码面向 GORM 持久化和 gin HTTP 服务，不支持其他 ORM 或 HTTP 框架。
+- 不生成 gRPC stub，生成的 Go interface 是普通 Go interface，不是 gRPC service。
+- 不支持的 proto 特性（streaming RPC、`map<K,V>`、`oneof`、well-known types）会在生成阶段报错退出，不会静默生成错误代码。详见[已知限制](#已知限制)。
+
+---
+
 ## 安装
 
 ```bash
@@ -21,7 +46,7 @@ gcode [flags]                 从 proto 文件生成 Go 代码
 
 gcode version                 打印版本信息
 
-gcode gen-proto [flags]       生成派生 proto 文件（*.update.proto / *.create.proto）
+gcode gen-proto [flags]       从 schema（.meta.proto）文件生成 entity/create/update proto 文件
   -in string                  输入 proto 目录（生成文件写入同一目录）
 
 gcode gen-ts [flags]          从 proto 文件生成 TypeScript 类型定义
@@ -108,7 +133,7 @@ err = u2.UnmarshalBinary(wire)
 #### message 定义（含 validate 和派生 message 注解）
 
 ```proto
-// proto/person.proto
+// proto/person.meta.proto
 syntax = "proto3";
 package myapp;
 option go_package = "myapp/dao;dao";
@@ -116,6 +141,13 @@ option go_package = "myapp/dao;dao";
 import "buf/validate/validate.proto";
 import "gcode/options.proto";
 
+// 标记此文件为 schema 源。gen-proto 读取此文件，生成
+// person.entity.proto、person.create.proto 和 person.update.proto。
+option (gcode.schema) = {};
+
+// 原始 message：字段不使用 optional。
+// 字段的可选语义由派生 message 的注解决定，而非原始定义。
+// 所有字段均为普通字段（非 optional）——gen-proto 控制派生 proto 中的指针语义。
 message Person {
   string name = 1 [
     (buf.validate.field).string.min_len = 1,
@@ -126,13 +158,13 @@ message Person {
     (buf.validate.field).int32.lte = 150
   ];
   string email = 3 [(buf.validate.field).string.email = true];
-  optional string nickname = 4 [
+  string nickname = 4 [
     (buf.validate.field).string.min_len = 1,
     (buf.validate.field).string.max_len = 10
   ];
 
   // 生成 update 派生 message：PersonUpdateByName
-  // condition_fields 是 WHERE 条件字段，不写入 ToMap()
+  // condition_fields 是 WHERE 条件字段，在派生 struct 中为非指针类型，不写入 ToMap()
   option (gcode.update_message) = {
     name: "PersonUpdateByName"
     condition_fields: ["name"]
@@ -140,7 +172,8 @@ message Person {
   };
 
   // 生成 create 派生 message：PersonCreate
-  // required_fields 在派生 message 中为非指针类型（必填）
+  // 派生 struct 中所有字段默认为指针类型（可选）。
+  // required_fields 强制指定字段为非指针类型（必填）。
   option (gcode.create_message) = {
     name: "PersonCreate"
     ignore_fields: []
@@ -157,6 +190,7 @@ syntax = "proto3";
 package myapp;
 option go_package = "myapp/dao;dao";
 
+import "person.entity.proto";
 import "person.create.proto";
 import "person.update.proto";
 
@@ -176,13 +210,13 @@ service PersonService {
 }
 ```
 
-> **注意**：`person.create.proto` 和 `person.update.proto` 由第二步的 `gen-proto` 命令生成，不需要手动编写。
+> **注意**：`person.entity.proto`、`person.create.proto` 和 `person.update.proto` 由第二步的 `gen-proto` 命令生成，不需要手动编写。
 
 ---
 
 ### 第二步：生成派生 proto
 
-`gen-proto` 读取 `gcode.update_message` / `gcode.create_message` 注解，生成派生 proto 文件：
+`gen-proto` 读取 `.meta.proto` schema 文件，为每个 schema 生成三类 proto 文件：
 
 ```bash
 gcode gen-proto -in proto/
@@ -192,13 +226,18 @@ gcode gen-proto -in proto/
 
 ```
 proto/
-  person.proto              ← 原始文件（不变）
+  person.meta.proto         ← schema 源文件（不变）
   person_service.proto      ← 原始文件（不变）
-  person.update.proto       ← 生成：PersonUpdateByName message
-  person.create.proto       ← 生成：PersonCreate message
+  person.entity.proto       ← 生成：Person message（无 validate，有 gorm）
+  person.update.proto       ← 生成：PersonUpdateByName message（含 validate）
+  person.create.proto       ← 生成：PersonCreate message（含 validate）
 ```
 
-> **注意**：`gcode gen-proto` 每次运行会覆盖已有的 `*.update.proto` / `*.create.proto` 文件。不要手动修改这些生成文件，修改会在下次运行时丢失。
+- `person.entity.proto` — 包含 `Person` struct 定义和 gorm 注解，无 `buf.validate` 注解；`Person.Validate()` 返回 nil。
+- `person.create.proto` — 包含 `PersonCreate`，validate 注解从 schema 拷贝；`PersonCreate.Validate()` 执行所有规则。
+- `person.update.proto` — 包含 `PersonUpdateByName`，validate 注解从 schema 拷贝；`PersonUpdateByName.Validate()` 执行所有规则。
+
+> **注意**：`gcode gen-proto` 每次运行会覆盖已有的生成文件。不要手动修改 `*.entity.proto`、`*.create.proto` 或 `*.update.proto`，修改会在下次运行时丢失。
 
 ---
 
@@ -212,17 +251,26 @@ gcode -in proto/ -out dao/
 
 ```
 dao/
-  person.pb.dao.go              ← Person struct + 序列化方法
-  person.pb.dao.validate.go     ← Person.Validate() 方法
-  person.update.pb.dao.go       ← PersonUpdateByName struct + ToMap()
-  person.update.pb.dao.validate.go
-  person.create.pb.dao.go       ← PersonCreate struct
-  person.create.pb.dao.validate.go
-  person_service.pb.dao.go      ← 请求/响应 message struct
+  person.entity.pb.dao.go           ← Person struct + 序列化方法
+  person.entity.pb.dao.validate.go  ← Person.Validate()（返回 nil，无 validate 注解）
+  person.update.pb.dao.go           ← PersonUpdateByName struct + ToMap() + ApplyTo()
+  person.update.pb.dao.validate.go  ← PersonUpdateByName.Validate()
+  person.create.pb.dao.go           ← PersonCreate struct + ToEntity()
+  person.create.pb.dao.validate.go  ← PersonCreate.Validate()
+  person_service.pb.dao.go          ← 请求/响应 message struct
   person_service.pb.dao.validate.go
-  person_service.pb.rpc.go      ← PersonService interface
-  person_service.pb.http.go     ← gin handler 工厂函数
+  person_service.pb.rpc.go          ← PersonService interface
+  person_service.pb.http.go         ← gin handler 工厂函数
 ```
+
+**派生 struct 的字段指针规则：**
+
+| Struct | 字段类型 | Go 类型 | 说明 |
+|---|---|---|---|
+| `PersonCreate` | `required_fields` 中的字段 | `T`（非指针） | 调用方必须提供值 |
+| `PersonCreate` | 其余字段 | `*T`（指针） | nil = 未提供，跳过校验 |
+| `PersonUpdateByName` | `condition_fields` 中的字段 | `T`（非指针） | WHERE 条件，不写入 `ToMap()` |
+| `PersonUpdateByName` | 其余字段 | `*T`（指针） | nil = 不更新此字段 |
 
 ---
 
@@ -337,6 +385,8 @@ type Order struct {
 
 ### 第五步：使用 Validate()
 
+每个 message 都会生成 `Validate()` 方法。entity message（来自 `*.entity.proto`）的 `Validate()` 返回 nil——它们不含 validate 注解。validate 校验在 create/update message 上有意义：
+
 ```go
 import (
     "errors"
@@ -346,15 +396,20 @@ import (
     "myapp/dao"
 )
 
-p := &dao.Person{Name: "", Age: 200}
+// PersonCreate.Validate() 执行 schema 中定义的所有规则
+req := &dao.PersonCreate{Name: "", Age: 200}
 
-if err := p.Validate(); err != nil {
+if err := req.Validate(); err != nil {
     var ve *validateruntime.ValidationError
     if errors.As(err, &ve) {
         fmt.Printf("field=%s rule=%s msg=%s\n", ve.Field, ve.Rule, ve.Message)
         // field=name rule=min_len msg=length must be >= 1
     }
 }
+
+// PersonUpdateByName.Validate() 同样执行所有规则
+upd := &dao.PersonUpdateByName{Name: "Alice"}
+if err := upd.Validate(); err != nil { ... }
 ```
 
 `Validate()` 是生成的公共方法，可以在任何场景调用——service 实现层、消息队列消费、批量导入等。生成的 HTTP handler 内部也会自动调用 `req.Validate()`（在 bind 之后、调用 service 之前），两者不冲突：handler 内置调用保证传输层统一拦截，公共方法保证其他场景也能复用同一套校验逻辑。
@@ -379,11 +434,35 @@ db.Model(&dao.Person{}).Where("name = ?", req.Name).Updates(req.ToMap())
 
 > **ToMap() key 规则**：`ToMap()` 的 map key 使用 gorm column 名。如果字段配置了 `(gcode.field).gorm.column` 覆盖，key 使用覆盖后的列名；无覆盖时使用 proto 字段名。这确保 `db.Updates(map)` 能正确匹配数据库列（GORM 对 map 直接用 key 作为列名，不走 struct tag 映射）。
 >
-> **validate 继承**：派生 message 的 `Validate()` 自动继承源 message 的规则。optional 字段（指针类型）为 nil 时跳过校验；condition_fields 不做零值守卫，直接校验。详见 [注解参考 — validate 继承行为](annotations.zh.md#validate-继承行为)。
+> **validate 规则**：validate 规则在 schema（`.meta.proto`）中定义，由 `gen-proto` 拷贝到生成的 `*.create.proto` / `*.update.proto` 文件中。render 层直接从这些 proto 字段读取规则，无需跨文件反查。optional 字段（指针类型）为 nil 时跳过校验；condition_fields 不做零值守卫，直接校验。详见 [注解参考 — validate 继承行为](annotations.zh.md#validate-继承行为)。
 
 ---
 
-### 第七步：实现 RPC interface
+### 第七步：使用 DeepClone()
+
+每个生成的 struct 都有 `DeepClone()` 方法，返回一个完全独立的副本，克隆体与原对象之间不共享任何内存。适用于需要在应用变更前保留原始状态的场景：
+
+```go
+// 在应用更新前保留原始状态
+original := entity.DeepClone()
+updateMsg.ApplyTo(entity)
+
+// 对比 original 与 entity 的差异，用于 diff、审计日志或乐观锁冲突检测
+if original.Age != entity.Age {
+    log.Printf("age changed: %d → %d", original.Age, entity.Age)
+}
+```
+
+`DeepClone()` 正确处理所有字段类型：
+- scalar 和 enum 字段：按值复制
+- optional 字段（`*T`）：分配新指针，修改克隆体的字段不影响原对象
+- bytes 和 repeated 字段：分配新 slice 并复制内容
+- 嵌套 message 字段：递归克隆
+- nil 接收者：返回 nil
+
+---
+
+### 第八步：实现 RPC interface
 
 生成的 `PersonService` interface：
 
@@ -416,7 +495,7 @@ func (s *personServiceImpl) CreatePerson(ctx context.Context, req *dao.PersonCre
 
 ---
 
-### 第八步：注册 gin 路由（完整 HTTP 服务）
+### 第九步：注册 gin 路由（完整 HTTP 服务）
 
 > **gin 依赖**：生成的 `*.pb.http.go` 文件会导入 [gin](https://github.com/gin-gonic/gin)，需要在项目中安装：
 > ```bash
@@ -665,9 +744,9 @@ gcode gen-ts -in proto/ -out ts/
 
 ```
 ts/
-  person.pb.ts              ← Person interface + Status enum + PersonRules 验证元数据
-  person.create.pb.ts       ← PersonCreate interface（从 person.pb.ts import Status）
-  person.update.pb.ts       ← PersonUpdateByName interface（从 person.pb.ts import Status）
+  person.entity.pb.ts       ← Person interface + Status enum（无验证元数据）
+  person.create.pb.ts       ← PersonCreate interface + PersonCreateRules 验证元数据
+  person.update.pb.ts       ← PersonUpdateByName interface + PersonUpdateByNameRules 验证元数据
   person_service.pb.ts      ← 请求/响应 interface + 验证元数据
 ```
 
@@ -763,6 +842,5 @@ npm test
 | 不支持 `oneof` | 中 | 非合成的 oneof 字段在解析阶段报错 |
 | 不支持 well-known types | 中 | `google.protobuf.*` 类型（如 `Timestamp`）会报错 |
 | 不支持 proto2 | 低 | 仅接受 `syntax = "proto3"` |
-| 跨 package enum import 不会自动生成 | 低 | 当 message 引用其他 proto package 的 enum 时，生成的 `*.update.proto` / `*.create.proto` 会缺少该 import，需手动补充 |
 | HTTP path param 不支持 | 低 | 生成的 handler 仅从请求体绑定数据，路径参数（如 `/users/:id`）需在 service 层手动提取 |
 | `repeated` enum 的 `defined_only` 不生效 | 低 | repeated enum 字段的 `defined_only` 约束会被静默跳过 |

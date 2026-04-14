@@ -44,6 +44,14 @@ extend google.protobuf.FieldOptions {
   GcodeFieldOptions field = 50002;
 }
 
+// SchemaFileOptions marks a proto file as a schema definition source.
+// gen-proto generates *.entity.proto / *.create.proto / *.update.proto from this file.
+message SchemaFileOptions {}
+
+extend google.protobuf.FileOptions {
+  SchemaFileOptions schema = 50000;
+}
+
 // UpdateMessageOptions configures generation of a partial-update message derived from this message.
 // Multiple options may be declared to generate multiple update messages.
 message UpdateMessageOptions {

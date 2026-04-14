@@ -95,49 +95,57 @@
 **影响**：
 - 用户通过 nil 检查判断字段是否设置
 - marshal 时 nil 指针字段跳过（不写入 wire）
-- validate 继承时 nil 指针字段跳过校验
+- nil 指针字段跳过校验
 
 ---
 
-## D6：validate 继承机制
+## D6：validate 规则显式写入生成的 proto 文件
 
-**问题**：create/update 派生 message 如何复用源 message 的 validate 规则？
+**问题**：create/update 派生 message 如何携带 validate 规则？
 
 **约束**：
-- 派生 message 的字段是源 message 字段的子集，validate 规则应自动继承
+- 派生 message 的字段是源 message 字段的子集，validate 规则应在生成的 proto 文件中可见
 - 派生 message 中 optional 字段（指针类型）nil 时不应触发校验
 - condition_fields（WHERE 条件字段）在 update 场景中是必填的，不应做零值守卫
 - required_fields（create 场景强制非 optional 字段）同样不做 nil 守卫，直接校验
+- validate 规则应从 proto 文件本身可读——不应有隐式的跨文件反查
 
 **决策**：
-- render 层通过 `create_source`/`update_source` 注解追踪源 message
-- 在全局 `MessageIndex` 中定位源 message 的 validate 规则
+- `gen-proto` 将 validate 注解从 schema（`.meta.proto`）直接拷贝到生成的 `*.create.proto` / `*.update.proto` 字段上
+- render 层直接从派生 message 自身字段读取 validate 规则——不查 `MessageIndex`
 - optional 字段（指针类型）：生成 `if p.Field != nil { ... }` 守卫
 - condition_fields：禁用零值守卫（`name != ""`），直接校验
+- `update_source`/`create_source` 注解保留，用于 ToEntity/ApplyTo/ToMap/GormMessageOptions——它们声明衍生关系，不涉及 validate 规则
 
 **影响**：
-- validate 规则只在源 message 中写一次，派生 message 自动继承
-- 派生 message 的 `Validate()` 方法与源 message 语义一致
+- validate 规则在生成的 proto 文件中可见——用户可直接阅读 `*.create.proto` / `*.update.proto` 了解所有约束
+- render 层对 validate 无隐式的源 message 索引依赖
+- 派生 message 的 `Validate()` 方法与 schema 定义语义一致
 
 ---
 
 ## D7：create/update 派生 message 两阶段 pipeline
 
-**问题**：如何从一个 proto 文件生成派生 message？
+**问题**：如何从 proto 文件生成派生 message？
 
 **约束**：
 - 派生 message 需要作为独立的 proto message 存在，才能被 service rpc 引用
 - 生成的中间 proto 文件可被其他工具复用（如 protoc-gen-go、buf），保持与 proto 生态的兼容性
 - CLI 保持单一职责：gen-proto 只负责 proto 生成，gcode 只负责 Go 生成
+- schema 源（`.meta.proto`）应是 validate 规则的唯一出处
 
 **决策**：两阶段 pipeline：
-1. `gcode gen-proto`：读取 `gcode.update_message`/`gcode.create_message` 注解，生成中间 proto 文件（`*.update.proto`/`*.create.proto`）
-2. `gcode`：将所有 proto 文件（含生成的中间 proto）统一处理，生成 Go 代码
+1. `gcode gen-proto`：读取 `.meta.proto` schema 文件，为每个 schema 生成三类 proto 文件：
+   - `*.entity.proto` — struct 定义（无 validate 注解，有 gorm）
+   - `*.create.proto` — create message（validate 注解从 schema 拷贝）
+   - `*.update.proto` — update message（validate 注解从 schema 拷贝）
+2. `gcode`：处理 entity/create/update/service proto 文件生成 Go 代码；跳过 `.meta.proto` 文件
 
 **影响**：
 - 派生 message 是真正的 proto message，可被 service rpc 直接引用
 - 两阶段解耦：gen-proto 只关心 proto 生成，gcode 只关心 Go 生成
-- 中间 proto 文件通过 `update_source`/`create_source` 注解记录来源，供 validate 继承使用
+- validate 规则显式写入生成的 proto 文件——render 层无隐式跨文件反查
+- 生成文件中的 `update_source`/`create_source` 注解记录衍生关系，供 ToEntity/ApplyTo/ToMap 使用
 
 ---
 
@@ -329,3 +337,21 @@
 - 常见场景无需任何配置
 - 如果模块被 fork 或重命名，必须手动更新生成代码中的 import 路径——这是有意为之：模块重命名是破坏性变更，应该有明确的操作
 - 可配置 import 路径的需求推迟到未来大版本中处理
+
+---
+
+## D17：保留生成 proto 文件中的 update_source / create_source 注解
+
+**问题**：既然 validate 规则已显式拷贝，是否应从生成的 `*.update.proto` / `*.create.proto` 文件中移除 `update_source`（字段 50005）和 `create_source`（字段 50006）注解？
+
+**约束**：
+- `ToEntity()`、`ApplyTo()`、`ToMap()` 和 `GormMessageOptions` 传播均依赖这些注解来识别源实体并在 `MessageIndex` 中定位它
+- 移除它们需要为 render 层提供替代机制来找到源 message
+- 最初提出移除的动机是消除"隐式 validate 反查"——该问题已通过 D6 解决（validate 规则现在显式写入 proto 字段）
+
+**决策**：保留生成文件中的 `update_source`/`create_source` 注解。它们与 validate 的用途不同：声明衍生关系（此 message 从哪个实体派生），而非校验规则。这是显式的，不是隐式的。
+
+**影响**：
+- `ToEntity()`、`ApplyTo()`、`ToMap()` 和 `GormMessageOptions` 无需任何改动即可继续工作
+- render 层有两个独立关注点：衍生关系（通过 `update_source`/`create_source`）和 validate 规则（通过字段注解）——两者均为显式
+- 未来如果设计出更好的衍生关系声明机制，可以移除这些注解，但当前推迟处理

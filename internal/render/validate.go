@@ -6,6 +6,8 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/pinealctx/x/ds"
+
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/transform"
 )
@@ -14,7 +16,8 @@ import (
 // Every message gets a Validate() error method; messages without constraints get
 // an empty method that returns nil, ensuring interface consistency.
 // For update/create messages (UpdateSource/CreateSource non-empty), validate rules
-// are inherited from the source message via ctx.MessageIndex.
+// are read directly from the derived message's own fields (which carry validate
+// annotations from gen-proto).
 // The returned bytes are gofmt-formatted and ready to write to disk.
 func ValidateFile(gf transform.GoFile, modulePath string, ctx Context) ([]byte, error) {
 	// Build enum GoName → GoEnum map for defined_only lookups.
@@ -51,45 +54,39 @@ func ValidateFile(gf transform.GoFile, modulePath string, ctx Context) ([]byte, 
 	return src, nil
 }
 
+// mergeEnums combines local file enums with global enum index.
+// Local file enums take precedence over global entries.
+func mergeEnums(local, global map[string]transform.GoEnum) map[string]transform.GoEnum {
+	if global == nil {
+		return local
+	}
+	merged := make(map[string]transform.GoEnum, len(local)+len(global))
+	maps.Copy(merged, global)
+	maps.Copy(merged, local) // local takes precedence
+	return merged
+}
+
 // writeValidateMethod writes the Validate() error method for a single GoMessage.
-// For update/create messages, validate rules are inherited from the source message
-// via ctx.MessageIndex: optional fields skip validation when nil.
+// For update/create messages (UpdateSource/CreateSource non-empty), validate rules are read directly
+// from the derived message's own fields (which already carry validate annotations
+// from gen-proto). Required fields are validated unconditionally; optional fields
+// are skipped when nil.
 func writeValidateMethod(b *strings.Builder, msg transform.GoMessage, enumByGoName map[string]transform.GoEnum, ctx Context) {
 	recv := receiverName(msg.GoName)
 	fmt.Fprintf(b, "func (%s *%s) Validate() error {\n", recv, msg.GoName)
 
-	sourceName := msg.UpdateSource
-	if sourceName == "" {
-		sourceName = msg.CreateSource
-	}
+	isDerived := msg.UpdateSource != "" || msg.CreateSource != ""
 
-	if sourceName != "" && ctx.MessageIndex != nil {
-		// Inherited validate: look up source message and use its field validate rules.
-		if srcMsg, ok := ctx.MessageIndex[sourceName]; ok {
-			// Merge local and global enum tables so enum defined_only checks work
-			// even when the enum is defined in a different file from the derived message.
-			mergedEnums := enumByGoName
-			if ctx.EnumIndex != nil {
-				mergedEnums = make(map[string]transform.GoEnum, len(enumByGoName)+len(ctx.EnumIndex))
-				maps.Copy(mergedEnums, ctx.EnumIndex)
-				maps.Copy(mergedEnums, enumByGoName) // local file takes precedence
-			}
-			writeInheritedValidation(b, recv, msg, srcMsg, mergedEnums)
-			b.WriteString("return nil\n}\n\n")
-			return
-		}
+	if isDerived {
+		// Derived message: validate rules are on the derived fields themselves.
+		mergedEnums := mergeEnums(enumByGoName, ctx.EnumIndex)
+		writeDerivedValidation(b, recv, msg, mergedEnums)
+		b.WriteString("return nil\n}\n\n")
+		return
 	}
 
 	// Standard validate: use the message's own field validate rules.
-	// Merge ctx.EnumIndex so that defined_only checks work even when the enum
-	// is defined in a different file (e.g. Status in person.proto referenced
-	// from AllValidate in all_types.proto).
-	effectiveEnums := enumByGoName
-	if ctx.EnumIndex != nil {
-		effectiveEnums = make(map[string]transform.GoEnum, len(enumByGoName)+len(ctx.EnumIndex))
-		maps.Copy(effectiveEnums, ctx.EnumIndex)
-		maps.Copy(effectiveEnums, enumByGoName) // local file takes precedence
-	}
+	effectiveEnums := mergeEnums(enumByGoName, ctx.EnumIndex)
 	for _, f := range msg.Fields {
 		if f.ValidateOptions == nil && f.Type.Kind != model.FieldKindMessage {
 			continue
@@ -99,53 +96,50 @@ func writeValidateMethod(b *strings.Builder, msg transform.GoMessage, enumByGoNa
 	b.WriteString("return nil\n}\n\n")
 }
 
-// writeInheritedValidation generates validate checks for an update/create message
-// by inheriting rules from the source message's fields.
-// Optional fields (pointer types) are skipped when nil.
-func writeInheritedValidation(b *strings.Builder, recv string, msg transform.GoMessage, srcMsg *transform.GoMessage, enumByGoName map[string]transform.GoEnum) {
-	// Build a map from field name to source field for O(1) lookup.
-	srcFieldByName := make(map[string]transform.GoField, len(srcMsg.Fields))
-	for _, sf := range srcMsg.Fields {
-		srcFieldByName[sf.Name] = sf
+// writeDerivedValidation generates validate checks for an update/create message
+// using the derived message's own field validate rules. These rules are already
+// set by gen-proto when generating .create.proto/.update.proto files.
+// Fields in the required set (ConditionFields + RequiredFields) are validated
+// unconditionally; optional fields are skipped when nil.
+func writeDerivedValidation(b *strings.Builder, recv string, msg transform.GoMessage, enumByGoName map[string]transform.GoEnum) {
+	// Build required set: condition fields (update) + required fields (create).
+	requiredSet := ds.NewSet(msg.ConditionFields...)
+	for _, rf := range msg.RequiredFields {
+		requiredSet.Add(rf)
 	}
 
 	for _, f := range msg.Fields {
-		sf, ok := srcFieldByName[f.Name]
-		if !ok {
-			// Field not in source (e.g. condition_fields added by gen-proto): no inherited rules.
-			continue
-		}
-		if sf.ValidateOptions == nil && sf.Type.Kind != model.FieldKindMessage {
+		vo := f.ValidateOptions
+		if vo == nil && f.Type.Kind != model.FieldKindMessage {
 			continue
 		}
 
-		// For optional fields in the derived message, wrap validation in nil check.
-		// A field is optional in the derived message if its GoType starts with "*".
-		isOptional := strings.HasPrefix(f.GoType, "*")
 		fieldExpr := recv + "." + f.GoName
+		isRequired := requiredSet.Contains(f.Name)
 
-		if isOptional {
-			// Dereference pointer for validation; skip if nil.
+		switch {
+		case isRequired && f.Type.Kind == model.FieldKindMessage:
+			writeMessageFieldValidation(b, fieldExpr, f.Name, f.ValidateMessage, vo)
+
+		case isRequired:
+			writeFieldValidationExpr(b, fieldExpr, f, enumByGoName, true)
+
+		case strings.HasPrefix(f.GoType, "*"):
 			fmt.Fprintf(b, "if %s != nil {\n", fieldExpr)
-			// Use dereferenced value for scalar/enum checks.
-			// Known limitation: message-type fields in derived messages are not
-			// expected to be optional (gen-proto rejects message-type fields), so
-			// passing a dereferenced expression to writeMessageFieldValidation is
-			// safe in practice. If that constraint is ever relaxed, this path
-			// would need to handle the message case separately.
-			derefExpr := "*" + fieldExpr
-			writeFieldValidationExpr(b, derefExpr, sf, enumByGoName, false)
+			writeFieldValidationExpr(b, "*"+fieldExpr, f, enumByGoName, false)
 			b.WriteString("}\n")
-		} else {
-			// Non-optional (condition) field: disable zero-value guard so empty
-			// string is validated against min_len and other constraints.
-			writeFieldValidationExpr(b, fieldExpr, sf, enumByGoName, true)
+
+		default:
+			// Non-required, non-pointer field (e.g. repeated, or a create field not in
+			// RequiredFields whose GoType has no "*" prefix). Validate directly without
+			// a nil guard; string zero-value guard is still applied by writeFieldValidationExpr.
+			writeFieldValidationExpr(b, fieldExpr, f, enumByGoName, false)
 		}
 	}
 }
 
 // writeFieldValidationExpr writes validation for a field using a custom expression
-// (used for inherited validation where the field expression may be dereferenced).
+// (used for derived validation where the field expression may be dereferenced).
 // noZeroGuard=true disables the zero-value skip for string fields (used for
 // non-optional condition fields where empty string must be validated).
 func writeFieldValidationExpr(b *strings.Builder, fieldExpr string, f transform.GoField, enumByGoName map[string]transform.GoEnum, noZeroGuard bool) {

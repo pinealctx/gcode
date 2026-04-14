@@ -119,6 +119,55 @@ func (x *AllScalarsUpdate) MarshalAppend(b []byte) ([]byte, error) {
 	return b, nil
 }
 
+// DeepClone returns a deep copy of AllScalarsUpdate with no shared memory.
+func (x *AllScalarsUpdate) DeepClone() *AllScalarsUpdate {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	if x.FSint64 != nil {
+		v := *x.FSint64
+		clone.FSint64 = &v
+	}
+	if x.FSfixed32 != nil {
+		v := *x.FSfixed32
+		clone.FSfixed32 = &v
+	}
+	if x.FSfixed64 != nil {
+		v := *x.FSfixed64
+		clone.FSfixed64 = &v
+	}
+	if x.FDouble != nil {
+		v := *x.FDouble
+		clone.FDouble = &v
+	}
+	if x.FFixed32 != nil {
+		v := *x.FFixed32
+		clone.FFixed32 = &v
+	}
+	if x.FFixed64 != nil {
+		v := *x.FFixed64
+		clone.FFixed64 = &v
+	}
+	if x.FUint32 != nil {
+		v := *x.FUint32
+		clone.FUint32 = &v
+	}
+	if x.FUint64 != nil {
+		v := *x.FUint64
+		clone.FUint64 = &v
+	}
+	if x.FFloat != nil {
+		v := *x.FFloat
+		clone.FFloat = &v
+	}
+	if x.FBytes != nil {
+		clone.FBytes = make([]byte, len(x.FBytes))
+		copy(clone.FBytes, x.FBytes)
+	}
+	return &clone
+}
+
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.
@@ -402,4 +451,36 @@ func (x *AllScalarsUpdate) ToMap() map[string]any {
 		um["f_float"] = *x.FFloat
 	}
 	return um
+}
+
+// ApplyTo merges non-nil fields from AllScalarsUpdate into p.
+// Condition fields are skipped.
+func (x *AllScalarsUpdate) ApplyTo(p *AllScalars) {
+	if x.FSint64 != nil {
+		p.FSint64 = *x.FSint64
+	}
+	if x.FSfixed32 != nil {
+		p.FSfixed32 = *x.FSfixed32
+	}
+	if x.FSfixed64 != nil {
+		p.FSfixed64 = *x.FSfixed64
+	}
+	if x.FDouble != nil {
+		p.FDouble = *x.FDouble
+	}
+	if x.FFixed32 != nil {
+		p.FFixed32 = *x.FFixed32
+	}
+	if x.FFixed64 != nil {
+		p.FFixed64 = *x.FFixed64
+	}
+	if x.FUint32 != nil {
+		p.FUint32 = *x.FUint32
+	}
+	if x.FUint64 != nil {
+		p.FUint64 = *x.FUint64
+	}
+	if x.FFloat != nil {
+		p.FFloat = *x.FFloat
+	}
 }

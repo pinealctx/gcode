@@ -327,32 +327,47 @@ func TestAllValidate_BMinmax(t *testing.T) {
 	}
 }
 
-// TestAllValidate_RItems verifies repeated items gte constraint.
+// TestAllValidate_RItems verifies repeated min_items, max_items, and items.gte constraints.
 func TestAllValidate_RItems(t *testing.T) {
 	t.Parallel()
 
-	// fail: negative value in list
+	// fail: empty list violates min_items=1
 	a := validAllValidate()
-	a.RItems = []int32{0, 1, -1}
-	assertVE(t, a.Validate(), "r_items[2]", "gte")
+	a.RItems = nil
+	assertVE(t, a.Validate(), "r_items", "min_items")
+
+	// fail: empty slice also violates min_items=1
+	a2 := validAllValidate()
+	a2.RItems = []int32{}
+	assertVE(t, a2.Validate(), "r_items", "min_items")
+
+	// fail: 6 items violates max_items=5
+	a3 := validAllValidate()
+	a3.RItems = []int32{0, 1, 2, 3, 4, 5}
+	assertVE(t, a3.Validate(), "r_items", "max_items")
+
+	// fail: negative value in list violates items.gte=0
+	a4 := validAllValidate()
+	a4.RItems = []int32{0, 1, -1}
+	assertVE(t, a4.Validate(), "r_items[2]", "gte")
 
 	// fail: first element negative
-	a2 := validAllValidate()
-	a2.RItems = []int32{-5, 1, 2}
-	assertVE(t, a2.Validate(), "r_items[0]", "gte")
+	a5 := validAllValidate()
+	a5.RItems = []int32{-5, 1, 2}
+	assertVE(t, a5.Validate(), "r_items[0]", "gte")
 
-	// pass: all non-negative
-	a3 := validAllValidate()
-	a3.RItems = []int32{0, 1, 100}
-	if err := a3.Validate(); err != nil {
-		t.Errorf("r_items with non-negative values should pass, got: %v", err)
+	// pass: exactly at min boundary
+	a6 := validAllValidate()
+	a6.RItems = []int32{0}
+	if err := a6.Validate(); err != nil {
+		t.Errorf("r_items len=1 should pass min_items=1, got: %v", err)
 	}
 
-	// pass: empty list
-	a4 := validAllValidate()
-	a4.RItems = nil
-	if err := a4.Validate(); err != nil {
-		t.Errorf("nil r_items should pass, got: %v", err)
+	// pass: exactly at max boundary
+	a7 := validAllValidate()
+	a7.RItems = []int32{0, 1, 2, 3, 4}
+	if err := a7.Validate(); err != nil {
+		t.Errorf("r_items len=5 should pass max_items=5, got: %v", err)
 	}
 }
 

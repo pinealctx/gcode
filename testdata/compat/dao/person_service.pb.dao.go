@@ -196,6 +196,60 @@ func (x *DeletePersonResponse) MarshalAppend(b []byte) ([]byte, error) {
 	return b, nil
 }
 
+// DeepClone returns a deep copy of CreatePersonResponse with no shared memory.
+func (x *CreatePersonResponse) DeepClone() *CreatePersonResponse {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	return &clone
+}
+
+// DeepClone returns a deep copy of GetPersonRequest with no shared memory.
+func (x *GetPersonRequest) DeepClone() *GetPersonRequest {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	return &clone
+}
+
+// DeepClone returns a deep copy of GetPersonResponse with no shared memory.
+func (x *GetPersonResponse) DeepClone() *GetPersonResponse {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	return &clone
+}
+
+// DeepClone returns a deep copy of UpdatePersonResponse with no shared memory.
+func (x *UpdatePersonResponse) DeepClone() *UpdatePersonResponse {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	return &clone
+}
+
+// DeepClone returns a deep copy of DeletePersonRequest with no shared memory.
+func (x *DeletePersonRequest) DeepClone() *DeletePersonRequest {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	return &clone
+}
+
+// DeepClone returns a deep copy of DeletePersonResponse with no shared memory.
+func (x *DeletePersonResponse) DeepClone() *DeletePersonResponse {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	return &clone
+}
+
 // unmarshalFrom decodes a protobuf wire-format message from b.
 // Returns the number of bytes consumed.
 // If lenient is true, duplicate non-repeated fields use last-one-wins.

@@ -63,6 +63,7 @@ func (r *embeddedResolver) FindFileByPath(path string) (protocompile.SearchResul
 // gcodeExtensions holds the compiled extension descriptors for gcode options.
 // It is initialized once by buildGcodeExtensions and reused across Parse calls.
 type gcodeExtensions struct {
+	schemaExt        protoreflect.ExtensionType // extend google.protobuf.FileOptions    { SchemaFileOptions  schema = 50000 }
 	messageExt       protoreflect.ExtensionType // extend google.protobuf.MessageOptions { GcodeMessageOptions message = 50001 }
 	fieldExt         protoreflect.ExtensionType // extend google.protobuf.FieldOptions  { GcodeFieldOptions   field   = 50002 }
 	updateMessageExt protoreflect.ExtensionType // extend google.protobuf.MessageOptions { repeated UpdateMessageOptions update_message = 50003 }
@@ -124,10 +125,12 @@ func compileGcodeExtensions() (*gcodeExtensions, error) {
 	}
 
 	exts := fd.Extensions()
-	var msgExt, fieldExt, updateMsgExt, createMsgExt, updateSrcExt, createSrcExt protoreflect.ExtensionDescriptor
+	var schemaExt, msgExt, fieldExt, updateMsgExt, createMsgExt, updateSrcExt, createSrcExt protoreflect.ExtensionDescriptor
 	for i := 0; i < exts.Len(); i++ {
 		ext := exts.Get(i)
 		switch ext.Name() {
+		case "schema":
+			schemaExt = ext
 		case "message":
 			msgExt = ext
 		case "field":
@@ -142,6 +145,9 @@ func compileGcodeExtensions() (*gcodeExtensions, error) {
 			createSrcExt = ext
 		}
 	}
+	if schemaExt == nil {
+		return nil, fmt.Errorf("gcode options proto: missing expected extension 'schema'")
+	}
 	if msgExt == nil || fieldExt == nil {
 		return nil, fmt.Errorf("gcode options proto: missing expected extensions (message=%v, field=%v)", msgExt, fieldExt)
 	}
@@ -151,6 +157,7 @@ func compileGcodeExtensions() (*gcodeExtensions, error) {
 	}
 
 	return &gcodeExtensions{
+		schemaExt:        dynamicpb.NewExtensionType(schemaExt),
 		messageExt:       dynamicpb.NewExtensionType(msgExt),
 		fieldExt:         dynamicpb.NewExtensionType(fieldExt),
 		updateMessageExt: dynamicpb.NewExtensionType(updateMsgExt),
@@ -260,6 +267,18 @@ func readFieldOptions(opts proto.Message, ext protoreflect.ExtensionType) (gormC
 	}
 	validateMessage = getStringField(gcodeMsg, "validate_message")
 	return gormColumn, jsonOmitempty, jsonIgnore, validateMessage
+}
+
+// readSchemaFileOption reports whether the file carries (gcode.schema) = {};.
+func readSchemaFileOption(opts proto.Message, ext protoreflect.ExtensionType) bool {
+	if opts == nil {
+		return false
+	}
+	fileOpts, ok := opts.(*descriptorpb.FileOptions)
+	if !ok || fileOpts == nil {
+		return false
+	}
+	return proto.HasExtension(fileOpts, ext)
 }
 
 // readUpdateMessageOptions extracts repeated update_message options from MessageOptions.

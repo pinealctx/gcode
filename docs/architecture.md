@@ -7,18 +7,22 @@ gcode is a pure Go CLI tool that generates Go code from `.proto` files. It requi
 ## Pipeline
 
 ```
-.proto files (with gcode.update_message / gcode.create_message annotations)
+.meta.proto files (schema source — define validate rules, update_message / create_message annotations)
     │
     ▼
-[gen-proto]     Pre-step: reads update_message / create_message annotations,
-                generates derived proto files (*.update.proto / *.create.proto)
-                in the same directory for the main pipeline to process
+[gen-proto]     Pre-step: reads .meta.proto schema files,
+                generates three types of proto files per schema:
+                  *.entity.proto  — struct definition (no validate, with gorm)
+                  *.create.proto  — create message (validate annotations copied from schema)
+                  *.update.proto  — update message (validate annotations copied from schema)
+                All generated files are written to the same directory.
     │
     ▼
-.proto files (original + derived)
+.proto files (entity + create + update + service)
     │
     ▼
 [source]        Scans directory, discovers all .proto files, stable sort
+                (skips .meta.proto files — consumed only by gen-proto)
     │
     ▼
 [parser]        Parses proto via protocompile: reads message/field/enum/
@@ -38,16 +42,21 @@ gcode is a pure Go CLI tool that generates Go code from `.proto` files. It requi
     │
     ▼
 Generated files
-  *.pb.dao.go              struct definitions + MarshalBinary/UnmarshalBinary/ToMap
-  *.pb.dao.validate.go     Validate() error methods
-  *.pb.rpc.go              service interface definitions
-  *.pb.http.go             gin HTTP handler factory functions
+  *.entity.pb.dao.go           struct definitions + MarshalBinary/UnmarshalBinary
+  *.entity.pb.dao.validate.go  Validate() — returns nil (no validate annotations on entity)
+  *.create.pb.dao.go           struct + ToEntity()
+  *.create.pb.dao.validate.go  Validate() — rules read directly from create proto fields
+  *.update.pb.dao.go           struct + ToMap() + ApplyTo()
+  *.update.pb.dao.validate.go  Validate() — rules read directly from update proto fields
+  *.pb.rpc.go                  service interface definitions
+  *.pb.http.go                 gin HTTP handler factory functions
 ```
 
-TypeScript generation follows a parallel pipeline using the same parser and transform stages:
+TypeScript generation follows a parallel pipeline using the same parser and transform stages.
+`.meta.proto` files are skipped; only `*.entity.proto`, `*.create.proto`, `*.update.proto`, and regular proto files are processed:
 
 ```
-.proto files
+.proto files (entity / create / update / service)
     │
     ▼
 [source → parser → model → transform]
@@ -58,6 +67,9 @@ TypeScript generation follows a parallel pipeline using the same parser and tran
     │
     ▼
 Generated files
+  *.entity.pb.ts           interfaces, enums, enum name mapping (no validation metadata)
+  *.create.pb.ts           interface + XxxRules validation metadata
+  *.update.pb.ts           interface + XxxRules validation metadata
   *.pb.ts                  interfaces, enums, enum name mapping, validation metadata
 ```
 
@@ -164,13 +176,19 @@ Public package, importable by user projects.
 
 ## Generated File Types
 
-| File                   | Trigger                                | Content                                                                                                                                                                          |
-| ---------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `*.pb.dao.go`          | All proto files                        | struct definitions, json/gorm tags, MarshalBinary, UnmarshalBinary, UnmarshalBinaryLenient, ToMap (update derived messages), TableName() (when gorm.table annotation is present) |
-| `*.pb.dao.validate.go` | All proto files                        | `Validate() error` methods covering all buf/validate constraint types                                                                                                            |
-| `*.pb.rpc.go`          | Proto files with `service` definitions | Go interface, method signature: `Method(ctx context.Context, req *XxxRequest) (*XxxResponse, error)`                                                                             |
-| `*.pb.http.go`         | Proto files with `service` definitions | gin handler factory functions `XxxHandler(svc XxxService, interceptors ...handlerx.Interceptor[*Req, *Resp]) gin.HandlerFunc`; delegates to `httpruntime.NewHandler` (bind → validate → interceptor chain → svc call, with built-in panic recovery) |
-| `*.pb.ts`              | `gcode gen-ts` subcommand              | TypeScript interfaces, enums, enum name mapping, validation metadata, cross-file ES module imports                                                                               |
+| File                          | Trigger                                | Content                                                                                                                                                                          |
+| ----------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `*.entity.pb.dao.go`          | `*.entity.proto` files                 | struct definitions, json/gorm tags, MarshalBinary, UnmarshalBinary, UnmarshalBinaryLenient, TableName() (when gorm.table annotation is present) |
+| `*.entity.pb.dao.validate.go` | `*.entity.proto` files                 | `Validate() error` — returns nil (entity proto carries no validate annotations) |
+| `*.create.pb.dao.go`          | `*.create.proto` files                 | struct definitions, ToEntity() |
+| `*.create.pb.dao.validate.go` | `*.create.proto` files                 | `Validate() error` — rules read directly from create proto fields |
+| `*.update.pb.dao.go`          | `*.update.proto` files                 | struct definitions, ToMap(), ApplyTo() |
+| `*.update.pb.dao.validate.go` | `*.update.proto` files                 | `Validate() error` — rules read directly from update proto fields |
+| `*.pb.dao.go`                 | Regular proto files                    | struct definitions, json/gorm tags, MarshalBinary, UnmarshalBinary, UnmarshalBinaryLenient, ToMap (update derived messages), TableName() (when gorm.table annotation is present) |
+| `*.pb.dao.validate.go`        | Regular proto files                    | `Validate() error` methods covering all buf/validate constraint types                                                                                                            |
+| `*.pb.rpc.go`                 | Proto files with `service` definitions | Go interface, method signature: `Method(ctx context.Context, req *XxxRequest) (*XxxResponse, error)`                                                                             |
+| `*.pb.http.go`                | Proto files with `service` definitions | gin handler factory functions `XxxHandler(svc XxxService, interceptors ...handlerx.Interceptor[*Req, *Resp]) gin.HandlerFunc`; delegates to `httpruntime.NewHandler` (bind → validate → interceptor chain → svc call, with built-in panic recovery) |
+| `*.pb.ts`                     | `gcode gen-ts` subcommand              | TypeScript interfaces, enums, enum name mapping, validation metadata (entity files: no validation metadata), cross-file ES module imports                                        |
 
 ---
 
@@ -212,6 +230,6 @@ github.com/pinealctx/gcode/
 3. **JSON tags built-in** — Generates `json:"field_name"` by default; supports `omitempty`/`ignore` via `(gcode.field).json` annotations
 4. **gorm tags optional** — Controlled by `(gcode.message).gorm` annotation; `(gcode.field).gorm.column` overrides column name
 5. **Validation via annotations** — Reuses buf/validate annotation semantics to generate `Validate() error` methods
-6. **Derived messages inherit validation** — create/update derived messages track their source via `create_source`/`update_source`; the render layer inherits validation rules automatically
+6. **Validate rules explicit in proto** — validate annotations are defined in `.meta.proto` and copied by `gen-proto` into `*.create.proto` / `*.update.proto`. The render layer reads rules directly from those proto fields — no cross-file lookup required
 7. **RPC interface transport-agnostic** — Generates Go interfaces only; no routing, serialization, or client stubs; user controls the transport layer entirely
 8. **HTTP adapter decoupled from business logic** — Handlers propagate errors via `c.Error(err)+return`; `DefaultErrorHandler` middleware handles response writing; users can replace it with a custom implementation

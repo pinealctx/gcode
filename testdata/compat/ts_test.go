@@ -17,10 +17,11 @@ import (
 
 // _goldenFiles lists every expected .pb.ts golden file relative to testdata/compat/ts/.
 var _goldenFiles = []string{
-	"all_types.pb.ts",
+	"all_types.entity.pb.ts",
 	"all_types.create.pb.ts",
 	"all_types.update.pb.ts",
-	"person.pb.ts",
+	"all_validate.pb.ts",
+	"person.entity.pb.ts",
 	"person.create.pb.ts",
 	"person.update.pb.ts",
 	"person_service.pb.ts",

@@ -13,13 +13,14 @@ import (
 
 // Context carries cross-file context needed during rendering.
 // A zero-value Context is valid and disables context-dependent features
-// (ToMap generation, validate inheritance).
+// (ToMap generation, ToEntity/ApplyTo generation, GormMessageOptions propagation).
 type Context struct {
 	// MessageIndex maps GoName to GoMessage for cross-file lookups.
-	// Used by ToMap and validate inheritance to find the source message.
+	// Used by ToEntity, ApplyTo, and GormMessageOptions propagation to find the source message.
+	// Not used by ValidateFile: validate rules are read directly from derived message fields.
 	MessageIndex map[string]*transform.GoMessage
 	// EnumIndex maps GoName to GoEnum for cross-file enum lookups.
-	// Used by validate inheritance to resolve enum defined_only checks when
+	// Used by ValidateFile to resolve enum defined_only checks when
 	// the enum is defined in a different file from the derived message.
 	EnumIndex map[string]transform.GoEnum
 }
@@ -69,6 +70,9 @@ func File(gf transform.GoFile, modulePath string, ctx Context) ([]byte, error) {
 		writeMarshalMethods(&body, msg)
 	}
 	for _, msg := range gf.Messages {
+		writeDeepCloneMethod(&body, msg)
+	}
+	for _, msg := range gf.Messages {
 		if err := writeUnmarshalMethods(&body, msg); err != nil {
 			return nil, err
 		}
@@ -76,6 +80,20 @@ func File(gf transform.GoFile, modulePath string, ctx Context) ([]byte, error) {
 	for _, msg := range gf.Messages {
 		if msg.UpdateSource != "" {
 			writeToMapMethod(&body, msg)
+		}
+	}
+	for _, msg := range gf.Messages {
+		if msg.CreateSource != "" && ctx.MessageIndex != nil {
+			if src, ok := ctx.MessageIndex[msg.CreateSource]; ok {
+				writeToEntityMethod(&body, msg, src)
+			}
+		}
+	}
+	for _, msg := range gf.Messages {
+		if msg.UpdateSource != "" && ctx.MessageIndex != nil {
+			if src, ok := ctx.MessageIndex[msg.UpdateSource]; ok {
+				writeApplyToMethod(&body, msg, src)
+			}
 		}
 	}
 	for _, enum := range gf.Enums {

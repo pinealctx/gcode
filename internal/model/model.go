@@ -55,6 +55,7 @@ type File struct {
 	Messages       []Message
 	Enums          []Enum
 	Services       []Service
+	IsSchema       bool // true when the file carries option (gcode.schema) = {};
 	LeadingComment Comment
 	Location       Location
 }

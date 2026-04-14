@@ -9,6 +9,7 @@ This document provides detailed documentation for all annotations supported by g
 - [Prerequisites](#prerequisites)
 - [Message-level annotations](#message-level-annotations)
   - [(gcode.message).gorm.table](#gcodemessagegormtable)
+  - [Source message design principles](#source-message-design-principles)
   - [(gcode.update_message)](#gcodeupdate_message)
   - [(gcode.create_message)](#gcodecreate_message)
 - [Field-level annotations](#field-level-annotations)
@@ -23,6 +24,7 @@ This document provides detailed documentation for all annotations supported by g
   - [repeated](#repeated)
   - [enum](#enum)
   - [message](#message)
+- [DeepClone](#deepclone)
 
 ---
 
@@ -31,11 +33,17 @@ This document provides detailed documentation for all annotations supported by g
 Import the required proto files before using gcode annotations:
 
 ```proto
-import "gcode/options.proto";         // gcode.message / gcode.field / update_message / create_message
+import "gcode/options.proto";         // gcode.schema / gcode.message / gcode.field / update_message / create_message
 import "buf/validate/validate.proto"; // buf.validate.field
 ```
 
 Both files are embedded in the gcode binary. No extra installation needed.
+
+For schema files (`.meta.proto`), also add the file-level schema marker:
+
+```proto
+option (gcode.schema) = {};  // marks this file as a schema source for gen-proto
+```
 
 > **Field count limit**: A message may have at most 128 non-repeated fields. Exceeding this limit causes a generation-time error. This is an intentional design constraint: a flat message with more than 128 fields is almost always a design problem. Consider using nested messages to group related fields, or `repeated` fields to represent multiple instances of the same type.
 
@@ -88,6 +96,57 @@ db.Create(&dao.PersonCreate{Nickname: "ali", Email: "ali@example.com"})
 ```go
 db.Model(&dao.Person{}).Where("name = ?", req.Name).Updates(req.ToMap())
 ```
+
+---
+
+### Source message design principles
+
+The source message (e.g. `Person`) serves as both a struct definition and a schema definition. When designing source messages for use with `create_message` and `update_message`, follow these principles:
+
+**Do not use `optional` on source message fields.** Optionality is determined by the derived message, not the source. The source message defines what fields exist; the create/update annotations define whether each field is required or optional.
+
+```proto
+// ❌ Avoid: optional on source message fields
+message Person {
+  optional string nickname = 1;
+  optional int32  level    = 2;
+}
+
+// ✅ Prefer: plain fields on source message
+message Person {
+  string nickname = 1;
+  int32  level    = 2;
+}
+```
+
+**Do not use `(buf.validate.field).required = true` on scalar/enum source fields.** The source message defines value constraints (e.g. `min_len`, `gte`, `defined_only`), not whether a field must be present. Presence is an orthogonal concern handled by `required_fields` (create) and `condition_fields` (update):
+
+| Concern | Defined by | Example |
+|---------|-----------|---------|
+| **Constraint** (WHAT) | Source message validate rules | `min_len = 1`, `gte = 0`, `defined_only` |
+| **Presence** (WHETHER) | create/update annotation | `required_fields`, `condition_fields` |
+
+```proto
+// ❌ Avoid: required on source scalar fields
+message Person {
+  string email = 1 [(buf.validate.field).string.min_len = 1,
+                     (buf.validate.field).required = true];  // unnecessary
+}
+
+// ✅ Prefer: constraint on source, presence on derived
+message Person {
+  string email = 1 [(buf.validate.field).string.min_len = 1];  // constraint only
+  option (gcode.create_message) = {
+    required_fields: ["email"]  // presence enforced here
+  };
+}
+```
+
+> **Exception**: For message-type fields (e.g. `Address address = 1`), `(buf.validate.field).message.required = true` is valid on the source message — it constrains the nested message to be non-nil when present. This is a value constraint, not a presence check.
+
+**Message-type fields are naturally nullable.** Proto3 message fields always have presence semantics (nil = not set). Both `gcode gen-proto` and the Go render layer handle message-type fields correctly:
+- In generated proto: no `optional` keyword is emitted for message-type fields
+- In Go validate: required message fields get a nil check (error if nil) followed by recursive validation
 
 ---
 
@@ -169,32 +228,31 @@ If you write a `*.update.proto` file manually (instead of using `gcode gen-proto
 
 > **Recommendation**: Always use `gcode gen-proto` to generate `*.update.proto` files. Do not write them manually.
 
-#### Cross-package enum limitation
+#### Cross-package references
 
-`gcode gen-proto` does not support cross-package enum references in derived proto files. If a field's enum type is defined in a different proto file (different package), the generated `*.update.proto` or `*.create.proto` will be missing the required `import` statement, causing a compilation error.
-
-**Workaround**: Define the enum in the same proto file as the message that uses it, or in a proto file within the same package.
+`gcode gen-proto` automatically resolves cross-file enum and message references. If a field's type is defined in another proto file, the generated `*.update.proto` or `*.create.proto` automatically includes the required `import` statement.
 
 ```proto
-// ✅ Works: enum and message in the same file
-enum Status { ... }
+// ✅ enum defined in a separate proto file
+// common.proto:
+enum Status { STATUS_UNSPECIFIED = 0; STATUS_ACTIVE = 1; STATUS_INACTIVE = 2; }
+
+// user.proto:
+import "common.proto";
 message User {
   Status status = 1;
-  option (gcode.update_message) = { name: "UserUpdate" ... };
+  option (gcode.update_message) = { name: "UserUpdate" condition_fields: ["status"] };
 }
-
-// ❌ Does not work: enum defined in another package
-// import "other_package/types.proto";
-// message User {
-//   other_package.Status status = 1;  // gen-proto cannot resolve this import
-// }
+// Generated user.update.proto automatically includes: import "common.proto";
 ```
 
-The `Validate()` method of an update derived message automatically inherits validate rules from the source message, with the following differences:
+No manual `import` management is needed for derived proto files.
+
+The `Validate()` method of an update derived message uses validate rules copied from the schema by `gen-proto`. The rules are read directly from the derived message's own proto fields — no cross-file lookup. Behavior:
 
 - **Optional fields (pointer types)**: nil values skip validation — no rules are triggered
 - **condition_fields**: validated without a zero-value guard — even an empty string triggers `min_len`
-- **Fields excluded by ignore_fields**: not included in validate inheritance — rules are completely skipped
+- **Fields excluded by ignore_fields**: not included in the derived message — rules are completely skipped
 
 ```go
 req := &dao.PersonUpdateByName{
@@ -204,6 +262,26 @@ req := &dao.PersonUpdateByName{
 err := req.Validate()
 // err: field=name rule=min_len msg=length must be >= 1
 ```
+
+#### ApplyTo() method
+
+The update derived message generates an `ApplyTo()` method that merges non-nil fields into an existing source entity. This is useful for in-memory/cache operations where you want to apply a partial update without going through the database:
+
+```go
+// Load existing entity from cache or DB
+person := cache.Get(key)  // *dao.Person
+
+// Apply partial update — only non-nil fields are overwritten
+req.ApplyTo(person)  // condition field "name" is NOT applied
+
+// person now has updated fields; nil fields in req are untouched
+cache.Set(key, person)
+```
+
+`ApplyTo()` handles pointer type differences between the update and source structs:
+- **Optional scalar/enum** (`*T` → `T`): nil-guard + dereference — only set when provided
+- **Optional pointer** (`*T` → `*T`): nil-guard + pointer assign — shared reference
+- **Repeated/bytes** (`[]T`): nil-guard — distinguishes "not provided" (nil) from "set to empty"
 
 ---
 
@@ -252,11 +330,11 @@ type PersonCreate struct {
 
 #### Validate inheritance
 
-`Validate()` inheritance rules for a create derived message:
+`Validate()` rules for a create derived message come from the schema (`.meta.proto`), copied by `gen-proto` into the generated `*.create.proto` fields. The render layer reads them directly:
 
 - **Optional fields (pointer types)**: nil skips validation
 - **required_fields (non-pointer)**: validated directly, no nil guard
-- **Fields excluded by ignore_fields**: not included in validate inheritance
+- **Fields excluded by ignore_fields**: not included in the derived message
 - **condition_fields**: create_message has no condition_fields — not applicable
 
 ```go
@@ -265,6 +343,31 @@ req := &dao.PersonCreate{
     Name:     nil, // optional field, nil → skips validation
 }
 ```
+
+#### ToEntity() method
+
+The create derived message generates a `ToEntity()` method that converts the create struct to the source entity type. This is useful for building an entity in memory before persisting it:
+
+```go
+req := &dao.PersonCreate{
+    Nickname: "alice",
+    Email:    strPtr("alice@example.com"),
+}
+
+person := req.ToEntity()  // returns *dao.Person
+person.CreatedAt = time.Now().Unix()  // fill server-generated fields
+
+db.Create(person)
+cache.Set(key, person)
+```
+
+`ToEntity()` handles pointer type differences between the create and source structs:
+- **Required field** (`T` → `*T`): takes address — required fields always have a value
+- **Optional scalar/enum** (`*T` → `T`): nil-guard + dereference — zero value if not provided
+- **Optional pointer** (`*T` → `*T`): nil-guard + pointer assign — shared reference
+- **Repeated/bytes** (`[]T`): direct assign
+
+Fields excluded by `ignore_fields` remain at their zero values in the returned entity.
 
 ---
 
@@ -600,3 +703,41 @@ message Order {
 Triggered when: `shipping_address == nil` (nested message not set).
 
 > **Note**: `(buf.validate.field).required` and `(buf.validate.field).message.required` have the same effect on message-type fields — both check whether the field is nil.
+
+---
+
+## DeepClone
+
+Every generated message struct has a `DeepClone()` method that returns a fully independent copy with no shared memory between the clone and the original.
+
+### Signature
+
+```go
+func (x *Msg) DeepClone() *Msg
+```
+
+- Returns `nil` when called on a `nil` receiver.
+- All pointer, slice, and nested message fields are recursively copied so that mutating the clone never affects the original.
+
+### Field handling
+
+| Field type | Go type example | How it is cloned |
+|---|---|---|
+| scalar | `string`, `int32`, `bool` | shallow copy is sufficient (value type) |
+| enum | `Status` | shallow copy is sufficient (int32 alias) |
+| bytes (singular) | `[]byte` | `make` + `copy` |
+| bytes (HasPresence) | `[]byte` (nil = absent) | `make` + `copy` when non-nil |
+| optional scalar/enum | `*string`, `*int32`, `*Status` | allocate new pointer: `v := *p.F; clone.F = &v` |
+| message | `*Address` | recursive `DeepClone()`, nil is preserved |
+| repeated scalar/enum | `[]int32`, `[]Status` | `make` + `copy` |
+| repeated bytes | `[][]byte` | `make` outer slice; `make` + `copy` each element |
+| repeated message | `[]*Address` | `make` outer slice; recursive `DeepClone()` per element |
+
+### Typical usage
+
+```go
+// Preserve the original entity before applying an update.
+original := entity.DeepClone()
+updateMsg.ApplyTo(entity)
+// Compare original vs entity for diff, audit log, or optimistic-lock conflict detection.
+```
