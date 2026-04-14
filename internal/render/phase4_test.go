@@ -147,12 +147,42 @@ func TestToMapNotGeneratedForNonUpdate(t *testing.T) {
 func TestValidateInheritance_UpdateMessage(t *testing.T) {
 	t.Parallel()
 
-	updateMsg := buildUpdateGoMessage()
-	srcMsg := buildSourceGoMessage()
-	msgIndex := map[string]*transform.GoMessage{
-		"User": &srcMsg,
+	minLen1 := uint64(1)
+	maxLen100 := uint64(100)
+	// Update message with validate options directly on its own fields
+	// (gen-proto copies validate rules from source to derived proto).
+	updateMsg := transform.GoMessage{
+		GoName:          "UserUpdateByID",
+		UpdateSource:    "User",
+		ConditionFields: []string{"id"},
+		Fields: []transform.GoField{
+			{
+				Field:  model.Field{Name: "id", Number: 1, Cardinality: model.CardinalitySingular, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}, JSONName: "id"},
+				GoName: "Id",
+				GoType: "int64",
+			},
+			{
+				Field: model.Field{
+					Name: "name", Number: 2, Cardinality: model.CardinalitySingular, Optional: true,
+					Type:            model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
+					JSONName:        "name",
+					ValidateOptions: &model.ValidateFieldOptions{MinLen: &minLen1, MaxLen: &maxLen100},
+				},
+				GoName: "Name",
+				GoType: "*string",
+			},
+			{
+				Field: model.Field{
+					Name: "email", Number: 3, Cardinality: model.CardinalitySingular, Optional: true,
+					Type:            model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
+					JSONName:        "email",
+					ValidateOptions: &model.ValidateFieldOptions{Email: true},
+				},
+				GoName: "Email",
+				GoType: "*string",
+			},
+		},
 	}
-	ctx := Context{MessageIndex: msgIndex}
 
 	gf := transform.GoFile{
 		Source:   "user.update.proto",
@@ -160,7 +190,7 @@ func TestValidateInheritance_UpdateMessage(t *testing.T) {
 		Messages: []transform.GoMessage{updateMsg},
 	}
 
-	src, err := ValidateFile(gf, testModulePhase4, ctx)
+	src, err := ValidateFile(gf, testModulePhase4, Context{})
 	if err != nil {
 		t.Fatalf("ValidateFile() error: %v", err)
 	}
@@ -177,13 +207,13 @@ func TestValidateInheritance_UpdateMessage(t *testing.T) {
 	if !strings.Contains(s, "if x.Email != nil") {
 		t.Errorf("missing nil check for optional Email field in:\n%s", s)
 	}
-	// Validate rules from source should be inherited (email check).
+	// Validate rules should be read from derived field's own options.
 	if !strings.Contains(s, "IsEmail") {
-		t.Errorf("email validate rule should be inherited in:\n%s", s)
+		t.Errorf("email validate rule should be present in:\n%s", s)
 	}
 	// min_len rule for name.
 	if !strings.Contains(s, "min_len") {
-		t.Errorf("min_len validate rule should be inherited in:\n%s", s)
+		t.Errorf("min_len validate rule should be present in:\n%s", s)
 	}
 }
 
@@ -191,8 +221,11 @@ func TestValidateInheritance_CreateMessage(t *testing.T) {
 	t.Parallel()
 
 	minLen1 := uint64(1)
-	srcMsg := transform.GoMessage{
-		GoName: "Product",
+	// Create message: sku is required (non-optional) with validate options
+	// directly on its own field (gen-proto copies from source to derived proto).
+	createMsg := transform.GoMessage{
+		GoName:       "ProductCreate",
+		CreateSource: "Product",
 		Fields: []transform.GoField{
 			{
 				Field: model.Field{
@@ -200,23 +233,10 @@ func TestValidateInheritance_CreateMessage(t *testing.T) {
 					JSONName:        "sku",
 					ValidateOptions: &model.ValidateFieldOptions{MinLen: &minLen1},
 				},
-				GoName: "Sku", GoType: "string",
-			},
-		},
-	}
-	// Create message: sku is required (non-optional), title is optional.
-	createMsg := transform.GoMessage{
-		GoName:       "ProductCreate",
-		CreateSource: "Product",
-		Fields: []transform.GoField{
-			{
-				Field:  model.Field{Name: "sku", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}, JSONName: "sku"},
 				GoName: "Sku", GoType: "string", // non-optional (required_fields)
 			},
 		},
 	}
-	msgIndex := map[string]*transform.GoMessage{"Product": &srcMsg}
-	ctx := Context{MessageIndex: msgIndex}
 
 	gf := transform.GoFile{
 		Source:   "product.create.proto",
@@ -224,7 +244,7 @@ func TestValidateInheritance_CreateMessage(t *testing.T) {
 		Messages: []transform.GoMessage{createMsg},
 	}
 
-	src, err := ValidateFile(gf, testModulePhase4, ctx)
+	src, err := ValidateFile(gf, testModulePhase4, Context{})
 	if err != nil {
 		t.Fatalf("ValidateFile() error: %v", err)
 	}
@@ -235,66 +255,7 @@ func TestValidateInheritance_CreateMessage(t *testing.T) {
 		t.Errorf("non-optional field should not have nil check in:\n%s", s)
 	}
 	if !strings.Contains(s, "min_len") {
-		t.Errorf("min_len rule should be inherited for non-optional field in:\n%s", s)
-	}
-}
-
-func TestValidateInheritance_NoSourceInIndex(t *testing.T) {
-	t.Parallel()
-
-	// When source message is not in index, fall back to own validate rules.
-	updateMsg := transform.GoMessage{
-		GoName:       "UserUpdateByID",
-		UpdateSource: "User",
-		Fields: []transform.GoField{
-			{
-				Field:  model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}, JSONName: "id"},
-				GoName: "Id", GoType: "int64",
-			},
-		},
-	}
-	// Empty index — source not found.
-	ctx := Context{MessageIndex: map[string]*transform.GoMessage{}}
-
-	gf := transform.GoFile{
-		Source:   "user.update.proto",
-		Package:  "testpkg",
-		Messages: []transform.GoMessage{updateMsg},
-	}
-
-	src, err := ValidateFile(gf, testModulePhase4, ctx)
-	if err != nil {
-		t.Fatalf("ValidateFile() error: %v", err)
-	}
-	// Should still generate a Validate() method (empty body).
-	if !strings.Contains(string(src), "func (x *UserUpdateByID) Validate()") {
-		t.Errorf("Validate method should still be generated when source not in index")
-	}
-}
-
-func TestValidateInheritance_NilContext(t *testing.T) {
-	t.Parallel()
-
-	// Zero-value Context should not panic.
-	updateMsg := transform.GoMessage{
-		GoName:       "UserUpdateByID",
-		UpdateSource: "User",
-		Fields: []transform.GoField{
-			{
-				Field:  model.Field{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}, JSONName: "id"},
-				GoName: "Id", GoType: "int64",
-			},
-		},
-	}
-	gf := transform.GoFile{
-		Source:   "user.update.proto",
-		Package:  "testpkg",
-		Messages: []transform.GoMessage{updateMsg},
-	}
-
-	_, err := ValidateFile(gf, testModulePhase4, Context{})
-	if err != nil {
-		t.Fatalf("ValidateFile() with zero Context should not error: %v", err)
+		t.Errorf("min_len rule should be present for non-optional field in:\n%s", s)
 	}
 }
 
