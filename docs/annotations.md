@@ -32,11 +32,17 @@ This document provides detailed documentation for all annotations supported by g
 Import the required proto files before using gcode annotations:
 
 ```proto
-import "gcode/options.proto";         // gcode.message / gcode.field / update_message / create_message
+import "gcode/options.proto";         // gcode.schema / gcode.message / gcode.field / update_message / create_message
 import "buf/validate/validate.proto"; // buf.validate.field
 ```
 
 Both files are embedded in the gcode binary. No extra installation needed.
+
+For schema files (`.meta.proto`), also add the file-level schema marker:
+
+```proto
+option (gcode.schema) = {};  // marks this file as a schema source for gen-proto
+```
 
 > **Field count limit**: A message may have at most 128 non-repeated fields. Exceeding this limit causes a generation-time error. This is an intentional design constraint: a flat message with more than 128 fields is almost always a design problem. Consider using nested messages to group related fields, or `repeated` fields to represent multiple instances of the same type.
 
@@ -241,11 +247,11 @@ message User {
 
 No manual `import` management is needed for derived proto files.
 
-The `Validate()` method of an update derived message automatically inherits validate rules from the source message, with the following differences:
+The `Validate()` method of an update derived message uses validate rules copied from the schema by `gen-proto`. The rules are read directly from the derived message's own proto fields — no cross-file lookup. Behavior:
 
 - **Optional fields (pointer types)**: nil values skip validation — no rules are triggered
 - **condition_fields**: validated without a zero-value guard — even an empty string triggers `min_len`
-- **Fields excluded by ignore_fields**: not included in validate inheritance — rules are completely skipped
+- **Fields excluded by ignore_fields**: not included in the derived message — rules are completely skipped
 
 ```go
 req := &dao.PersonUpdateByName{
@@ -323,11 +329,11 @@ type PersonCreate struct {
 
 #### Validate inheritance
 
-`Validate()` inheritance rules for a create derived message:
+`Validate()` rules for a create derived message come from the schema (`.meta.proto`), copied by `gen-proto` into the generated `*.create.proto` fields. The render layer reads them directly:
 
 - **Optional fields (pointer types)**: nil skips validation
 - **required_fields (non-pointer)**: validated directly, no nil guard
-- **Fields excluded by ignore_fields**: not included in validate inheritance
+- **Fields excluded by ignore_fields**: not included in the derived message
 - **condition_fields**: create_message has no condition_fields — not applicable
 
 ```go

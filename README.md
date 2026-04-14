@@ -15,7 +15,7 @@ A code generator that produces plain Go structs from `.proto` files. No `protoc`
 - **JSON tags built-in** — Generates `json:"camelCase"` tags by default; supports `omitempty`/`ignore` via annotations.
 - **GORM support** — Generates gorm struct tags and `TableName()` via `(gcode.message).gorm` annotation.
 - **Built-in validation** — Reuses `buf/validate` annotation syntax to generate `Validate() error` methods.
-- **Derived message generation** — Declare update/create derived messages via annotations; validate rules auto-inherited.
+- **Derived message generation** — Declare update/create derived messages via annotations in `.meta.proto` schema files; `gen-proto` generates entity/create/update proto files with validate annotations explicitly copied.
 - **gin HTTP adapter** — Generates handler factory functions decoupled from service interfaces.
 - **TypeScript generation** — Generates interfaces, enums, and validation metadata from proto files via `gcode gen-ts`.
 - **Comment passthrough** — Proto leading comments pass through to all generated code.
@@ -116,7 +116,7 @@ func main() {
 }
 ```
 
-> **Derived messages**: If you use `gcode.update_message` or `gcode.create_message` annotations, run `gcode gen-proto -in proto/` first to generate intermediate proto files, then `gcode -in proto/ -out dao/`. See [Getting Started](docs/getting-started.md#step-2-generate-derived-proto-files) for the full workflow.
+> **Derived messages**: If you use `gcode.update_message` or `gcode.create_message` annotations, write them in a `.meta.proto` schema file with `option (gcode.schema) = {}`. Then run `gcode gen-proto -in proto/` to generate `*.entity.proto`, `*.create.proto`, and `*.update.proto`, then `gcode -in proto/ -out dao/`. See [Getting Started](docs/getting-started.md#step-2-generate-derived-proto-files) for the full workflow.
 
 **5. Generate TypeScript types (optional)**
 

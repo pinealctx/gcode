@@ -32,11 +32,17 @@
 在 proto 文件中使用 gcode 注解前，需要导入对应的 proto 文件：
 
 ```proto
-import "gcode/options.proto";       // gcode.message / gcode.field / update_message / create_message
+import "gcode/options.proto";       // gcode.schema / gcode.message / gcode.field / update_message / create_message
 import "buf/validate/validate.proto"; // buf.validate.field
 ```
 
 两个文件均已嵌入 gcode 二进制，无需额外安装。
+
+对于 schema 文件（`.meta.proto`），还需添加文件级 schema 标记：
+
+```proto
+option (gcode.schema) = {};  // 标记此文件为 gen-proto 的 schema 源
+```
 
 > **字段数量限制**：每个 message 最多支持 128 个非 repeated 字段，超出限制会在生成阶段报错。这是有意为之的设计约束：超过 128 个非 repeated 字段的扁平 message 几乎都是设计问题。建议用嵌套 message 对相关字段分组，或用 `repeated` 字段表示同类型的多个实例。
 
@@ -242,11 +248,11 @@ message User {
 
 衍生 proto 文件无需手动管理 import。
 
-update 派生 message 的 `Validate()` 自动继承源 message 的 validate 规则，但行为有以下差异：
+update 派生 message 的 `Validate()` 使用由 `gen-proto` 从 schema 拷贝的 validate 规则，直接从派生 message 自身的 proto 字段读取，无需跨文件反查。行为如下：
 
 - **可选字段（指针类型）**：值为 nil 时跳过校验，不触发 validate 规则
 - **condition_fields**：不做零值守卫，直接校验（即使值为空字符串也会触发 min_len 规则）
-- **ignore_fields 排除的字段**：不参与 validate 继承，规则完全跳过
+- **ignore_fields 排除的字段**：不包含在派生 message 中，规则完全跳过
 
 ```go
 req := &dao.PersonUpdateByName{
@@ -324,11 +330,11 @@ type PersonCreate struct {
 
 #### validate 继承行为
 
-create 派生 message 的 `Validate()` 继承规则：
+create 派生 message 的 `Validate()` 规则来自 schema（`.meta.proto`），由 `gen-proto` 拷贝到生成的 `*.create.proto` 字段中，render 层直接读取：
 
 - **可选字段（指针类型）**：nil 时跳过校验
 - **required_fields 字段（非指针）**：直接校验，不做 nil 守卫
-- **ignore_fields 排除的字段**：不参与 validate 继承
+- **ignore_fields 排除的字段**：不包含在派生 message 中
 - **condition_fields**：create_message 无此概念，不适用
 
 ```go
