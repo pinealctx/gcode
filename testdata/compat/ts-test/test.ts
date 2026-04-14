@@ -253,6 +253,8 @@ assertEqual((AllValidateRules.bMinmax as { maxLength: number }).maxLength, 100, 
 
 // repeated items constraint
 assertEqual((AllValidateRules.rItems as { type: string }).type, "array", "AllValidateRules.rItems.type === array");
+assertEqual((AllValidateRules.rItems as { minItems: number }).minItems, 1, "AllValidateRules.rItems.minItems === 1");
+assertEqual((AllValidateRules.rItems as { maxItems: number }).maxItems, 5, "AllValidateRules.rItems.maxItems === 5");
 assertEqual((AllValidateRules.rItems as { items: { minimum: number } }).items.minimum, 0, "AllValidateRules.rItems.items.minimum === 0");
 assertEqual((AllValidateRules.rItems as { items: { type: string } }).items.type, "integer", "AllValidateRules.rItems.items.type === integer");
 
@@ -321,6 +323,9 @@ assertEqual(PersonCreateRules.email.format, "email", "PersonCreateRules.email.fo
 // role is optional in create
 assertEqual(PersonCreateRules.role.required, false, "PersonCreateRules.role.required === false");
 assert((PersonCreateRules.role as { enum: readonly string[] }).enum.includes("admin"), "PersonCreateRules.role.enum includes admin");
+// typeId notIn constraint (inherited from source Person)
+assert((PersonCreateRules.typeId as { notIn: readonly number[] }).notIn.includes(0), "PersonCreateRules.typeId.notIn includes 0");
+assert((PersonCreateRules.typeId as { notIn: readonly number[] }).notIn.includes(-1), "PersonCreateRules.typeId.notIn includes -1");
 
 // PersonUpdateByNameRules: name is required (condition field)
 assertEqual(PersonUpdateByNameRules.name.required, true, "PersonUpdateByNameRules.name.required === true");
@@ -367,7 +372,7 @@ assertEqual(treeLeaf.child.child.value, "deepest", "TreeNode.child.child.value d
 
 // --- summary ---
 
-assertEqual(passed, 103, "expected exactly 103 assertions before count guard");
+assertEqual(passed, 107, "expected exactly 107 assertions before count guard");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {

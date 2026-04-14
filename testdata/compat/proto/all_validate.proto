@@ -47,6 +47,8 @@ message AllValidate {
   ];
 
   repeated int32 r_items = 13 [
+    (buf.validate.field).repeated.min_items = 1,
+    (buf.validate.field).repeated.max_items = 5,
     (buf.validate.field).repeated.items.int32.gte = 0
   ];
 

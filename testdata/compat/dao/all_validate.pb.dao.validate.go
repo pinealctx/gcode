@@ -92,6 +92,12 @@ func (x *AllValidate) Validate() error {
 			return &validateruntime.ValidationError{Field: "b_minmax", Rule: "max_len", Message: validateruntime.MsgOr("", "length must be <= 100")}
 		}
 	}
+	if len(x.RItems) < 1 {
+		return &validateruntime.ValidationError{Field: "r_items", Rule: "min_items", Message: validateruntime.MsgOr("", "must have at least 1 item(s)")}
+	}
+	if len(x.RItems) > 5 {
+		return &validateruntime.ValidationError{Field: "r_items", Rule: "max_items", Message: validateruntime.MsgOr("", "must have at most 5 item(s)")}
+	}
 	for i, v := range x.RItems {
 		if v < 0 {
 			return &validateruntime.ValidationError{Field: fmt.Sprintf("r_items[%d]", i), Rule: "gte", Message: validateruntime.MsgOr("", "must be >= 0")}

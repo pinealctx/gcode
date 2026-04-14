@@ -171,3 +171,126 @@ func TestValidate_IntNotIn(t *testing.T) {
 		t.Errorf("type_id=1: got %v, want nil", err)
 	}
 }
+
+// TestValidate_NicknameRequired verifies that nickname (required field) fails when empty.
+func TestValidate_NicknameRequired(t *testing.T) {
+	t.Parallel()
+
+	// fail: empty nickname violates min_len=1 (required semantics)
+	p := validPersonCreate()
+	p.Nickname = ""
+	assertVE(t, p.Validate(), "nickname", "min_len")
+
+	// fail: nil pointer is not possible (Nickname is non-optional string), but
+	// a value exceeding max_len=10 must fail
+	p2 := validPersonCreate()
+	p2.Nickname = "toolongname"
+	assertVE(t, p2.Validate(), "nickname", "max_len")
+}
+
+// validPersonUpdate returns a dao.PersonUpdateByName that satisfies all validate constraints.
+func validPersonUpdate() *dao.PersonUpdateByName {
+	return &dao.PersonUpdateByName{
+		Name:     "Alice", // condition field, required
+		Age:      int32Ptr(30),
+		Status:   ptrStatus(dao.Status_STATUS_ACTIVE),
+		Nickname: strPtr("Ali"),
+		Email:    strPtr("alice@example.com"),
+		Role:     strPtr("admin"),
+		TypeId:   int32Ptr(1),
+	}
+}
+
+// TestValidate_ValidPersonUpdate verifies that a fully valid PersonUpdateByName passes Validate().
+func TestValidate_ValidPersonUpdate(t *testing.T) {
+	t.Parallel()
+	if err := validPersonUpdate().Validate(); err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+}
+
+// TestValidate_Update_NameRequired verifies that the condition field name is required.
+func TestValidate_Update_NameRequired(t *testing.T) {
+	t.Parallel()
+
+	// fail: empty name violates min_len=1
+	p := validPersonUpdate()
+	p.Name = ""
+	assertVE(t, p.Validate(), "name", "min_len")
+
+	// fail: name too long
+	p2 := validPersonUpdate()
+	p2.Name = string(make([]byte, 101))
+	assertVE(t, p2.Validate(), "name", "max_len")
+}
+
+// TestValidate_Update_OptionalFieldsSkipped verifies nil optional fields skip validation.
+func TestValidate_Update_OptionalFieldsSkipped(t *testing.T) {
+	t.Parallel()
+
+	// all optional fields nil — only name is validated
+	p := &dao.PersonUpdateByName{Name: "Alice"}
+	if err := p.Validate(); err != nil {
+		t.Errorf("update with only name set should pass, got: %v", err)
+	}
+}
+
+// TestValidate_Update_IntNotIn verifies not_in constraint on type_id in update.
+func TestValidate_Update_IntNotIn(t *testing.T) {
+	t.Parallel()
+
+	p := validPersonUpdate()
+	p.TypeId = int32Ptr(0)
+	assertVE(t, p.Validate(), "type_id", "not_in")
+
+	p2 := validPersonUpdate()
+	p2.TypeId = int32Ptr(-1)
+	assertVE(t, p2.Validate(), "type_id", "not_in")
+
+	// pass: nil skips check
+	p3 := validPersonUpdate()
+	p3.TypeId = nil
+	if err := p3.Validate(); err != nil {
+		t.Errorf("nil type_id should skip not_in check, got: %v", err)
+	}
+}
+
+// TestValidate_Update_StringIn verifies in constraint on role in update.
+func TestValidate_Update_StringIn(t *testing.T) {
+	t.Parallel()
+
+	p := validPersonUpdate()
+	p.Role = strPtr("superuser")
+	assertVE(t, p.Validate(), "role", "in")
+
+	// pass: nil skips check
+	p2 := validPersonUpdate()
+	p2.Role = nil
+	if err := p2.Validate(); err != nil {
+		t.Errorf("nil role should skip in check, got: %v", err)
+	}
+}
+
+// TestValidate_Update_NicknameOptional verifies optional nickname constraints in update.
+func TestValidate_Update_NicknameOptional(t *testing.T) {
+	t.Parallel()
+
+	// fail: non-empty value exceeding max_len
+	p := validPersonUpdate()
+	p.Nickname = strPtr("toolongname")
+	assertVE(t, p.Validate(), "nickname", "max_len")
+
+	// pass: nil skips check
+	p2 := validPersonUpdate()
+	p2.Nickname = nil
+	if err := p2.Validate(); err != nil {
+		t.Errorf("nil nickname should skip check, got: %v", err)
+	}
+
+	// pass: empty string skips check (zero-value guard)
+	p3 := validPersonUpdate()
+	p3.Nickname = strPtr("")
+	if err := p3.Validate(); err != nil {
+		t.Errorf("empty nickname should skip check, got: %v", err)
+	}
+}

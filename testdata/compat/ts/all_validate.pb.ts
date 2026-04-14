@@ -38,7 +38,7 @@ export const AllValidateRules = {
   sUri: { required: false, type: "string", format: "uri" },
   oStatus: { required: false, type: "enum", definedOnly: true },
   bMinmax: { required: false, type: "string", minLength: 1, maxLength: 100 },
-  rItems: { required: false, type: "array", items: { type: "integer", minimum: 0 } },
+  rItems: { required: false, type: "array", minItems: 1, maxItems: 5, items: { type: "integer", minimum: 0 } },
   iGtLt: { required: false, type: "integer", exclusiveMinimum: -10, exclusiveMaximum: 10 },
   uGtLt: { required: false, type: "integer", exclusiveMinimum: 5, exclusiveMaximum: 100 },
   fLt: { required: false, type: "number", exclusiveMaximum: 99.5 },
