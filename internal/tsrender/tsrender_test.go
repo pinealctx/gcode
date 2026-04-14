@@ -78,7 +78,7 @@ func TestTSFileBasic(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestTSFileEnum(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestTSFileOptionalFields(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestTSFileRepeatedFields(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestTSFileMessageField(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestTSFileInt64AsString(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -271,7 +271,7 @@ func TestTSFileBytesAsString(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestTSFileOptionalBytes(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -321,7 +321,7 @@ func TestTSFileEmpty(t *testing.T) {
 		Package: "test",
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -348,7 +348,7 @@ func TestTSFileHeader(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -384,7 +384,7 @@ func TestTSFileEnumWithComment(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -419,7 +419,7 @@ func TestTSCommentJSDocEscape(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -465,7 +465,7 @@ func TestTSFileEnumField(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -499,7 +499,7 @@ func TestTSFileJSONName(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -535,7 +535,7 @@ func TestTSFileRepeatedEnumField(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -566,7 +566,7 @@ func TestTSFileRepeatedMessageField(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -597,7 +597,7 @@ func TestTSFileNonOptionalMessageField(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -656,7 +656,7 @@ func TestTSFileCrossFileImport(t *testing.T) {
 		"Customer": "user.pb.ts",
 	}
 
-	out, err := TSFile(gf, registry, nil)
+	out, err := TSFile(gf, registry)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -700,7 +700,7 @@ func TestTSFileSameFileNoImport(t *testing.T) {
 		"Status": "combined.pb.ts",
 	}
 
-	out, err := TSFile(gf, registry, nil)
+	out, err := TSFile(gf, registry)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -737,7 +737,7 @@ func TestTSFileMultipleTypesFromSameSource(t *testing.T) {
 		"Payload": "common.pb.ts",
 	}
 
-	out, err := TSFile(gf, registry, nil)
+	out, err := TSFile(gf, registry)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -771,7 +771,7 @@ func TestTSFileRepeatedCrossFileImport(t *testing.T) {
 		"Flag": "enums.pb.ts",
 	}
 
-	out, err := TSFile(gf, registry, nil)
+	out, err := TSFile(gf, registry)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -801,7 +801,7 @@ func TestTSFileRegistryMissNoImport(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -838,7 +838,7 @@ func TestTSFileMismatchedProtoPackage(t *testing.T) {
 		"Catalog_Status": "catalog.pb.ts",
 	}
 
-	out, err := TSFile(gf, registry, nil)
+	out, err := TSFile(gf, registry)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}

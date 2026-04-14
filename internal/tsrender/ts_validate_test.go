@@ -21,15 +21,15 @@ func floatPtr(v float64) *float64 { return &v }
 // and returns the output as a string.
 func renderRules(msg transform.GoMessage) string {
 	var b strings.Builder
-	writeTSValidationRules(&b, msg, nil)
+	writeTSValidationRules(&b, msg)
 	return b.String()
 }
 
-// renderRulesWithIndex is a test helper that renders validation rules with a
-// message index for inheritance support.
-func renderRulesWithIndex(msg transform.GoMessage, msgIndex map[string]*transform.GoMessage) string {
+// renderDerived is a test helper that renders validation rules for a derived
+// (create/update) message whose fields carry their own ValidateOptions.
+func renderDerived(msg transform.GoMessage) string {
 	var b strings.Builder
-	writeTSValidationRules(&b, msg, msgIndex)
+	writeTSValidationRules(&b, msg)
 	return b.String()
 }
 
@@ -732,7 +732,7 @@ func TestValidationFullFile(t *testing.T) {
 		},
 	}
 
-	out, err := TSFile(gf, nil, nil)
+	out, err := TSFile(gf, nil)
 	if err != nil {
 		t.Fatalf("TSFile returned error: %v", err)
 	}
@@ -756,62 +756,11 @@ func TestValidationFullFile(t *testing.T) {
 	}
 }
 
-func TestTSInheritedValidationRulesCreate(t *testing.T) {
+func TestTSDerivedValidationRulesCreate(t *testing.T) {
 	t.Parallel()
 
-	// Source message with validate rules.
-	srcMsg := transform.GoMessage{
-		GoName: "Person",
-		Fields: []transform.GoField{
-			{
-				Field: model.Field{
-					Name:        "name",
-					JSONName:    "name",
-					Cardinality: model.CardinalitySingular,
-					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
-					ValidateOptions: &model.ValidateFieldOptions{
-						MinLen: uintPtr(1),
-						MaxLen: uintPtr(100),
-					},
-				},
-			},
-			{
-				Field: model.Field{
-					Name:        "nickname",
-					JSONName:    "nickname",
-					Cardinality: model.CardinalitySingular,
-					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
-					ValidateOptions: &model.ValidateFieldOptions{
-						MinLen: uintPtr(1),
-						MaxLen: uintPtr(10),
-					},
-				},
-			},
-			{
-				Field: model.Field{
-					Name:        "age",
-					JSONName:    "age",
-					Cardinality: model.CardinalitySingular,
-					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt32},
-					ValidateOptions: &model.ValidateFieldOptions{
-						GTEInt: intPtr(0),
-						LTEInt: intPtr(150),
-					},
-				},
-			},
-			// No validate options — should not appear in derived rules.
-			{
-				Field: model.Field{
-					Name:        "active",
-					JSONName:    "active",
-					Cardinality: model.CardinalitySingular,
-					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarBool},
-				},
-			},
-		},
-	}
-
-	// Derived create message: nickname is required (non-optional in derived proto).
+	// Derived create message: fields carry their own ValidateOptions (copied by gen-proto).
+	// nickname is in RequiredFields (non-optional), others are optional.
 	derivedMsg := transform.GoMessage{
 		GoName:         "PersonCreate",
 		CreateSource:   "Person",
@@ -824,6 +773,10 @@ func TestTSInheritedValidationRulesCreate(t *testing.T) {
 					Cardinality: model.CardinalitySingular,
 					Optional:    true,
 					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
+					ValidateOptions: &model.ValidateFieldOptions{
+						MinLen: uintPtr(1),
+						MaxLen: uintPtr(100),
+					},
 				},
 			},
 			{
@@ -832,6 +785,10 @@ func TestTSInheritedValidationRulesCreate(t *testing.T) {
 					JSONName:    "nickname",
 					Cardinality: model.CardinalitySingular,
 					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
+					ValidateOptions: &model.ValidateFieldOptions{
+						MinLen: uintPtr(1),
+						MaxLen: uintPtr(10),
+					},
 				},
 			},
 			{
@@ -841,8 +798,13 @@ func TestTSInheritedValidationRulesCreate(t *testing.T) {
 					Cardinality: model.CardinalitySingular,
 					Optional:    true,
 					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt32},
+					ValidateOptions: &model.ValidateFieldOptions{
+						GTEInt: intPtr(0),
+						LTEInt: intPtr(150),
+					},
 				},
 			},
+			// No ValidateOptions — should not appear in derived rules.
 			{
 				Field: model.Field{
 					Name:        "active",
@@ -855,28 +817,31 @@ func TestTSInheritedValidationRulesCreate(t *testing.T) {
 		},
 	}
 
-	msgIndex := map[string]*transform.GoMessage{"Person": &srcMsg}
-	s := renderRulesWithIndex(derivedMsg, msgIndex)
+	s := renderDerived(derivedMsg)
 
-	// nickname is required.
+	// nickname is required (in RequiredFields).
 	assertContains(t, s, `nickname: { required: true, type: "string", minLength: 1, maxLength: 10 }`)
-	// name is optional in create, inherits constraints.
+	// name is optional in create, has constraints.
 	assertContains(t, s, `name: { required: false, type: "string", minLength: 1, maxLength: 100 }`)
-	// age is optional in create, inherits constraints.
+	// age is optional in create, has constraints.
 	assertContains(t, s, `age: { required: false, type: "integer", minimum: 0, maximum: 150 }`)
-	// active has no validate options — should not appear.
+	// active has no ValidateOptions — should not appear.
 	if strings.Contains(s, "active") {
-		t.Errorf("field 'active' without source ValidateOptions should not appear in inherited rules, got:\n%s", s)
+		t.Errorf("field 'active' without ValidateOptions should not appear in derived rules, got:\n%s", s)
 	}
 	// Rules constant name matches derived message.
 	assertContains(t, s, "export const PersonCreateRules = {")
 }
 
-func TestTSInheritedValidationRulesUpdate(t *testing.T) {
+func TestTSDerivedValidationRulesUpdate(t *testing.T) {
 	t.Parallel()
 
-	srcMsg := transform.GoMessage{
-		GoName: "Person",
+	// Derived update message: fields carry their own ValidateOptions (copied by gen-proto).
+	// name is a condition field (required), nickname is optional.
+	derivedMsg := transform.GoMessage{
+		GoName:          "PersonUpdateByName",
+		UpdateSource:    "Person",
+		ConditionFields: []string{"name"},
 		Fields: []transform.GoField{
 			{
 				Field: model.Field{
@@ -906,34 +871,7 @@ func TestTSInheritedValidationRulesUpdate(t *testing.T) {
 		},
 	}
 
-	// Derived update: name is condition field (non-optional), nickname is optional.
-	derivedMsg := transform.GoMessage{
-		GoName:          "PersonUpdateByName",
-		UpdateSource:    "Person",
-		ConditionFields: []string{"name"},
-		Fields: []transform.GoField{
-			{
-				Field: model.Field{
-					Name:        "name",
-					JSONName:    "name",
-					Cardinality: model.CardinalitySingular,
-					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
-				},
-			},
-			{
-				Field: model.Field{
-					Name:        "nickname",
-					JSONName:    "nickname",
-					Cardinality: model.CardinalitySingular,
-					Optional:    true,
-					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
-				},
-			},
-		},
-	}
-
-	msgIndex := map[string]*transform.GoMessage{"Person": &srcMsg}
-	s := renderRulesWithIndex(derivedMsg, msgIndex)
+	s := renderDerived(derivedMsg)
 
 	// name is required (condition field).
 	assertContains(t, s, `name: { required: true, type: "string", minLength: 1, maxLength: 100 }`)
@@ -943,11 +881,10 @@ func TestTSInheritedValidationRulesUpdate(t *testing.T) {
 	assertContains(t, s, "export const PersonUpdateByNameRules = {")
 }
 
-func TestTSInheritedValidationRulesNoSource(t *testing.T) {
+func TestTSDerivedValidationRulesNoSource(t *testing.T) {
 	t.Parallel()
 
-	// CreateSource set but source message not in index — falls back to standard path
-	// using the derived message's own ValidateOptions.
+	// CreateSource set; derived fields carry their own ValidateOptions.
 	derivedMsg := transform.GoMessage{
 		GoName:       "PersonCreate",
 		CreateSource: "Person",
@@ -967,10 +904,10 @@ func TestTSInheritedValidationRulesNoSource(t *testing.T) {
 		},
 	}
 
-	s := renderRulesWithIndex(derivedMsg, map[string]*transform.GoMessage{})
-	// Falls back to standard path since source not in index.
+	s := renderDerived(derivedMsg)
 	assertContains(t, s, "export const PersonCreateRules = {")
-	assertContains(t, s, `name: { required: true, type: "string", minLength: 1 }`)
+	// name is not in ConditionFields/RequiredFields, so required=false despite vo.Required=true.
+	assertContains(t, s, `name: { required: false, type: "string", minLength: 1 }`)
 }
 
 // TestValidationRepeatedItemsTypeMapping verifies that tsItemValidationType

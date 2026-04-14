@@ -71,17 +71,9 @@ func RunGenTS(ctx context.Context, args []string) error {
 		}
 	}
 
-	// Build message index: GoName → GoMessage for validate rule inheritance.
-	msgIndex := make(map[string]*transform.GoMessage)
-	for i := range goFiles {
-		for j := range goFiles[i].Messages {
-			msgIndex[goFiles[i].Messages[j].GoName] = &goFiles[i].Messages[j]
-		}
-	}
-
 	// Second pass: render TS files with type registry for cross-file imports.
 	for i, gf := range goFiles {
-		tsSrc, err := tsrender.TSFile(gf, registry, msgIndex)
+		tsSrc, err := tsrender.TSFile(gf, registry)
 		if err != nil {
 			return fmt.Errorf("render ts %q: %w", files[i].Path, err)
 		}

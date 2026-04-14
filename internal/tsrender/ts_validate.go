@@ -46,32 +46,26 @@ func tsValidationType(f transform.GoField) string {
 }
 
 // writeTSValidationRules generates a validation rules constant for a message.
-// For source messages, only fields with ValidateOptions produce entries.
-// For create/update messages (CreateSource/UpdateSource non-empty), validate
-// rules are inherited from the source message's fields via msgIndex.
+// For derived (create/update) messages (CreateSource/UpdateSource non-empty),
+// rules are read directly from the derived message's own fields, which carry
+// validate annotations copied by gen-proto. Required/optional is determined
+// from ConditionFields and RequiredFields.
+// For all other messages, only fields with ValidateOptions produce entries.
 //
 // Example output:
 //
 //	export const PersonRules = {
 //	  name: { required: true, type: "string", minLength: 1 } },
 //	} as const
-func writeTSValidationRules(b *strings.Builder, msg transform.GoMessage, msgIndex map[string]*transform.GoMessage) {
-	// Determine if this is a derived (create/update) message.
-	sourceName := msg.UpdateSource
-	if sourceName == "" {
-		sourceName = msg.CreateSource
-	}
-
-	if sourceName != "" && msgIndex != nil {
-		srcMsg, ok := msgIndex[sourceName]
-		if ok {
-			writeTSInheritedValidationRules(b, msg, srcMsg)
-			return
-		}
+func writeTSValidationRules(b *strings.Builder, msg transform.GoMessage) {
+	// Derived message: use own field validate rules with required set from
+	// ConditionFields + RequiredFields.
+	if msg.UpdateSource != "" || msg.CreateSource != "" {
+		writeTSDerivedValidationRules(b, msg)
+		return
 	}
 
 	// Standard: use the message's own field validate rules.
-	// Collect fields that have validation rules.
 	type fieldEntry struct {
 		name  string
 		field transform.GoField
@@ -133,10 +127,11 @@ func writeTSFieldRules(b *strings.Builder, jsonName string, f transform.GoField,
 	b.WriteString(" }")
 }
 
-// writeTSInheritedValidationRules generates validation rules for a create/update
-// message by inheriting constraint rules from the source message. Presence
-// (required vs optional) is determined from the derived message's field structure.
-func writeTSInheritedValidationRules(b *strings.Builder, msg transform.GoMessage, srcMsg *transform.GoMessage) {
+// writeTSDerivedValidationRules generates validation rules for a create/update
+// message using the derived message's own field ValidateOptions (copied by
+// gen-proto from the source). Required/optional is determined from
+// ConditionFields (update) and RequiredFields (create).
+func writeTSDerivedValidationRules(b *strings.Builder, msg transform.GoMessage) {
 	// Build required set from ConditionFields + RequiredFields.
 	requiredSet := make(map[string]bool, len(msg.ConditionFields)+len(msg.RequiredFields))
 	for _, cf := range msg.ConditionFields {
@@ -146,38 +141,21 @@ func writeTSInheritedValidationRules(b *strings.Builder, msg transform.GoMessage
 		requiredSet[rf] = true
 	}
 
-	// Build source field lookup by name.
-	srcFieldByName := make(map[string]transform.GoField, len(srcMsg.Fields))
-	for _, sf := range srcMsg.Fields {
-		srcFieldByName[sf.Name] = sf
-	}
-
-	// Collect fields with inherited rules.
+	// Collect fields with validate rules.
 	type fieldEntry struct {
 		jsonName string
-		srcField transform.GoField
-		dstField transform.GoField
+		field    transform.GoField
 		required bool
 	}
 	var entries []fieldEntry
 	for _, f := range msg.Fields {
-		sf, ok := srcFieldByName[f.Name]
-		if !ok {
-			continue
-		}
-		// Use derived field's validate options (gen-proto copies from source),
-		// fall back to source field's options for backward compatibility.
 		vo := f.ValidateOptions
-		if vo == nil {
-			vo = sf.ValidateOptions
-		}
-		if vo == nil && sf.Type.Kind != model.FieldKindMessage {
+		if vo == nil && f.Type.Kind != model.FieldKindMessage {
 			continue
 		}
 		entries = append(entries, fieldEntry{
 			jsonName: f.JSONName,
-			srcField: sf,
-			dstField: f,
+			field:    f,
 			required: requiredSet[f.Name],
 		})
 	}
@@ -187,7 +165,7 @@ func writeTSInheritedValidationRules(b *strings.Builder, msg transform.GoMessage
 
 	fmt.Fprintf(b, "export const %sRules = {\n", msg.GoName)
 	for i, e := range entries {
-		writeTSInheritedFieldRules(b, e.jsonName, e.srcField, e.dstField, e.required, "  ")
+		writeTSDerivedFieldRules(b, e.jsonName, e.field, e.required, "  ")
 		if i < len(entries)-1 {
 			b.WriteString(",\n")
 		} else {
@@ -197,21 +175,16 @@ func writeTSInheritedValidationRules(b *strings.Builder, msg transform.GoMessage
 	b.WriteString("} as const\n\n")
 }
 
-// writeTSInheritedFieldRules writes validation rules for a single field in a
-// derived (create/update) message. Constraint rules come from srcField (source
-// message's ValidateOptions); presence (required) is determined by the derived
-// message's context.
-func writeTSInheritedFieldRules(b *strings.Builder, jsonName string, srcField transform.GoField, dstField transform.GoField, required bool, indent string) {
-	// Use derived field's validate options (gen-proto copies from source),
-	// fall back to source field's options for backward compatibility.
-	vo := dstField.ValidateOptions
-	if vo == nil {
-		vo = srcField.ValidateOptions
-	}
+// writeTSDerivedFieldRules writes validation rules for a single field in a
+// derived (create/update) message. Constraint rules come from the field's own
+// ValidateOptions (copied by gen-proto); required is determined by the derived
+// message's ConditionFields/RequiredFields context.
+func writeTSDerivedFieldRules(b *strings.Builder, jsonName string, f transform.GoField, required bool, indent string) {
+	vo := f.ValidateOptions
 
 	var parts []string
 	parts = append(parts, fmt.Sprintf("required: %t", required))
-	parts = append(parts, fmt.Sprintf("type: %q", tsValidationType(dstField)))
+	parts = append(parts, fmt.Sprintf("type: %q", tsValidationType(f)))
 
 	if vo != nil {
 		parts = appendConstraintParts(parts, vo)
@@ -230,7 +203,7 @@ func writeTSInheritedFieldRules(b *strings.Builder, jsonName string, srcField tr
 
 	if vo != nil && vo.Items != nil {
 		b.WriteString(", items: { ")
-		writeItemRules(b, vo.Items, dstField)
+		writeItemRules(b, vo.Items, f)
 		b.WriteString(" }")
 	}
 

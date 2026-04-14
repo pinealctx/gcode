@@ -22,8 +22,7 @@ type TypeRegistry map[string]string
 // representation. The returned bytes are ready to write to disk as a .pb.ts file.
 // The registry maps Go type names to their source .pb.ts output file name,
 // used to generate ES module import statements for cross-file references.
-// msgIndex maps GoName to GoMessage for validate rule inheritance in create/update messages.
-func TSFile(gf transform.GoFile, registry TypeRegistry, msgIndex map[string]*transform.GoMessage) ([]byte, error) {
+func TSFile(gf transform.GoFile, registry TypeRegistry) ([]byte, error) {
 	var b strings.Builder
 
 	protoPkg := gf.ProtoPackage
@@ -43,7 +42,7 @@ func TSFile(gf transform.GoFile, registry TypeRegistry, msgIndex map[string]*tra
 	}
 
 	for _, msg := range gf.Messages {
-		writeTSValidationRules(&b, msg, msgIndex)
+		writeTSValidationRules(&b, msg)
 	}
 
 	return []byte(b.String()), nil
