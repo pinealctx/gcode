@@ -79,7 +79,7 @@ func RunGenTS(ctx context.Context, args []string) error {
 		}
 
 		outPath := filepath.Join(cfg.OutputDir, tsOutputFileName(files[i].Path))
-		if err := os.WriteFile(outPath, tsSrc, 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
+		if err := writeFileMkdir(outPath, tsSrc); err != nil {
 			return fmt.Errorf("write %q: %w", outPath, err)
 		}
 	}
@@ -87,10 +87,11 @@ func RunGenTS(ctx context.Context, args []string) error {
 	return nil
 }
 
-// tsOutputFileName derives the .pb.ts output filename from a proto file path.
-// e.g. "subdir/person.proto" → "person.pb.ts"
+// tsOutputFileName derives the .pb.ts output filename from a proto file path,
+// preserving the directory structure to avoid collisions from same-name protos
+// in different subdirectories.
+// e.g. "subdir/person.proto" → "subdir/person.pb.ts"
 func tsOutputFileName(protoPath string) string {
-	base := filepath.Base(protoPath)
-	name := strings.TrimSuffix(base, ".proto")
+	name := strings.TrimSuffix(protoPath, ".proto")
 	return name + ".pb.ts"
 }

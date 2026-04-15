@@ -132,7 +132,7 @@ func Run(ctx context.Context, args []string) error {
 		}
 
 		outPath := filepath.Join(cfg.OutputDir, outputFileName(ff.src.Path))
-		if err := os.WriteFile(outPath, src, 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
+		if err := writeFileMkdir(outPath, src); err != nil {
 			return fmt.Errorf("write %q: %w", outPath, err)
 		}
 
@@ -142,7 +142,7 @@ func Run(ctx context.Context, args []string) error {
 		}
 
 		validateOutPath := filepath.Join(cfg.OutputDir, validateOutputFileName(ff.src.Path))
-		if err := os.WriteFile(validateOutPath, validateSrc, 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
+		if err := writeFileMkdir(validateOutPath, validateSrc); err != nil {
 			return fmt.Errorf("write validate %q: %w", validateOutPath, err)
 		}
 
@@ -152,7 +152,7 @@ func Run(ctx context.Context, args []string) error {
 				return fmt.Errorf("render rpc %q: %w", ff.src.Path, err)
 			}
 			rpcOutPath := filepath.Join(cfg.OutputDir, rpcOutputFileName(ff.src.Path))
-			if err := os.WriteFile(rpcOutPath, rpcSrc, 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
+			if err := writeFileMkdir(rpcOutPath, rpcSrc); err != nil {
 				return fmt.Errorf("write rpc %q: %w", rpcOutPath, err)
 			}
 
@@ -161,7 +161,7 @@ func Run(ctx context.Context, args []string) error {
 				return fmt.Errorf("render http %q: %w", ff.src.Path, err)
 			}
 			httpOutPath := filepath.Join(cfg.OutputDir, httpOutputFileName(ff.src.Path))
-			if err := os.WriteFile(httpOutPath, httpSrc, 0o644); err != nil { //nolint:gosec // generated source files should be world-readable
+			if err := writeFileMkdir(httpOutPath, httpSrc); err != nil {
 				return fmt.Errorf("write http %q: %w", httpOutPath, err)
 			}
 		}
@@ -183,35 +183,39 @@ func filterMetaProtoSources(files []string) []string {
 	return result
 }
 
-// outputFileName derives the .pb.dao.go output filename from a proto file path.
-// e.g. "subdir/person.proto" → "person.pb.dao.go"
+// outputFileName derives the .pb.dao.go output filename from a proto file path,
+// preserving the directory structure to avoid collisions from same-name protos
+// in different subdirectories.
+// e.g. "subdir/person.proto" → "subdir/person.pb.dao.go"
 func outputFileName(protoPath string) string {
-	base := filepath.Base(protoPath)
-	name := strings.TrimSuffix(base, ".proto")
+	name := strings.TrimSuffix(protoPath, ".proto")
 	return name + ".pb.dao.go"
 }
 
-// validateOutputFileName derives the .pb.dao.validate.go output filename from a proto file path.
-// e.g. "subdir/person.proto" → "person.pb.dao.validate.go"
+// validateOutputFileName derives the .pb.dao.validate.go output filename from a proto file path,
+// preserving the directory structure to avoid collisions from same-name protos
+// in different subdirectories.
+// e.g. "subdir/person.proto" → "subdir/person.pb.dao.validate.go"
 func validateOutputFileName(protoPath string) string {
-	base := filepath.Base(protoPath)
-	name := strings.TrimSuffix(base, ".proto")
+	name := strings.TrimSuffix(protoPath, ".proto")
 	return name + ".pb.dao.validate.go"
 }
 
-// rpcOutputFileName derives the .pb.rpc.go output filename from a proto file path.
-// e.g. "subdir/user_service.proto" → "user_service.pb.rpc.go"
+// rpcOutputFileName derives the .pb.rpc.go output filename from a proto file path,
+// preserving the directory structure to avoid collisions from same-name protos
+// in different subdirectories.
+// e.g. "subdir/user_service.proto" → "subdir/user_service.pb.rpc.go"
 func rpcOutputFileName(protoPath string) string {
-	base := filepath.Base(protoPath)
-	name := strings.TrimSuffix(base, ".proto")
+	name := strings.TrimSuffix(protoPath, ".proto")
 	return name + ".pb.rpc.go"
 }
 
-// httpOutputFileName derives the .pb.http.go output filename from a proto file path.
-// e.g. "subdir/user_service.proto" → "user_service.pb.http.go"
+// httpOutputFileName derives the .pb.http.go output filename from a proto file path,
+// preserving the directory structure to avoid collisions from same-name protos
+// in different subdirectories.
+// e.g. "subdir/user_service.proto" → "subdir/user_service.pb.http.go"
 func httpOutputFileName(protoPath string) string {
-	base := filepath.Base(protoPath)
-	name := strings.TrimSuffix(base, ".proto")
+	name := strings.TrimSuffix(protoPath, ".proto")
 	return name + ".pb.http.go"
 }
 
@@ -229,4 +233,12 @@ func checkOutputCollisions(files []model.File, nameFuncs ...func(string) string)
 		}
 	}
 	return nil
+}
+
+// writeFileMkdir writes data to path, creating parent directories as needed.
+func writeFileMkdir(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644) //nolint:gosec // generated source files should be world-readable
 }
