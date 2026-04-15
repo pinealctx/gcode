@@ -65,6 +65,8 @@ func Parse(ctx context.Context, importPaths []string, files []string) ([]model.F
 	return modelFiles, nil
 }
 
+// mapFile maps a compiled proto file descriptor to a model.File.
+// It extracts imports, messages, enums, services, and file-level options.
 func mapFile(file protoreflect.FileDescriptor, exts *gcodeExtensions, validateExts *validateExtensions) (model.File, error) {
 	syntax, err := mapSyntax(file.Syntax())
 	if err != nil {

@@ -24,6 +24,11 @@ type AllValidate struct {
 	OStatus *Status `json:"oStatus"`
 	BMinmax []byte  `json:"bMinmax"`
 	RItems  []int32 `json:"rItems"`
+	// items in/not_in constraints
+	RStrIn     []string `json:"rStrIn"`
+	RStrNotIn  []string `json:"rStrNotIn"`
+	RIntIn     []int32  `json:"rIntIn"`
+	RUintNotIn []uint32 `json:"rUintNotIn"`
 	// exclusive bounds for signed int
 	IGtLt int32 `json:"iGtLt"`
 	// exclusive bounds for unsigned int
@@ -84,6 +89,30 @@ func (x *AllValidate) Size() int {
 			es += runtime.SizeInt32(v)
 		}
 		n += 1 + runtime.SizeVarint(uint64(es)) + es
+	}
+	if len(x.RStrIn) > 0 {
+		for _, v := range x.RStrIn {
+			n += 2 + runtime.SizeString(v)
+		}
+	}
+	if len(x.RStrNotIn) > 0 {
+		for _, v := range x.RStrNotIn {
+			n += 2 + runtime.SizeString(v)
+		}
+	}
+	if len(x.RIntIn) > 0 {
+		var es int
+		for _, v := range x.RIntIn {
+			es += runtime.SizeInt32(v)
+		}
+		n += 2 + runtime.SizeVarint(uint64(es)) + es
+	}
+	if len(x.RUintNotIn) > 0 {
+		var es int
+		for _, v := range x.RUintNotIn {
+			es += runtime.SizeUint32(v)
+		}
+		n += 2 + runtime.SizeVarint(uint64(es)) + es
 	}
 	if x.IGtLt != 0 {
 		n += 1 + runtime.SizeInt32(x.IGtLt)
@@ -169,6 +198,40 @@ func (x *AllValidate) MarshalAppend(b []byte) ([]byte, error) {
 			b = runtime.AppendVarint(b, uint64(v))
 		}
 	}
+	if len(x.RStrIn) > 0 {
+		for _, v := range x.RStrIn {
+			b = runtime.AppendTag(b, 19, runtime.WireBytes)
+			b = runtime.AppendString(b, v)
+		}
+	}
+	if len(x.RStrNotIn) > 0 {
+		for _, v := range x.RStrNotIn {
+			b = runtime.AppendTag(b, 20, runtime.WireBytes)
+			b = runtime.AppendString(b, v)
+		}
+	}
+	if len(x.RIntIn) > 0 {
+		b = runtime.AppendTag(b, 21, runtime.WireBytes)
+		var es int
+		for _, v := range x.RIntIn {
+			es += runtime.SizeInt32(v)
+		}
+		b = runtime.AppendVarint(b, uint64(es))
+		for _, v := range x.RIntIn {
+			b = runtime.AppendVarint(b, uint64(v))
+		}
+	}
+	if len(x.RUintNotIn) > 0 {
+		b = runtime.AppendTag(b, 22, runtime.WireBytes)
+		var es int
+		for _, v := range x.RUintNotIn {
+			es += runtime.SizeUint32(v)
+		}
+		b = runtime.AppendVarint(b, uint64(es))
+		for _, v := range x.RUintNotIn {
+			b = runtime.AppendVarint(b, uint64(v))
+		}
+	}
 	if x.IGtLt != 0 {
 		b = runtime.AppendTag(b, 14, runtime.WireVarint)
 		b = runtime.AppendVarint(b, uint64(x.IGtLt))
@@ -209,6 +272,22 @@ func (x *AllValidate) DeepClone() *AllValidate {
 	if x.RItems != nil {
 		clone.RItems = make([]int32, len(x.RItems))
 		copy(clone.RItems, x.RItems)
+	}
+	if x.RStrIn != nil {
+		clone.RStrIn = make([]string, len(x.RStrIn))
+		copy(clone.RStrIn, x.RStrIn)
+	}
+	if x.RStrNotIn != nil {
+		clone.RStrNotIn = make([]string, len(x.RStrNotIn))
+		copy(clone.RStrNotIn, x.RStrNotIn)
+	}
+	if x.RIntIn != nil {
+		clone.RIntIn = make([]int32, len(x.RIntIn))
+		copy(clone.RIntIn, x.RIntIn)
+	}
+	if x.RUintNotIn != nil {
+		clone.RUintNotIn = make([]uint32, len(x.RUintNotIn))
+		copy(clone.RUintNotIn, x.RUintNotIn)
 	}
 	return &clone
 }
@@ -480,6 +559,78 @@ func (x *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 					return 0, fmt.Errorf("field 13: %w", runtime.ErrTruncated)
 				}
 				x.RItems = append(x.RItems, int32(v))
+				pi += pn
+			}
+		case 19:
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 19: %w", runtime.ErrWireType)
+			}
+			payload, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 19: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 19: %w", runtime.ErrTruncated)
+			}
+			x.RStrIn = append(x.RStrIn, string(payload))
+			off += n
+		case 20:
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 20: %w", runtime.ErrWireType)
+			}
+			payload, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 20: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 20: %w", runtime.ErrTruncated)
+			}
+			x.RStrNotIn = append(x.RStrNotIn, string(payload))
+			off += n
+		case 21:
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 21: %w", runtime.ErrWireType)
+			}
+			packed, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 21: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 21: %w", runtime.ErrTruncated)
+			}
+			off += n
+			for pi := 0; pi < len(packed); {
+				v, pn := runtime.ConsumeVarint(packed[pi:])
+				if pn < 0 {
+					if pn == -2 {
+						return 0, fmt.Errorf("field 21: %w", runtime.ErrOverflow)
+					}
+					return 0, fmt.Errorf("field 21: %w", runtime.ErrTruncated)
+				}
+				x.RIntIn = append(x.RIntIn, int32(v))
+				pi += pn
+			}
+		case 22:
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 22: %w", runtime.ErrWireType)
+			}
+			packed, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 22: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 22: %w", runtime.ErrTruncated)
+			}
+			off += n
+			for pi := 0; pi < len(packed); {
+				v, pn := runtime.ConsumeVarint(packed[pi:])
+				if pn < 0 {
+					if pn == -2 {
+						return 0, fmt.Errorf("field 22: %w", runtime.ErrOverflow)
+					}
+					return 0, fmt.Errorf("field 22: %w", runtime.ErrTruncated)
+				}
+				x.RUintNotIn = append(x.RUintNotIn, uint32(v))
 				pi += pn
 			}
 		case 14:

@@ -18,6 +18,10 @@ export interface AllValidate {
   oStatus?: Status
   bMinmax: string
   rItems: number[]
+  rStrIn: string[]
+  rStrNotIn: string[]
+  rIntIn: number[]
+  rUintNotIn: number[]
   iGtLt: number
   uGtLt: number
   fLt: number
@@ -39,6 +43,10 @@ export const AllValidateRules = {
   oStatus: { required: false, type: "enum", definedOnly: true },
   bMinmax: { required: false, type: "string", minLength: 1, maxLength: 100 },
   rItems: { required: false, type: "array", minItems: 1, maxItems: 5, items: { type: "integer", minimum: 0 } },
+  rStrIn: { required: false, type: "array", items: { type: "string", enum: ["foo", "bar"] } },
+  rStrNotIn: { required: false, type: "array", items: { type: "string", notIn: ["bad"] } },
+  rIntIn: { required: false, type: "array", items: { type: "integer", enum: [1, 2, 3] } },
+  rUintNotIn: { required: false, type: "array", items: { type: "integer", notIn: [0] } },
   iGtLt: { required: false, type: "integer", exclusiveMinimum: -10, exclusiveMaximum: 10 },
   uGtLt: { required: false, type: "integer", exclusiveMinimum: 5, exclusiveMaximum: 100 },
   fLt: { required: false, type: "number", exclusiveMaximum: 99.5 },

@@ -551,13 +551,22 @@ func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string
 }
 
 // writeItemsValidation writes element-level validation for repeated fields.
+// It dispatches to type-specific sub-writers based on the element scalar kind.
 func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, items *model.ValidateFieldOptions, f transform.GoField, enumByGoName map[string]transform.GoEnum) {
-	// Determine element variable name and type based on field scalar.
-	// For repeated string → v is string; for repeated int32 → v is int32, etc.
 	fmt.Fprintf(b, "for i, v := range %s {\n", fieldExpr)
 	elemField := fmt.Sprintf("fmt.Sprintf(\"%s[%%d]\", i)", fieldName)
 
-	// string items
+	writeItemsStringValidation(b, elemField, vm, items)
+	writeItemsSignedIntValidation(b, elemField, vm, items, f)
+	writeItemsUnsignedIntValidation(b, elemField, vm, items, f)
+	writeItemsFloatValidation(b, elemField, vm, items)
+	writeItemsEnumValidation(b, elemField, vm, items, f, enumByGoName)
+
+	b.WriteString("}\n")
+}
+
+// writeItemsStringValidation writes string element constraints (min_len, max_len, pattern, email, uri, in, not_in).
+func writeItemsStringValidation(b *strings.Builder, elemField, vm string, items *model.ValidateFieldOptions) {
 	if items.MinLen != nil {
 		fmt.Fprintf(b, "if len(v) < %d {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"min_len\", Message: validateruntime.MsgOr(%q, \"length must be >= %d\")}\n}\n",
 			*items.MinLen, elemField, vm, *items.MinLen)
@@ -578,7 +587,38 @@ func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, i
 		fmt.Fprintf(b, "if !validateruntime.IsURI(v) {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"uri\", Message: validateruntime.MsgOr(%q, \"must be a valid URI\")}\n}\n",
 			elemField, vm)
 	}
-	// signed int items
+	if len(items.InStr) > 0 {
+		display := buildStringList(items.InStr)
+		b.WriteString("{\nfound := false\n")
+		b.WriteString("for _, sv := range []string{")
+		for i, s := range items.InStr {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%q", s)
+		}
+		b.WriteString("} {\n")
+		fmt.Fprintf(b, "if v == sv {\nfound = true\nbreak\n}\n}\n")
+		fmt.Fprintf(b, "if !found {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"in\", Message: validateruntime.MsgOr(%q, %q)}\n}\n}\n",
+			elemField, vm, "must be one of "+display)
+	}
+	if len(items.NotInStr) > 0 {
+		display := buildStringList(items.NotInStr)
+		b.WriteString("for _, sv := range []string{")
+		for i, s := range items.NotInStr {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%q", s)
+		}
+		b.WriteString("} {\n")
+		fmt.Fprintf(b, "if v == sv {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"not_in\", Message: validateruntime.MsgOr(%q, %q)}\n}\n}\n",
+			elemField, vm, "must not be one of "+display)
+	}
+}
+
+// writeItemsSignedIntValidation writes signed integer element constraints (gt, gte, lt, lte, in, not_in).
+func writeItemsSignedIntValidation(b *strings.Builder, elemField, vm string, items *model.ValidateFieldOptions, f transform.GoField) {
 	if items.GTInt != nil {
 		fmt.Fprintf(b, "if v <= %d {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %d\")}\n}\n",
 			*items.GTInt, elemField, vm, *items.GTInt)
@@ -595,7 +635,40 @@ func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, i
 		fmt.Fprintf(b, "if v > %d {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %d\")}\n}\n",
 			*items.LTEInt, elemField, vm, *items.LTEInt)
 	}
-	// unsigned int items
+	if len(items.InInt) > 0 {
+		goType := signedGoType(f.Type.Scalar)
+		display := buildInt64List(items.InInt)
+		b.WriteString("{\nfound := false\n")
+		fmt.Fprintf(b, "for _, iv := range []%s{", goType)
+		for i, n := range items.InInt {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", n)
+		}
+		b.WriteString("} {\n")
+		b.WriteString("if v == iv {\nfound = true\nbreak\n}\n}\n")
+		fmt.Fprintf(b, "if !found {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"in\", Message: validateruntime.MsgOr(%q, \"must be one of %s\")}\n}\n}\n",
+			elemField, vm, display)
+	}
+	if len(items.NotInInt) > 0 {
+		goType := signedGoType(f.Type.Scalar)
+		display := buildInt64List(items.NotInInt)
+		fmt.Fprintf(b, "for _, iv := range []%s{", goType)
+		for i, n := range items.NotInInt {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", n)
+		}
+		b.WriteString("} {\n")
+		fmt.Fprintf(b, "if v == iv {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"not_in\", Message: validateruntime.MsgOr(%q, \"must not be one of %s\")}\n}\n}\n",
+			elemField, vm, display)
+	}
+}
+
+// writeItemsUnsignedIntValidation writes unsigned integer element constraints (gt, gte, lt, lte, in, not_in).
+func writeItemsUnsignedIntValidation(b *strings.Builder, elemField, vm string, items *model.ValidateFieldOptions, f transform.GoField) {
 	if items.GTUint != nil {
 		fmt.Fprintf(b, "if v <= %d {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %d\")}\n}\n",
 			*items.GTUint, elemField, vm, *items.GTUint)
@@ -612,7 +685,40 @@ func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, i
 		fmt.Fprintf(b, "if v > %d {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %d\")}\n}\n",
 			*items.LTEUint, elemField, vm, *items.LTEUint)
 	}
-	// float items
+	if len(items.InUint) > 0 {
+		goType := unsignedGoType(f.Type.Scalar)
+		display := buildUint64List(items.InUint)
+		b.WriteString("{\nfound := false\n")
+		fmt.Fprintf(b, "for _, uv := range []%s{", goType)
+		for i, n := range items.InUint {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", n)
+		}
+		b.WriteString("} {\n")
+		b.WriteString("if v == uv {\nfound = true\nbreak\n}\n}\n")
+		fmt.Fprintf(b, "if !found {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"in\", Message: validateruntime.MsgOr(%q, \"must be one of %s\")}\n}\n}\n",
+			elemField, vm, display)
+	}
+	if len(items.NotInUint) > 0 {
+		goType := unsignedGoType(f.Type.Scalar)
+		display := buildUint64List(items.NotInUint)
+		fmt.Fprintf(b, "for _, uv := range []%s{", goType)
+		for i, n := range items.NotInUint {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", n)
+		}
+		b.WriteString("} {\n")
+		fmt.Fprintf(b, "if v == uv {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"not_in\", Message: validateruntime.MsgOr(%q, \"must not be one of %s\")}\n}\n}\n",
+			elemField, vm, display)
+	}
+}
+
+// writeItemsFloatValidation writes float/double element constraints (gt, gte, lt, lte).
+func writeItemsFloatValidation(b *strings.Builder, elemField, vm string, items *model.ValidateFieldOptions) {
 	if items.GTFloat != nil {
 		fmt.Fprintf(b, "if v <= %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"gt\", Message: validateruntime.MsgOr(%q, \"must be > %g\")}\n}\n",
 			*items.GTFloat, elemField, vm, *items.GTFloat)
@@ -629,24 +735,28 @@ func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, i
 		fmt.Fprintf(b, "if v > %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %g\")}\n}\n",
 			*items.LTEFloat, elemField, vm, *items.LTEFloat)
 	}
-	// enum items defined_only: generate switch inside the loop.
-	if items.DefinedOnly {
-		enumGoName := stripTypePrefix(f.GoType)
-		enum, ok := enumByGoName[enumGoName]
-		if ok && len(enum.Values) > 0 {
-			b.WriteString("switch v {\n case ")
-			for i, v := range enum.Values {
-				if i > 0 {
-					b.WriteString(", ")
-				}
-				b.WriteString(v.GoName)
-			}
-			b.WriteString(":\n// ok\n")
-			fmt.Fprintf(b, "default:\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"defined_only\", Message: validateruntime.MsgOr(%q, \"must be a defined enum value\")}\n}\n",
-				elemField, vm)
-		}
+}
+
+// writeItemsEnumValidation writes enum element defined_only constraint.
+func writeItemsEnumValidation(b *strings.Builder, elemField, vm string, items *model.ValidateFieldOptions, f transform.GoField, enumByGoName map[string]transform.GoEnum) {
+	if !items.DefinedOnly {
+		return
 	}
-	b.WriteString("}\n")
+	enumGoName := stripTypePrefix(f.GoType)
+	enum, ok := enumByGoName[enumGoName]
+	if !ok || len(enum.Values) == 0 {
+		return
+	}
+	b.WriteString("switch v {\n case ")
+	for i, v := range enum.Values {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(v.GoName)
+	}
+	b.WriteString(":\n// ok\n")
+	fmt.Fprintf(b, "default:\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"defined_only\", Message: validateruntime.MsgOr(%q, \"must be a defined enum value\")}\n}\n",
+		elemField, vm)
 }
 
 // --- helpers ---

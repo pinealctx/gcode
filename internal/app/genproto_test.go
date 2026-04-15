@@ -1134,7 +1134,7 @@ func TestAppendItemsValidate_PanicsOnUnknownScalar(t *testing.T) {
 	}()
 	var opts []string
 	items := &model.ValidateFieldOptions{MinLen: uint64Ptr(1)}
-	appendItemsValidate(opts, items, model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarKind("unknown")})
+	appendItemsValidate(opts, items, model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarKind("unknown")}) //nolint:govet // intentionally invalid ScalarKind to trigger panic guard
 }
 
 func TestAppendItemsValidate_PanicsOnUnknownKind(t *testing.T) {
@@ -1151,7 +1151,7 @@ func TestAppendItemsValidate_PanicsOnUnknownKind(t *testing.T) {
 	}()
 	var opts []string
 	items := &model.ValidateFieldOptions{DefinedOnly: true}
-	appendItemsValidate(opts, items, model.FieldType{Kind: model.FieldKind("unknown"), Name: "X"})
+	appendItemsValidate(opts, items, model.FieldType{Kind: model.FieldKind("unknown"), Name: "X"}) //nolint:govet // intentionally invalid FieldKind to trigger panic guard
 }
 
 func uint64Ptr(v uint64) *uint64 { return &v }

@@ -535,3 +535,76 @@ func TestAllValidate_SPattern(t *testing.T) {
 		t.Errorf("s_pattern=\"\" (zero value) should skip check, got: %v", err)
 	}
 }
+
+// TestAllValidate_ItemsInNotIn verifies items-level in/not_in constraints on repeated fields.
+func TestAllValidate_ItemsInNotIn(t *testing.T) {
+	t.Parallel()
+
+	// --- r_str_in: items must be "foo" or "bar" ---
+
+	// fail: value not in allowed set
+	a1 := validAllValidate()
+	a1.RStrIn = []string{"baz"}
+	assertVE(t, a1.Validate(), "r_str_in[0]", "in")
+
+	// fail: second element not in set
+	a2 := validAllValidate()
+	a2.RStrIn = []string{"foo", "other"}
+	assertVE(t, a2.Validate(), "r_str_in[1]", "in")
+
+	// pass: all elements in allowed set
+	a3 := validAllValidate()
+	a3.RStrIn = []string{"foo", "bar", "foo"}
+	if err := a3.Validate(); err != nil {
+		t.Errorf("r_str_in all valid should pass, got: %v", err)
+	}
+
+	// pass: empty slice skips items validation
+	a4 := validAllValidate()
+	a4.RStrIn = nil
+	if err := a4.Validate(); err != nil {
+		t.Errorf("r_str_in nil should pass, got: %v", err)
+	}
+
+	// --- r_str_not_in: items must not be "bad" ---
+
+	// fail: forbidden value present
+	b1 := validAllValidate()
+	b1.RStrNotIn = []string{"ok", "bad"}
+	assertVE(t, b1.Validate(), "r_str_not_in[1]", "not_in")
+
+	// pass: no forbidden values
+	b2 := validAllValidate()
+	b2.RStrNotIn = []string{"ok", "fine"}
+	if err := b2.Validate(); err != nil {
+		t.Errorf("r_str_not_in no forbidden values should pass, got: %v", err)
+	}
+
+	// --- r_int_in: items must be 1, 2, or 3 ---
+
+	// fail: value not in allowed set
+	c1 := validAllValidate()
+	c1.RIntIn = []int32{4}
+	assertVE(t, c1.Validate(), "r_int_in[0]", "in")
+
+	// pass: all elements in allowed set
+	c2 := validAllValidate()
+	c2.RIntIn = []int32{1, 2, 3, 1}
+	if err := c2.Validate(); err != nil {
+		t.Errorf("r_int_in all valid should pass, got: %v", err)
+	}
+
+	// --- r_uint_not_in: items must not be 0 ---
+
+	// fail: zero value present
+	d1 := validAllValidate()
+	d1.RUintNotIn = []uint32{1, 0}
+	assertVE(t, d1.Validate(), "r_uint_not_in[1]", "not_in")
+
+	// pass: no zero values
+	d2 := validAllValidate()
+	d2.RUintNotIn = []uint32{1, 2, 3}
+	if err := d2.Validate(); err != nil {
+		t.Errorf("r_uint_not_in no zero values should pass, got: %v", err)
+	}
+}
