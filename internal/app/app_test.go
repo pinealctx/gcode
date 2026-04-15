@@ -364,10 +364,10 @@ message User { int32 id = 1; }
 	}
 }
 
-// TestRun_OutputFileNameCollision verifies that two proto files in different
-// subdirectories with the same basename are detected and rejected before any
-// output is written.
-func TestRun_OutputFileNameCollision(t *testing.T) {
+// TestRun_SubdirectorySameBasename verifies that two proto files in different
+// subdirectories with the same basename are generated into separate output paths
+// (sub1/user.pb.dao.go and sub2/user.pb.dao.go) without collision.
+func TestRun_SubdirectorySameBasename(t *testing.T) {
 	t.Parallel()
 
 	inputDir := t.TempDir()
@@ -394,18 +394,34 @@ message UserB { int32 id = 1; }
 `)
 
 	err := Run(t.Context(), []string{"-in", inputDir, "-out", outputDir})
-	if err == nil {
-		t.Fatal("expected error for output filename collision, got nil")
+	if err != nil {
+		t.Fatalf("Run returned unexpected error: %v", err)
 	}
-	var ae AppError
-	if !errors.As(err, &ae) {
-		t.Errorf("expected AppError domain type, got %T: %v", err, err)
+
+	// Verify both DAO files exist with correct package and struct definitions.
+	type subCheck struct {
+		sub        string
+		structName string
 	}
-	entries, readErr := os.ReadDir(outputDir)
-	if readErr != nil {
-		t.Fatalf("ReadDir: %v", readErr)
+	for _, sc := range []subCheck{{"sub1", "UserA"}, {"sub2", "UserB"}} {
+		daoPath := filepath.Join(outputDir, sc.sub, "user.pb.dao.go")
+		data, readErr := os.ReadFile(daoPath)
+		if readErr != nil {
+			t.Fatalf("failed to read %s: %v", daoPath, readErr)
+		}
+		s := string(data)
+		if !strings.Contains(s, "package testpb") {
+			t.Errorf("%s: missing package declaration", daoPath)
+		}
+		if !strings.Contains(s, "type "+sc.structName+" struct") {
+			t.Errorf("%s: missing %s struct", daoPath, sc.structName)
+		}
 	}
-	if len(entries) != 0 {
-		t.Errorf("expected empty output dir on collision, got %d entries", len(entries))
+	// Verify validate files also exist in subdirectories.
+	for _, sub := range []string{"sub1", "sub2"} {
+		valPath := filepath.Join(outputDir, sub, "user.pb.dao.validate.go")
+		if _, statErr := os.Stat(valPath); statErr != nil {
+			t.Errorf("expected file %q to exist: %v", valPath, statErr)
+		}
 	}
 }
