@@ -15,6 +15,7 @@ func GoCamelCase(s string) string {
 	// That is, we process a word at a time, where words are marked by _ or
 	// upper case letter. Digits are treated as words.
 	var b []byte
+	// byte-indexed loop required for one-position lookahead (s[i+1]); cannot use for range.
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		switch {

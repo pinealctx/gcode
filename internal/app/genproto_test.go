@@ -11,7 +11,6 @@ import (
 	"github.com/pinealctx/gcode/internal/config"
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/parser"
-	"github.com/pinealctx/gcode/internal/source"
 )
 
 // writeFile writes content to path, creating parent dirs as needed.
@@ -583,8 +582,8 @@ func TestRunGenProto_EmptyDirectory(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty directory, got nil")
 	}
-	if !errors.Is(err, source.ErrNoProtoFiles) {
-		t.Errorf("expected source.ErrNoProtoFiles, got %T: %v", err, err)
+	if !errors.Is(err, ErrNoProtoFiles) {
+		t.Errorf("expected ErrNoProtoFiles, got %T: %v", err, err)
 	}
 }
 
@@ -666,10 +665,45 @@ func TestProtoFieldLine_NonOptionalScalar(t *testing.T) {
 	}
 }
 
+func TestProtoFieldLine_OptionalScalar(t *testing.T) {
+	t.Parallel()
+
+	f := model.Field{
+		Name:        "name",
+		Cardinality: model.CardinalitySingular,
+		Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
+	}
+	line, err := protoFieldLine(f, true, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if line != "optional string name = 2;" {
+		t.Errorf("got %q, want %q", line, "optional string name = 2;")
+	}
+}
+
 func TestProtoBaseName_Subdirectory(t *testing.T) {
 	t.Parallel()
 
 	got := protoBaseName("subdir/user.proto")
+	if got != "user" {
+		t.Errorf("got %q, want %q", got, "user")
+	}
+}
+
+func TestProtoBaseName_MetaSuffix(t *testing.T) {
+	t.Parallel()
+
+	got := protoBaseName("person.meta.proto")
+	if got != "person" {
+		t.Errorf("got %q, want %q", got, "person")
+	}
+}
+
+func TestProtoBaseName_RootDir(t *testing.T) {
+	t.Parallel()
+
+	got := protoBaseName("user.proto")
 	if got != "user" {
 		t.Errorf("got %q, want %q", got, "user")
 	}
@@ -681,6 +715,9 @@ func TestRunGenProto_NonExistentDirectory(t *testing.T) {
 	err := RunGenProto(t.Context(), []string{"-in", "/nonexistent/path/that/does/not/exist"})
 	if err == nil {
 		t.Fatal("expected error for non-existent directory, got nil")
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("expected fs.ErrNotExist in chain, got %T: %v", err, err)
 	}
 }
 
@@ -1000,3 +1037,121 @@ func TestBuildCreateMessage_InvalidName(t *testing.T) {
 		}
 	}
 }
+
+func TestAppendItemsValidate_DispatchesByElemType(t *testing.T) {
+	t.Parallel()
+
+	gteVal := int64(-100)
+	ltVal := int64(0)
+	gtFloat := 0.5
+	minLenVal := uint64(1)
+
+	tests := []struct {
+		name     string
+		items    *model.ValidateFieldOptions
+		elemType model.FieldType
+		want     string
+	}{
+		{
+			name:     "string items min_len",
+			items:    &model.ValidateFieldOptions{MinLen: &minLenVal},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
+			want:     "(buf.validate.field).repeated.items.string.min_len = 1",
+		},
+		{
+			name:     "sint32 items gte",
+			items:    &model.ValidateFieldOptions{GTEInt: &gteVal},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarSint32},
+			want:     "(buf.validate.field).repeated.items.sint32.gte = -100",
+		},
+		{
+			name:     "sfixed32 items lt",
+			items:    &model.ValidateFieldOptions{LTInt: &ltVal},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarSfixed32},
+			want:     "(buf.validate.field).repeated.items.sfixed32.lt = 0",
+		},
+		{
+			name:     "double items gt",
+			items:    &model.ValidateFieldOptions{GTFloat: &gtFloat},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarDouble},
+			want:     "(buf.validate.field).repeated.items.double.gt = 0.5",
+		},
+		{
+			name:     "bytes items min_len",
+			items:    &model.ValidateFieldOptions{MinLen: &minLenVal},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarBytes},
+			want:     "(buf.validate.field).repeated.items.bytes.min_len = 1",
+		},
+		{
+			name:     "enum items defined_only",
+			items:    &model.ValidateFieldOptions{DefinedOnly: true},
+			elemType: model.FieldType{Kind: model.FieldKindEnum, Name: "Status"},
+			want:     "(buf.validate.field).repeated.items.enum.defined_only = true",
+		},
+		{
+			name:     "message items no constraints",
+			items:    &model.ValidateFieldOptions{DefinedOnly: true},
+			elemType: model.FieldType{Kind: model.FieldKindMessage, Name: "Address"},
+			want:     "",
+		},
+		{
+			name:     "bool items no constraints",
+			items:    &model.ValidateFieldOptions{DefinedOnly: true},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarBool},
+			want:     "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var opts []string
+			opts = appendItemsValidate(opts, tt.items, tt.elemType)
+			if tt.want == "" {
+				if len(opts) != 0 {
+					t.Errorf("expected no output, got %v", opts)
+				}
+				return
+			}
+			if len(opts) != 1 || opts[0] != tt.want {
+				t.Errorf("got %v, want [%s]", opts, tt.want)
+			}
+		})
+	}
+}
+
+func TestAppendItemsValidate_PanicsOnUnknownScalar(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for unknown scalar type")
+		}
+		msg, ok := r.(string)
+		if !ok || !strings.Contains(msg, "unsupported scalar type") {
+			t.Errorf("unexpected panic message: %v", r)
+		}
+	}()
+	var opts []string
+	items := &model.ValidateFieldOptions{MinLen: uint64Ptr(1)}
+	appendItemsValidate(opts, items, model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarKind("unknown")})
+}
+
+func TestAppendItemsValidate_PanicsOnUnknownKind(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for unknown field kind")
+		}
+		msg, ok := r.(string)
+		if !ok || !strings.Contains(msg, "unsupported field kind") {
+			t.Errorf("unexpected panic message: %v", r)
+		}
+	}()
+	var opts []string
+	items := &model.ValidateFieldOptions{DefinedOnly: true}
+	appendItemsValidate(opts, items, model.FieldType{Kind: model.FieldKind("unknown"), Name: "X"})
+}
+
+func uint64Ptr(v uint64) *uint64 { return &v }

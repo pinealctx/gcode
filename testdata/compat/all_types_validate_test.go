@@ -449,6 +449,64 @@ func TestAllValidate_DGt(t *testing.T) {
 	}
 }
 
+// TestAllRepeatedUpdate_Valid verifies that a fully valid AllRepeatedUpdate passes Validate().
+func TestAllRepeatedUpdate_Valid(t *testing.T) {
+	t.Parallel()
+	u := &dao.AllRepeatedUpdate{
+		RSint32:   []int32{-100, 0},
+		RSfixed32: []int32{-1, -5},
+		RDouble:   []float64{0.6, 1.0},
+		RBytes:    [][]byte{{0x01}, {0x02}},
+		REnum:     []dao.Status{dao.Status_STATUS_UNSPECIFIED, dao.Status_STATUS_ACTIVE},
+	}
+	if err := u.Validate(); err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+}
+
+// TestAllRepeatedUpdate_ItemsConstraints verifies items-level constraints on repeated fields.
+func TestAllRepeatedUpdate_ItemsConstraints(t *testing.T) {
+	t.Parallel()
+
+	// fail: sint32 item below gte=-100
+	u1 := &dao.AllRepeatedUpdate{RSint32: []int32{-101}}
+	assertVE(t, u1.Validate(), "r_sint32[0]", "gte")
+
+	// fail: sfixed32 item >= 0 (lt=0)
+	u2 := &dao.AllRepeatedUpdate{RSfixed32: []int32{0}}
+	assertVE(t, u2.Validate(), "r_sfixed32[0]", "lt")
+
+	// fail: double item <= 0.5 (gt=0.5)
+	u3 := &dao.AllRepeatedUpdate{RDouble: []float64{0.5}}
+	assertVE(t, u3.Validate(), "r_double[0]", "gt")
+
+	// fail: bytes item with len < 1 (min_len=1)
+	u4 := &dao.AllRepeatedUpdate{RBytes: [][]byte{{}}}
+	assertVE(t, u4.Validate(), "r_bytes[0]", "min_len")
+
+	// fail: undefined enum value (defined_only)
+	u5 := &dao.AllRepeatedUpdate{REnum: []dao.Status{dao.Status(999)}}
+	assertVE(t, u5.Validate(), "r_enum[0]", "defined_only")
+
+	// pass: all defined enum values accepted
+	for _, v := range []dao.Status{
+		dao.Status_STATUS_UNSPECIFIED,
+		dao.Status_STATUS_ACTIVE,
+		dao.Status_STATUS_INACTIVE,
+	} {
+		u := &dao.AllRepeatedUpdate{REnum: []dao.Status{v}}
+		if err := u.Validate(); err != nil {
+			t.Errorf("r_enum=%v should pass defined_only, got: %v", v, err)
+		}
+	}
+
+	// pass: empty slices skip items validation
+	u6 := &dao.AllRepeatedUpdate{}
+	if err := u6.Validate(); err != nil {
+		t.Errorf("empty AllRepeatedUpdate should pass, got: %v", err)
+	}
+}
+
 // TestAllValidate_SPattern verifies string pattern constraint.
 func TestAllValidate_SPattern(t *testing.T) {
 	t.Parallel()

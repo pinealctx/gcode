@@ -155,13 +155,15 @@ func writeFieldValidationExpr(b *strings.Builder, fieldExpr string, f transform.
 
 	switch {
 	case f.Cardinality == model.CardinalityRepeated:
-		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo)
+		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo, f, enumByGoName)
 	case f.Type.Kind == model.FieldKindMessage:
 		writeMessageFieldValidation(b, fieldExpr, fieldName, vm, vo)
 	case f.Type.Kind == model.FieldKindEnum:
 		writeEnumValidation(b, fieldExpr, fieldName, vm, vo, f, enumByGoName)
 	case f.Type.Kind == model.FieldKindScalar:
 		writeScalarValidation(b, fieldExpr, fieldName, vm, vo, f, noZeroGuard)
+	default:
+		panic(fmt.Sprintf("writeFieldValidationExpr: unhandled kind=%v cardinality=%v", f.Type.Kind, f.Cardinality))
 	}
 }
 
@@ -176,7 +178,7 @@ func writeFieldValidation(b *strings.Builder, recv string, f transform.GoField, 
 
 	switch {
 	case f.Cardinality == model.CardinalityRepeated:
-		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo)
+		writeRepeatedValidation(b, fieldExpr, fieldName, vm, vo, f, enumByGoName)
 
 	case f.Type.Kind == model.FieldKindMessage:
 		writeMessageFieldValidation(b, fieldExpr, fieldName, vm, vo)
@@ -198,6 +200,8 @@ func writeFieldValidation(b *strings.Builder, recv string, f transform.GoField, 
 		} else {
 			writeScalarValidation(b, fieldExpr, fieldName, vm, vo, f, false)
 		}
+	default:
+		panic(fmt.Sprintf("writeFieldValidation: unhandled kind=%v cardinality=%v", f.Type.Kind, f.Cardinality))
 	}
 }
 
@@ -219,9 +223,14 @@ func writeScalarValidation(b *strings.Builder, fieldExpr, fieldName, vm string, 
 		// bool required not supported (parser rejects it)
 	case model.ScalarFloat, model.ScalarDouble:
 		writeFloatValidation(b, fieldExpr, fieldName, vm, vo)
-	default:
-		// signed or unsigned integer
+	case model.ScalarInt32, model.ScalarInt64,
+		model.ScalarUint32, model.ScalarUint64,
+		model.ScalarSint32, model.ScalarSint64,
+		model.ScalarFixed32, model.ScalarFixed64,
+		model.ScalarSfixed32, model.ScalarSfixed64:
 		writeIntValidation(b, fieldExpr, fieldName, vm, vo, scalar)
+	default:
+		panic(fmt.Sprintf("writeScalarValidation: unhandled scalar kind %v", scalar))
 	}
 }
 
@@ -520,10 +529,12 @@ func writeMessageFieldValidation(b *strings.Builder, fieldExpr, fieldName, vm st
 }
 
 // writeRepeatedValidation writes repeated field constraints.
-// Note: defined_only for repeated enum fields is not currently supported
-// and is silently skipped.
-func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions) {
+func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions, f transform.GoField, enumByGoName map[string]transform.GoEnum) {
 	if vo == nil {
+		// No validate options, but repeated message fields still need element-level Validate() calls.
+		if f.Type.Kind == model.FieldKindMessage {
+			fmt.Fprintf(b, "for _, v := range %s {\nif err := v.Validate(); err != nil {\nreturn err\n}\n}\n", fieldExpr)
+		}
 		return
 	}
 	if vo.MinItems != nil {
@@ -535,12 +546,12 @@ func writeRepeatedValidation(b *strings.Builder, fieldExpr, fieldName, vm string
 			fieldExpr, *vo.MaxItems, fieldName, vm, *vo.MaxItems)
 	}
 	if vo.Items != nil {
-		writeItemsValidation(b, fieldExpr, fieldName, vm, vo.Items)
+		writeItemsValidation(b, fieldExpr, fieldName, vm, vo.Items, f, enumByGoName)
 	}
 }
 
 // writeItemsValidation writes element-level validation for repeated fields.
-func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, items *model.ValidateFieldOptions) {
+func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, items *model.ValidateFieldOptions, f transform.GoField, enumByGoName map[string]transform.GoEnum) {
 	// Determine element variable name and type based on field scalar.
 	// For repeated string → v is string; for repeated int32 → v is int32, etc.
 	fmt.Fprintf(b, "for i, v := range %s {\n", fieldExpr)
@@ -617,6 +628,23 @@ func writeItemsValidation(b *strings.Builder, fieldExpr, fieldName, vm string, i
 	if items.LTEFloat != nil {
 		fmt.Fprintf(b, "if v > %g {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"lte\", Message: validateruntime.MsgOr(%q, \"must be <= %g\")}\n}\n",
 			*items.LTEFloat, elemField, vm, *items.LTEFloat)
+	}
+	// enum items defined_only: generate switch inside the loop.
+	if items.DefinedOnly {
+		enumGoName := stripTypePrefix(f.GoType)
+		enum, ok := enumByGoName[enumGoName]
+		if ok && len(enum.Values) > 0 {
+			b.WriteString("switch v {\n case ")
+			for i, v := range enum.Values {
+				if i > 0 {
+					b.WriteString(", ")
+				}
+				b.WriteString(v.GoName)
+			}
+			b.WriteString(":\n// ok\n")
+			fmt.Fprintf(b, "default:\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"defined_only\", Message: validateruntime.MsgOr(%q, \"must be a defined enum value\")}\n}\n",
+				elemField, vm)
+		}
 	}
 	b.WriteString("}\n")
 }

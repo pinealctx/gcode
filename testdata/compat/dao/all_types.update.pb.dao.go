@@ -23,6 +23,15 @@ type AllScalarsUpdate struct {
 	FBytes    []byte   `json:"fBytes"`
 }
 
+type AllRepeatedUpdate struct {
+	RSint32   []int32    `json:"rSint32"`
+	RSfixed32 []int32    `json:"rSfixed32"`
+	RDouble   []float64  `json:"rDouble"`
+	RBytes    [][]byte   `json:"rBytes"`
+	RMessage  []*Address `json:"rMessage"`
+	REnum     []Status   `json:"rEnum"`
+}
+
 // Size returns the protobuf wire size of AllScalarsUpdate.
 func (x *AllScalarsUpdate) Size() int {
 	if x == nil {
@@ -119,6 +128,111 @@ func (x *AllScalarsUpdate) MarshalAppend(b []byte) ([]byte, error) {
 	return b, nil
 }
 
+// Size returns the protobuf wire size of AllRepeatedUpdate.
+func (x *AllRepeatedUpdate) Size() int {
+	if x == nil {
+		return 0
+	}
+	var n int
+	if len(x.RSint32) > 0 {
+		var es int
+		for _, v := range x.RSint32 {
+			es += runtime.SizeSint32(v)
+		}
+		n += 1 + runtime.SizeVarint(uint64(es)) + es
+	}
+	if len(x.RSfixed32) > 0 {
+		es := len(x.RSfixed32) * 4
+		n += 1 + runtime.SizeVarint(uint64(es)) + es
+	}
+	if len(x.RDouble) > 0 {
+		es := len(x.RDouble) * 8
+		n += 1 + runtime.SizeVarint(uint64(es)) + es
+	}
+	if len(x.RBytes) > 0 {
+		for _, v := range x.RBytes {
+			n += 1 + runtime.SizeBytes(v)
+		}
+	}
+	if len(x.RMessage) > 0 {
+		for _, v := range x.RMessage {
+			s := v.Size()
+			n += 1 + runtime.SizeVarint(uint64(s)) + s
+		}
+	}
+	if len(x.REnum) > 0 {
+		var es int
+		for _, v := range x.REnum {
+			es += runtime.SizeEnum(int32(v))
+		}
+		n += 1 + runtime.SizeVarint(uint64(es)) + es
+	}
+	return n
+}
+
+// MarshalBinary implements encoding.BinaryMarshaler.
+func (x *AllRepeatedUpdate) MarshalBinary() ([]byte, error) {
+	return x.MarshalAppend(make([]byte, 0, x.Size()))
+}
+
+// MarshalAppend appends the protobuf wire encoding of AllRepeatedUpdate to b.
+func (x *AllRepeatedUpdate) MarshalAppend(b []byte) ([]byte, error) {
+	if len(x.RSint32) > 0 {
+		b = runtime.AppendTag(b, 1, runtime.WireBytes)
+		var es int
+		for _, v := range x.RSint32 {
+			es += runtime.SizeSint32(v)
+		}
+		b = runtime.AppendVarint(b, uint64(es))
+		for _, v := range x.RSint32 {
+			b = runtime.AppendSint32(b, v)
+		}
+	}
+	if len(x.RSfixed32) > 0 {
+		b = runtime.AppendTag(b, 2, runtime.WireBytes)
+		b = runtime.AppendVarint(b, uint64(len(x.RSfixed32)*4))
+		for _, v := range x.RSfixed32 {
+			b = runtime.AppendFixed32(b, uint32(v))
+		}
+	}
+	if len(x.RDouble) > 0 {
+		b = runtime.AppendTag(b, 3, runtime.WireBytes)
+		b = runtime.AppendVarint(b, uint64(len(x.RDouble)*8))
+		for _, v := range x.RDouble {
+			b = runtime.AppendDouble(b, v)
+		}
+	}
+	if len(x.RBytes) > 0 {
+		for _, v := range x.RBytes {
+			b = runtime.AppendTag(b, 4, runtime.WireBytes)
+			b = runtime.AppendBytes(b, v)
+		}
+	}
+	if len(x.RMessage) > 0 {
+		for _, v := range x.RMessage {
+			b = runtime.AppendTag(b, 5, runtime.WireBytes)
+			b = runtime.AppendVarint(b, uint64(v.Size()))
+			var err error
+			b, err = v.MarshalAppend(b)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if len(x.REnum) > 0 {
+		b = runtime.AppendTag(b, 6, runtime.WireBytes)
+		var es int
+		for _, v := range x.REnum {
+			es += runtime.SizeEnum(int32(v))
+		}
+		b = runtime.AppendVarint(b, uint64(es))
+		for _, v := range x.REnum {
+			b = runtime.AppendVarint(b, uint64(v))
+		}
+	}
+	return b, nil
+}
+
 // DeepClone returns a deep copy of AllScalarsUpdate with no shared memory.
 func (x *AllScalarsUpdate) DeepClone() *AllScalarsUpdate {
 	if x == nil {
@@ -164,6 +278,47 @@ func (x *AllScalarsUpdate) DeepClone() *AllScalarsUpdate {
 	if x.FBytes != nil {
 		clone.FBytes = make([]byte, len(x.FBytes))
 		copy(clone.FBytes, x.FBytes)
+	}
+	return &clone
+}
+
+// DeepClone returns a deep copy of AllRepeatedUpdate with no shared memory.
+func (x *AllRepeatedUpdate) DeepClone() *AllRepeatedUpdate {
+	if x == nil {
+		return nil
+	}
+	clone := *x
+	if x.RSint32 != nil {
+		clone.RSint32 = make([]int32, len(x.RSint32))
+		copy(clone.RSint32, x.RSint32)
+	}
+	if x.RSfixed32 != nil {
+		clone.RSfixed32 = make([]int32, len(x.RSfixed32))
+		copy(clone.RSfixed32, x.RSfixed32)
+	}
+	if x.RDouble != nil {
+		clone.RDouble = make([]float64, len(x.RDouble))
+		copy(clone.RDouble, x.RDouble)
+	}
+	if x.RBytes != nil {
+		clone.RBytes = make([][]byte, len(x.RBytes))
+		for i, v := range x.RBytes {
+			if v != nil {
+				tmp := make([]byte, len(v))
+				copy(tmp, v)
+				clone.RBytes[i] = tmp
+			}
+		}
+	}
+	if x.RMessage != nil {
+		clone.RMessage = make([]*Address, len(x.RMessage))
+		for i, v := range x.RMessage {
+			clone.RMessage[i] = v.DeepClone()
+		}
+	}
+	if x.REnum != nil {
+		clone.REnum = make([]Status, len(x.REnum))
+		copy(clone.REnum, x.REnum)
 	}
 	return &clone
 }
@@ -419,6 +574,170 @@ func (x *AllScalarsUpdate) UnmarshalBinaryLenient(data []byte) error {
 	return err
 }
 
+// unmarshalFrom decodes a protobuf wire-format message from b.
+// Returns the number of bytes consumed.
+// If lenient is true, duplicate non-repeated fields use last-one-wins.
+// depth is the remaining nesting budget; callers pass runtime.DefaultRecursionLimit.
+func (x *AllRepeatedUpdate) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
+	if depth <= 0 {
+		return 0, runtime.ErrNestingDepth
+	}
+	off := 0
+	for off < len(b) {
+		fieldNum, wireType, n := runtime.ConsumeTag(b[off:])
+		if n < 0 {
+			if n == -2 {
+				return 0, fmt.Errorf("field tag: %w", runtime.ErrOverflow)
+			}
+			return 0, fmt.Errorf("field tag: %w", runtime.ErrTruncated)
+		}
+		off += n
+
+		switch fieldNum {
+		case 1:
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 1: %w", runtime.ErrWireType)
+			}
+			packed, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
+			}
+			off += n
+			for pi := 0; pi < len(packed); {
+				v, pn := runtime.ConsumeVarint(packed[pi:])
+				if pn < 0 {
+					if pn == -2 {
+						return 0, fmt.Errorf("field 1: %w", runtime.ErrOverflow)
+					}
+					return 0, fmt.Errorf("field 1: %w", runtime.ErrTruncated)
+				}
+				x.RSint32 = append(x.RSint32, runtime.DecodeZigZag32(v))
+				pi += pn
+			}
+		case 2:
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 2: %w", runtime.ErrWireType)
+			}
+			packed, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 2: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 2: %w", runtime.ErrTruncated)
+			}
+			off += n
+			if len(packed)%4 != 0 {
+				return 0, fmt.Errorf("field 2: %w", runtime.ErrPackedLen)
+			}
+			for pi := 0; pi < len(packed); pi += 4 {
+				v, _ := runtime.ConsumeFixed32(packed[pi:])
+				x.RSfixed32 = append(x.RSfixed32, int32(v))
+			}
+		case 3:
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 3: %w", runtime.ErrWireType)
+			}
+			packed, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 3: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 3: %w", runtime.ErrTruncated)
+			}
+			off += n
+			if len(packed)%8 != 0 {
+				return 0, fmt.Errorf("field 3: %w", runtime.ErrPackedLen)
+			}
+			for pi := 0; pi < len(packed); pi += 8 {
+				v, _ := runtime.ConsumeFixed64(packed[pi:])
+				x.RDouble = append(x.RDouble, math.Float64frombits(v))
+			}
+		case 4:
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 4: %w", runtime.ErrWireType)
+			}
+			payload, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 4: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 4: %w", runtime.ErrTruncated)
+			}
+			tmp := make([]byte, len(payload))
+			copy(tmp, payload)
+			x.RBytes = append(x.RBytes, tmp)
+			off += n
+		case 5:
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 5: %w", runtime.ErrWireType)
+			}
+			payload, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 5: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 5: %w", runtime.ErrTruncated)
+			}
+			elem := new(Address)
+			if _, err := elem.unmarshalFrom(payload, lenient, depth-1); err != nil {
+				return 0, fmt.Errorf("field 5: %w", err)
+			}
+			x.RMessage = append(x.RMessage, elem)
+			off += n
+		case 6:
+			if wireType != runtime.WireBytes {
+				return 0, fmt.Errorf("field 6: %w", runtime.ErrWireType)
+			}
+			packed, n := runtime.ConsumeBytes(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 6: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 6: %w", runtime.ErrTruncated)
+			}
+			off += n
+			for pi := 0; pi < len(packed); {
+				v, pn := runtime.ConsumeVarint(packed[pi:])
+				if pn < 0 {
+					if pn == -2 {
+						return 0, fmt.Errorf("field 6: %w", runtime.ErrOverflow)
+					}
+					return 0, fmt.Errorf("field 6: %w", runtime.ErrTruncated)
+				}
+				x.REnum = append(x.REnum, Status(int32(v)))
+				pi += pn
+			}
+		default:
+			n = runtime.SkipField(b[off:], wireType)
+			if n < 0 {
+				if n == -3 {
+					return 0, fmt.Errorf("unknown field %d: %w", fieldNum, runtime.ErrUnknownWireType)
+				}
+				return 0, fmt.Errorf("unknown field %d (wire type %d): %w", fieldNum, wireType, runtime.ErrTruncated)
+			}
+			off += n
+		}
+	}
+	return off, nil
+}
+
+// UnmarshalBinary implements encoding.BinaryUnmarshaler.
+// Duplicate non-repeated fields return an error.
+func (x *AllRepeatedUpdate) UnmarshalBinary(data []byte) error {
+	_, err := x.unmarshalFrom(data, false, runtime.DefaultRecursionLimit)
+	return err
+}
+
+// UnmarshalBinaryLenient unmarshals like UnmarshalBinary but allows
+// duplicate non-repeated fields, keeping the last value.
+func (x *AllRepeatedUpdate) UnmarshalBinaryLenient(data []byte) error {
+	_, err := x.unmarshalFrom(data, true, runtime.DefaultRecursionLimit)
+	return err
+}
+
 // ToMap converts AllScalarsUpdate to map[string]any for partial update APIs (e.g. GORM Updates).
 // Only non-nil fields are included.
 func (x *AllScalarsUpdate) ToMap() map[string]any {
@@ -456,6 +775,28 @@ func (x *AllScalarsUpdate) ToMap() map[string]any {
 	return um
 }
 
+// ToMap converts AllRepeatedUpdate to map[string]any for partial update APIs (e.g. GORM Updates).
+// Only non-nil fields are included.
+func (x *AllRepeatedUpdate) ToMap() map[string]any {
+	um := make(map[string]any)
+	if len(x.RSfixed32) > 0 {
+		um["r_sfixed32"] = x.RSfixed32
+	}
+	if len(x.RDouble) > 0 {
+		um["r_double"] = x.RDouble
+	}
+	if len(x.RBytes) > 0 {
+		um["r_bytes"] = x.RBytes
+	}
+	if len(x.RMessage) > 0 {
+		um["r_message"] = x.RMessage
+	}
+	if len(x.REnum) > 0 {
+		um["r_enum"] = x.REnum
+	}
+	return um
+}
+
 // ApplyTo merges non-nil fields from AllScalarsUpdate into p.
 // Condition fields are skipped.
 func (x *AllScalarsUpdate) ApplyTo(p *AllScalars) {
@@ -488,5 +829,25 @@ func (x *AllScalarsUpdate) ApplyTo(p *AllScalars) {
 	}
 	if x.FBytes != nil {
 		p.FBytes = x.FBytes
+	}
+}
+
+// ApplyTo merges non-nil fields from AllRepeatedUpdate into p.
+// Condition fields are skipped.
+func (x *AllRepeatedUpdate) ApplyTo(p *AllRepeated) {
+	if x.RSfixed32 != nil {
+		p.RSfixed32 = x.RSfixed32
+	}
+	if x.RDouble != nil {
+		p.RDouble = x.RDouble
+	}
+	if x.RBytes != nil {
+		p.RBytes = x.RBytes
+	}
+	if x.RMessage != nil {
+		p.RMessage = x.RMessage
+	}
+	if x.REnum != nil {
+		p.REnum = x.REnum
 	}
 }

@@ -28,7 +28,7 @@ func RunGenTS(ctx context.Context, args []string) error {
 	}
 
 	if len(scanResult.Files) == 0 {
-		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, source.ErrNoProtoFiles)
+		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, ErrNoProtoFiles)
 	}
 
 	// Exclude schema source files (.meta.proto) — only entity/create/update products are used.

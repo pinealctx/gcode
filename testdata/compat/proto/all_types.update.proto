@@ -9,6 +9,7 @@ option go_package = "github.com/pinealctx/gcode/testdata/compat/dao;dao";
 import "all_types.entity.proto";
 import "buf/validate/validate.proto";
 import "gcode/options.proto";
+import "person.entity.proto";
 
 message AllScalarsUpdate {
   option (gcode.update_source_opts) = { source: "AllScalars", condition_fields: ["f_sint32"] };
@@ -24,5 +25,16 @@ message AllScalarsUpdate {
   optional uint64 f_uint64 = 9;
   optional float f_float = 10;
   optional bytes f_bytes = 11 [(gcode.field).gorm.column = "f_bytes_col"];
+}
+
+message AllRepeatedUpdate {
+  option (gcode.update_source_opts) = { source: "AllRepeated", condition_fields: ["r_sint32"] };
+
+  repeated sint32 r_sint32 = 1 [(buf.validate.field).repeated.items.sint32.gte = -100];
+  repeated sfixed32 r_sfixed32 = 2 [(buf.validate.field).repeated.items.sfixed32.lt = 0];
+  repeated double r_double = 3 [(buf.validate.field).repeated.items.double.gt = 0.5];
+  repeated bytes r_bytes = 4 [(buf.validate.field).repeated.items.bytes.min_len = 1];
+  repeated Address r_message = 5;
+  repeated Status r_enum = 6 [(buf.validate.field).repeated.items.enum.defined_only = true];
 }
 

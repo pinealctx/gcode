@@ -25,7 +25,7 @@ type Person struct {
 	Rating      float32  `json:"rating" gorm:"column:rating"`
 	CreatedAt   int64    `json:"createdAt" gorm:"column:created_ts"`
 	Avatar      []byte   `json:"avatar" gorm:"column:avatar"`
-	Nickname    *string  `json:"nickname" gorm:"column:nickname"`
+	Nickname    *string  `json:"nickname,omitempty" gorm:"column:nickname"`
 	Level       *int32   `json:"level" gorm:"column:level"`
 	Verified    *bool    `json:"verified" gorm:"column:verified"`
 	Score       *float32 `json:"score" gorm:"column:score"`
@@ -33,7 +33,7 @@ type Person struct {
 	PrevStatus  *Status  `json:"prevStatus" gorm:"column:prev_status"`
 	Fingerprint []byte   `json:"fingerprint" gorm:"column:fingerprint"`
 	Email       string   `json:"email" gorm:"column:email"`
-	Role        string   `json:"role" gorm:"column:role"`
+	Role        string   `json:"-" gorm:"column:role"`
 	TypeId      int32    `json:"typeId" gorm:"column:type_id"`
 }
 

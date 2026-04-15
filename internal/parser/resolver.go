@@ -126,6 +126,7 @@ func compileGcodeExtensions() (*gcodeExtensions, error) {
 
 	exts := fd.Extensions()
 	var schemaExt, msgExt, fieldExt, updateMsgExt, createMsgExt, updateSrcOptsExt, createSrcExt protoreflect.ExtensionDescriptor
+	// protobuf descriptor API uses Len()/Get(i); no range iterator available.
 	for i := 0; i < exts.Len(); i++ {
 		ext := exts.Get(i)
 		switch ext.Name() {
@@ -300,6 +301,7 @@ func readUpdateMessageOptions(opts proto.Message, ext protoreflect.ExtensionType
 		return nil, nil
 	}
 	result := make([]model.UpdateMessageOptions, 0, listVal.Len())
+	// protobuf descriptor API uses Len()/Get(i); no range iterator available.
 	for i := 0; i < listVal.Len(); i++ {
 		item, ok := listVal.Get(i).Message().(*dynamicpb.Message)
 		if !ok || item == nil {
@@ -336,6 +338,7 @@ func readCreateMessageOptions(opts proto.Message, ext protoreflect.ExtensionType
 		return nil, nil
 	}
 	result := make([]model.CreateMessageOptions, 0, listVal.Len())
+	// protobuf descriptor API uses Len()/Get(i); no range iterator available.
 	for i := 0; i < listVal.Len(); i++ {
 		item, ok := listVal.Get(i).Message().(*dynamicpb.Message)
 		if !ok || item == nil {
@@ -463,6 +466,7 @@ func compileValidateExtensions() (*validateExtensions, error) {
 
 	exts := fd.Extensions()
 	var fieldExt protoreflect.ExtensionDescriptor
+	// protobuf descriptor API uses Len()/Get(i); no range iterator available.
 	for i := 0; i < exts.Len(); i++ {
 		ext := exts.Get(i)
 		if ext.Name() == "field" {
@@ -543,6 +547,7 @@ func getListField(msg *dynamicpb.Message, name protoreflect.Name) []protoreflect
 		return nil
 	}
 	result := make([]protoreflect.Value, list.Len())
+	// protobuf descriptor API uses Len()/Get(i); no range iterator available.
 	for i := 0; i < list.Len(); i++ {
 		result[i] = list.Get(i)
 	}

@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/pinealctx/gcode/internal/config"
-	"github.com/pinealctx/gcode/internal/source"
 )
 
 func TestRunGenTS_BasicRouting(t *testing.T) {
@@ -75,7 +74,7 @@ func TestRunGenTS_NoProtoFiles(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty input directory, got nil")
 	}
-	if !errors.Is(err, source.ErrNoProtoFiles) {
+	if !errors.Is(err, ErrNoProtoFiles) {
 		t.Errorf("error = %q, want ErrNoProtoFiles", err.Error())
 	}
 }

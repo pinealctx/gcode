@@ -15,14 +15,14 @@ type PersonCreate struct {
 	Active     *bool    `json:"active" gorm:"column:active"`
 	Status     *Status  `json:"status" gorm:"column:status"`
 	Rating     *float32 `json:"rating" gorm:"column:rating"`
-	Nickname   string   `json:"nickname" gorm:"column:nickname"`
+	Nickname   string   `json:"nickname,omitempty" gorm:"column:nickname"`
 	Level      *int32   `json:"level" gorm:"column:level"`
 	Verified   *bool    `json:"verified" gorm:"column:verified"`
 	Score      *float32 `json:"score" gorm:"column:score"`
 	UpdatedAt  *int64   `json:"updatedAt" gorm:"column:updated_at"`
 	PrevStatus *Status  `json:"prevStatus" gorm:"column:prev_status"`
 	Email      *string  `json:"email" gorm:"column:email"`
-	Role       *string  `json:"role" gorm:"column:role"`
+	Role       *string  `json:"-" gorm:"column:role"`
 	TypeId     *int32   `json:"typeId" gorm:"column:type_id"`
 }
 

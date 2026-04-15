@@ -39,7 +39,7 @@ func Run(ctx context.Context, args []string) error {
 	}
 
 	if len(scanResult.Files) == 0 {
-		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, source.ErrNoProtoFiles)
+		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, ErrNoProtoFiles)
 	}
 
 	// Exclude schema source files (.meta.proto) from gen-dao processing.
@@ -73,6 +73,8 @@ func Run(ctx context.Context, args []string) error {
 		gf  transform.GoFile
 	}
 	flattened := make([]flattenedFile, 0, len(files))
+	// msgIndex stores pointers: GoMessage contains a []GoField slice, so pointer avoids copying.
+	// enumIndex stores values: GoEnum is small (GoName + Values slice header), value copy is fine.
 	msgIndex := make(map[string]*transform.GoMessage)
 	enumIndex := make(map[string]transform.GoEnum)
 	// msgSrc and enumSrc track the source proto file for each GoName, used in collision error messages.
