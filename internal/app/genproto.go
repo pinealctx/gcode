@@ -265,7 +265,7 @@ func formatFieldDecl(f model.Field, optional bool, fieldNum int, optStr string) 
 // or empty string if no gorm annotation is present.
 func gormFieldOpts(f model.Field) string {
 	if f.GormOptions != nil && f.GormOptions.Column != "" {
-		return " [(gcode.field).gorm.column = " + fmt.Sprintf("%q", f.GormOptions.Column) + "]"
+		return " [(gcode.field).gorm.column = " + strconv.Quote(f.GormOptions.Column) + "]"
 	}
 	return ""
 }

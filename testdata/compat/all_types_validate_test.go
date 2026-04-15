@@ -580,6 +580,13 @@ func TestAllValidate_ItemsInNotIn(t *testing.T) {
 		t.Errorf("r_str_not_in no forbidden values should pass, got: %v", err)
 	}
 
+	// pass: nil slice skips items validation
+	b3 := validAllValidate()
+	b3.RStrNotIn = nil
+	if err := b3.Validate(); err != nil {
+		t.Errorf("r_str_not_in nil should pass, got: %v", err)
+	}
+
 	// --- r_int_in: items must be 1, 2, or 3 ---
 
 	// fail: value not in allowed set
