@@ -10,6 +10,3 @@ type sourceTag struct{}
 //
 //nolint:revive // SourceError intentionally includes the package name for clarity at call sites.
 type SourceError = errorx.Sentinel[sourceTag]
-
-// ErrNoProtoFiles is returned when a directory scan finds no .proto files.
-var ErrNoProtoFiles = SourceError("no .proto files found")

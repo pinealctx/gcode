@@ -116,6 +116,11 @@ func ErrResponse(err error) Response {
 // the service method through a handlerx interceptor chain.
 // WithRecovery is always applied as the outermost interceptor.
 // Additional interceptors are applied inside recovery, before the service method.
+//
+// Note: on bind/validate failure the handler calls c.Error and returns without
+// calling c.Abort(). Downstream middleware in the same handler chain will still
+// execute. Register DefaultErrorHandler (or an equivalent error-writing middleware)
+// after this handler to write the error response and abort the chain.
 func NewHandler[Req any, Resp any](
 	method func(ctx context.Context, req *Req) (*Resp, error),
 	interceptors ...handlerx.Interceptor[*Req, *Resp],

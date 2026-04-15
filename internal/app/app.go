@@ -39,7 +39,7 @@ func Run(ctx context.Context, args []string) error {
 	}
 
 	if len(scanResult.Files) == 0 {
-		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, source.ErrNoProtoFiles)
+		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, ErrNoProtoFiles)
 	}
 
 	// Exclude schema source files (.meta.proto) from gen-dao processing.
@@ -72,38 +72,55 @@ func Run(ctx context.Context, args []string) error {
 		src model.File
 		gf  transform.GoFile
 	}
+	// indexedMsg bundles a GoMessage pointer with its source proto path for collision error messages.
+	// Pointer is used because GoMessage contains a []GoField slice; value copy would be expensive.
+	type indexedMsg struct {
+		msg *transform.GoMessage
+		src string
+	}
+	// indexedEnum bundles a GoEnum value with its source proto path for collision error messages.
+	// Value copy is fine: GoEnum is small (GoName + Values slice header).
+	type indexedEnum struct {
+		enum transform.GoEnum
+		src  string
+	}
 	flattened := make([]flattenedFile, 0, len(files))
-	msgIndex := make(map[string]*transform.GoMessage)
-	enumIndex := make(map[string]transform.GoEnum)
-	// msgSrc and enumSrc track the source proto file for each GoName, used in collision error messages.
-	msgSrc := make(map[string]string)
-	enumSrc := make(map[string]string)
+	msgIndex := make(map[string]indexedMsg)
+	enumIndex := make(map[string]indexedEnum)
 	for _, f := range files {
 		gf := transform.Flatten(f)
 		for i := range gf.Messages {
 			m := &gf.Messages[i]
-			if _, exists := msgIndex[m.GoName]; exists {
-				return errorx.NewSentinelf[appTag]("message name collision: %q defined in both %q and %q; cross-file same-name messages are not supported", m.GoName, msgSrc[m.GoName], f.Path)
+			if prev, exists := msgIndex[m.GoName]; exists {
+				return errorx.NewSentinelf[appTag]("message name collision: %q defined in both %q and %q; cross-file same-name messages are not supported", m.GoName, prev.src, f.Path)
 			}
-			msgIndex[m.GoName] = m
-			msgSrc[m.GoName] = f.Path
+			msgIndex[m.GoName] = indexedMsg{msg: m, src: f.Path}
 		}
 		for _, e := range gf.Enums {
-			if _, exists := enumIndex[e.GoName]; exists {
-				return errorx.NewSentinelf[appTag]("enum name collision: %q defined in both %q and %q; cross-file same-name enums are not supported", e.GoName, enumSrc[e.GoName], f.Path)
+			if prev, exists := enumIndex[e.GoName]; exists {
+				return errorx.NewSentinelf[appTag]("enum name collision: %q defined in both %q and %q; cross-file same-name enums are not supported", e.GoName, prev.src, f.Path)
 			}
-			enumIndex[e.GoName] = e
-			enumSrc[e.GoName] = f.Path
+			enumIndex[e.GoName] = indexedEnum{enum: e, src: f.Path}
 		}
 		flattened = append(flattened, flattenedFile{src: f, gf: gf})
 	}
-	rctx := render.Context{MessageIndex: msgIndex, EnumIndex: enumIndex}
+
+	// Build render indexes from the merged index maps.
+	renderMsgIndex := make(map[string]*transform.GoMessage, len(msgIndex))
+	renderEnumIndex := make(map[string]transform.GoEnum, len(enumIndex))
+	for name, im := range msgIndex {
+		renderMsgIndex[name] = im.msg
+	}
+	for name, ie := range enumIndex {
+		renderEnumIndex[name] = ie.enum
+	}
+	rctx := render.Context{MessageIndex: renderMsgIndex, EnumIndex: renderEnumIndex}
 
 	// Check for cross-type name collisions: a message and an enum with the same
 	// GoName would produce two Go types with the same name in the same package.
-	for goName := range msgIndex {
-		if _, exists := enumIndex[goName]; exists {
-			return errorx.NewSentinelf[appTag]("name collision: %q defined as message in %q and as enum in %q; cross-type same-name types are not supported", goName, msgSrc[goName], enumSrc[goName])
+	for goName, im := range msgIndex {
+		if ie, exists := enumIndex[goName]; exists {
+			return errorx.NewSentinelf[appTag]("name collision: %q defined as message in %q and as enum in %q; cross-type same-name types are not supported", goName, im.src, ie.src)
 		}
 	}
 

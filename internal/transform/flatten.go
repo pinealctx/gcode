@@ -203,25 +203,14 @@ func flattenMessages(msgs []model.Message, pkgName string, outMsgs *[]GoMessage,
 }
 
 // conditionFieldsFor returns the condition field names for an update message.
-// Condition fields are the non-optional, non-repeated scalar/enum fields in the
-// derived update message — gen-proto generates condition_fields as non-optional
-// and all other fields as optional, so this is the authoritative way to identify them.
+// These are carried from the original update_message annotation via update_source_opts,
+// and stored directly in msg.ConditionFields by the parser.
 // Returns nil for non-update messages (UpdateSource == "").
-//
-// If a user hand-writes an update message, they must follow this convention:
-// condition fields (WHERE clause) must be non-optional, other fields must be optional.
-// Violating this convention will cause condition fields to appear in ToMap() output.
 func conditionFieldsFor(msg model.Message) []string {
 	if msg.UpdateSource == "" {
 		return nil
 	}
-	var result []string
-	for _, f := range msg.Fields {
-		if !f.Optional && f.Cardinality != model.CardinalityRepeated {
-			result = append(result, f.Name)
-		}
-	}
-	return result
+	return msg.ConditionFields
 }
 
 // requiredFieldsFor returns the required field names for a create message.

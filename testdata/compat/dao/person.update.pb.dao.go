@@ -16,14 +16,14 @@ type PersonUpdateByName struct {
 	Status     *Status  `json:"status"`
 	Rating     *float32 `json:"rating"`
 	CreatedAt  *int64   `json:"createdAt"`
-	Nickname   *string  `json:"nickname"`
+	Nickname   *string  `json:"nickname,omitempty"`
 	Level      *int32   `json:"level"`
 	Verified   *bool    `json:"verified"`
 	Score      *float32 `json:"score"`
 	UpdatedAt  *int64   `json:"updatedAt"`
 	PrevStatus *Status  `json:"prevStatus"`
 	Email      *string  `json:"email"`
-	Role       *string  `json:"role"`
+	Role       *string  `json:"-"`
 	TypeId     *int32   `json:"typeId"`
 }
 

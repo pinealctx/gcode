@@ -1042,7 +1042,7 @@ package test.user;
 import "gcode/options.proto";
 
 message UserUpdateByID {
-  option (gcode.update_source) = "User";
+  option (gcode.update_source_opts) = { source: "User", condition_fields: ["id"] };
 
   int64           id    = 1;
   optional string name  = 2;
@@ -1192,7 +1192,7 @@ package test.user;
 import "gcode/options.proto";
 
 message UserUpdateByID {
-  option (gcode.update_source) = "User";
+  option (gcode.update_source_opts) = { source: "User", condition_fields: ["id"] };
 
   int64           id    = 1;
   optional string name  = 2;
@@ -1218,6 +1218,9 @@ message UserCreate {
 	updateMsg := updateFiles[0].Messages[0]
 	if updateMsg.UpdateSource != "User" {
 		t.Errorf("UpdateSource = %q, want User", updateMsg.UpdateSource)
+	}
+	if len(updateMsg.ConditionFields) != 1 || updateMsg.ConditionFields[0] != "id" {
+		t.Errorf("ConditionFields = %v, want [id]", updateMsg.ConditionFields)
 	}
 	if updateMsg.CreateSource != "" {
 		t.Errorf("CreateSource should be empty, got %q", updateMsg.CreateSource)

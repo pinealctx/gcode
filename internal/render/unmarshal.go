@@ -331,6 +331,7 @@ func writeUnmarshalPackedScalar(b *strings.Builder, accessor string, fieldNum in
 	switch scalar {
 	case model.ScalarFixed32, model.ScalarSfixed32, model.ScalarFloat:
 		fmt.Fprintf(b, "\t\t\tif len(packed)%%4 != 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrPackedLen) }\n", fieldNum)
+		// Step-controlled loop (pi += 4) cannot be expressed with for range; old-style loop is intentional.
 		fmt.Fprintf(b, "\t\t\tfor pi := 0; pi < len(packed); pi += 4 {\n")
 		// ConsumeFixed32 cannot truncate here: packed length is pre-validated to be a multiple of 4.
 		fmt.Fprintf(b, "\t\t\t\tv, _ := runtime.ConsumeFixed32(packed[pi:])\n")
@@ -338,6 +339,7 @@ func writeUnmarshalPackedScalar(b *strings.Builder, accessor string, fieldNum in
 		fmt.Fprintf(b, "\t\t\t}\n")
 	case model.ScalarFixed64, model.ScalarSfixed64, model.ScalarDouble:
 		fmt.Fprintf(b, "\t\t\tif len(packed)%%8 != 0 { return 0, fmt.Errorf(\"field %d: %%w\", runtime.ErrPackedLen) }\n", fieldNum)
+		// Step-controlled loop (pi += 8) cannot be expressed with for range; old-style loop is intentional.
 		fmt.Fprintf(b, "\t\t\tfor pi := 0; pi < len(packed); pi += 8 {\n")
 		// ConsumeFixed64 cannot truncate here: packed length is pre-validated to be a multiple of 8.
 		fmt.Fprintf(b, "\t\t\t\tv, _ := runtime.ConsumeFixed64(packed[pi:])\n")

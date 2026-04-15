@@ -230,14 +230,13 @@ If you write a `*.update.proto` file manually (instead of using `gcode gen-proto
 
 #### Cross-package references
 
-`gcode gen-proto` automatically resolves cross-file enum and message references. If a field's type is defined in another proto file, the generated `*.update.proto` or `*.create.proto` automatically includes the required `import` statement.
+`gcode gen-proto` propagates imports from the schema file to the generated `*.create.proto` and `*.update.proto`. If the schema file imports `common.proto`, both derived files will also import `common.proto` — no manual import management needed.
 
 ```proto
-// ✅ enum defined in a separate proto file
-// common.proto:
+// common.proto — shared enum definitions
 enum Status { STATUS_UNSPECIFIED = 0; STATUS_ACTIVE = 1; STATUS_INACTIVE = 2; }
 
-// user.proto:
+// user.meta.proto — schema file
 import "common.proto";
 message User {
   Status status = 1;
@@ -246,7 +245,7 @@ message User {
 // Generated user.update.proto automatically includes: import "common.proto";
 ```
 
-No manual `import` management is needed for derived proto files.
+The mechanism is straightforward: `gen-proto` only parses `.meta.proto` files. Any file imported by a schema file (e.g. `common.proto`) is resolved automatically by protocompile as a dependency. The generated create/update protos inherit all non-system imports from the schema file directly.
 
 The `Validate()` method of an update derived message uses validate rules copied from the schema by `gen-proto`. The rules are read directly from the derived message's own proto fields — no cross-file lookup. Behavior:
 
@@ -280,8 +279,10 @@ cache.Set(key, person)
 
 `ApplyTo()` handles pointer type differences between the update and source structs:
 - **Optional scalar/enum** (`*T` → `T`): nil-guard + dereference — only set when provided
-- **Optional pointer** (`*T` → `*T`): nil-guard + pointer assign — shared reference
+- **Optional pointer** (`*T` → `*T`): nil-guard + pointer assign — shared reference (modifying one affects the other)
 - **Repeated/bytes** (`[]T`): nil-guard — distinguishes "not provided" (nil) from "set to empty"
+
+> **Memory semantics**: Like `ToEntity()`, `ApplyTo()` is not a deep copy. Ptr-to-ptr fields and repeated/bytes fields are assigned by reference, sharing memory between the update struct and the entity.
 
 ---
 
@@ -362,10 +363,12 @@ cache.Set(key, person)
 ```
 
 `ToEntity()` handles pointer type differences between the create and source structs:
-- **Required field** (`T` → `*T`): takes address — required fields always have a value
+- **Required field** (`T` → `*T`): copy-then-take-address — memory-isolated from the create struct
 - **Optional scalar/enum** (`*T` → `T`): nil-guard + dereference — zero value if not provided
-- **Optional pointer** (`*T` → `*T`): nil-guard + pointer assign — shared reference
-- **Repeated/bytes** (`[]T`): direct assign
+- **Optional pointer** (`*T` → `*T`): nil-guard + pointer assign — shared reference (modifying one affects the other)
+- **Repeated/bytes** (`[]T`): direct assign — shared backing array
+
+> **Memory semantics**: `ToEntity()` is a type conversion, not a deep copy. Repeated and bytes fields share the backing array with the create struct, and ptr-to-ptr fields share the pointer target. If you need full isolation, use `entity := req.ToEntity(); clone := entity.DeepClone()`.
 
 Fields excluded by `ignore_fields` remain at their zero values in the returned entity.
 
@@ -654,14 +657,20 @@ message BatchRequest {
 
 #### items — apply constraints to each element
 
-`items` supports the same constraints as the corresponding scalar type:
+`items` supports the same constraints as the corresponding scalar type, including `in`/`not_in`:
 
 ```proto
 message TagList {
   repeated string tags = 1 [
     (buf.validate.field).repeated.min_items = 1,
     (buf.validate.field).repeated.items.string.min_len = 1,   // each tag non-empty
-    (buf.validate.field).repeated.items.string.max_len = 50   // each tag max 50 bytes
+    (buf.validate.field).repeated.items.string.max_len = 50,  // each tag max 50 bytes
+    (buf.validate.field).repeated.items.string.not_in = "admin"  // each tag not "admin"
+  ];
+  repeated int32 scores = 2 [
+    (buf.validate.field).repeated.items.int32.in = 1,  // each score must be 1, 2, or 3
+    (buf.validate.field).repeated.items.int32.in = 2,
+    (buf.validate.field).repeated.items.int32.in = 3
   ];
 }
 ```

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"regexp"
 
 	"github.com/pinealctx/x/errorx"
@@ -139,7 +140,10 @@ func parseFieldConstraints(fc *dynamicpb.Message, kind protoreflect.Kind, fieldF
 		// repeated is handled separately below
 
 	default:
-		// unsupported kinds: no constraints
+		// GroupKind and MapKind are rejected earlier in the pipeline (mapMessage rejects
+		// map entries; proto2 groups are not supported). Panic here to catch any future
+		// kind additions that slip through without explicit handling.
+		panic(fmt.Sprintf("parseFieldConstraints: unhandled field kind %v for field %q", kind, fieldFullName))
 	}
 
 	// repeated constraints
@@ -383,11 +387,35 @@ func parseItemConstraints(fc *dynamicpb.Message, fieldFullName string) (*model.V
 		parseSignedIntRules(r, opts)
 		hasAny = true
 	}
+	if r := getMessageField(fc, "sint32"); r != nil {
+		parseSignedIntRules(r, opts)
+		hasAny = true
+	}
+	if r := getMessageField(fc, "sint64"); r != nil {
+		parseSignedIntRules(r, opts)
+		hasAny = true
+	}
+	if r := getMessageField(fc, "sfixed32"); r != nil {
+		parseSignedIntRules(r, opts)
+		hasAny = true
+	}
+	if r := getMessageField(fc, "sfixed64"); r != nil {
+		parseSignedIntRules(r, opts)
+		hasAny = true
+	}
 	if r := getMessageField(fc, "uint32"); r != nil {
 		parseUnsignedIntRules(r, opts)
 		hasAny = true
 	}
 	if r := getMessageField(fc, "uint64"); r != nil {
+		parseUnsignedIntRules(r, opts)
+		hasAny = true
+	}
+	if r := getMessageField(fc, "fixed32"); r != nil {
+		parseUnsignedIntRules(r, opts)
+		hasAny = true
+	}
+	if r := getMessageField(fc, "fixed64"); r != nil {
 		parseUnsignedIntRules(r, opts)
 		hasAny = true
 	}

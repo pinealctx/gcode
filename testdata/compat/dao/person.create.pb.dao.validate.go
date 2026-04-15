@@ -43,7 +43,7 @@ func (x *PersonCreate) Validate() error {
 	if x.Email != nil {
 		if *x.Email != "" {
 			if !validateruntime.IsEmail(*x.Email) {
-				return &validateruntime.ValidationError{Field: "email", Rule: "email", Message: validateruntime.MsgOr("", "must be a valid email address")}
+				return &validateruntime.ValidationError{Field: "email", Rule: "email", Message: validateruntime.MsgOr("invalid email address", "must be a valid email address")}
 			}
 		}
 	}

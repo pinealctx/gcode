@@ -449,6 +449,64 @@ func TestAllValidate_DGt(t *testing.T) {
 	}
 }
 
+// TestAllRepeatedUpdate_Valid verifies that a fully valid AllRepeatedUpdate passes Validate().
+func TestAllRepeatedUpdate_Valid(t *testing.T) {
+	t.Parallel()
+	u := &dao.AllRepeatedUpdate{
+		RSint32:   []int32{-100, 0},
+		RSfixed32: []int32{-1, -5},
+		RDouble:   []float64{0.6, 1.0},
+		RBytes:    [][]byte{{0x01}, {0x02}},
+		REnum:     []dao.Status{dao.Status_STATUS_UNSPECIFIED, dao.Status_STATUS_ACTIVE},
+	}
+	if err := u.Validate(); err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+}
+
+// TestAllRepeatedUpdate_ItemsConstraints verifies items-level constraints on repeated fields.
+func TestAllRepeatedUpdate_ItemsConstraints(t *testing.T) {
+	t.Parallel()
+
+	// fail: sint32 item below gte=-100
+	u1 := &dao.AllRepeatedUpdate{RSint32: []int32{-101}}
+	assertVE(t, u1.Validate(), "r_sint32[0]", "gte")
+
+	// fail: sfixed32 item >= 0 (lt=0)
+	u2 := &dao.AllRepeatedUpdate{RSfixed32: []int32{0}}
+	assertVE(t, u2.Validate(), "r_sfixed32[0]", "lt")
+
+	// fail: double item <= 0.5 (gt=0.5)
+	u3 := &dao.AllRepeatedUpdate{RDouble: []float64{0.5}}
+	assertVE(t, u3.Validate(), "r_double[0]", "gt")
+
+	// fail: bytes item with len < 1 (min_len=1)
+	u4 := &dao.AllRepeatedUpdate{RBytes: [][]byte{{}}}
+	assertVE(t, u4.Validate(), "r_bytes[0]", "min_len")
+
+	// fail: undefined enum value (defined_only)
+	u5 := &dao.AllRepeatedUpdate{REnum: []dao.Status{dao.Status(999)}}
+	assertVE(t, u5.Validate(), "r_enum[0]", "defined_only")
+
+	// pass: all defined enum values accepted
+	for _, v := range []dao.Status{
+		dao.Status_STATUS_UNSPECIFIED,
+		dao.Status_STATUS_ACTIVE,
+		dao.Status_STATUS_INACTIVE,
+	} {
+		u := &dao.AllRepeatedUpdate{REnum: []dao.Status{v}}
+		if err := u.Validate(); err != nil {
+			t.Errorf("r_enum=%v should pass defined_only, got: %v", v, err)
+		}
+	}
+
+	// pass: empty slices skip items validation
+	u6 := &dao.AllRepeatedUpdate{}
+	if err := u6.Validate(); err != nil {
+		t.Errorf("empty AllRepeatedUpdate should pass, got: %v", err)
+	}
+}
+
 // TestAllValidate_SPattern verifies string pattern constraint.
 func TestAllValidate_SPattern(t *testing.T) {
 	t.Parallel()
@@ -475,5 +533,85 @@ func TestAllValidate_SPattern(t *testing.T) {
 	a4.SPattern = ""
 	if err := a4.Validate(); err != nil {
 		t.Errorf("s_pattern=\"\" (zero value) should skip check, got: %v", err)
+	}
+}
+
+// TestAllValidate_ItemsInNotIn verifies items-level in/not_in constraints on repeated fields.
+func TestAllValidate_ItemsInNotIn(t *testing.T) {
+	t.Parallel()
+
+	// --- r_str_in: items must be "foo" or "bar" ---
+
+	// fail: value not in allowed set
+	a1 := validAllValidate()
+	a1.RStrIn = []string{"baz"}
+	assertVE(t, a1.Validate(), "r_str_in[0]", "in")
+
+	// fail: second element not in set
+	a2 := validAllValidate()
+	a2.RStrIn = []string{"foo", "other"}
+	assertVE(t, a2.Validate(), "r_str_in[1]", "in")
+
+	// pass: all elements in allowed set
+	a3 := validAllValidate()
+	a3.RStrIn = []string{"foo", "bar", "foo"}
+	if err := a3.Validate(); err != nil {
+		t.Errorf("r_str_in all valid should pass, got: %v", err)
+	}
+
+	// pass: empty slice skips items validation
+	a4 := validAllValidate()
+	a4.RStrIn = nil
+	if err := a4.Validate(); err != nil {
+		t.Errorf("r_str_in nil should pass, got: %v", err)
+	}
+
+	// --- r_str_not_in: items must not be "bad" ---
+
+	// fail: forbidden value present
+	b1 := validAllValidate()
+	b1.RStrNotIn = []string{"ok", "bad"}
+	assertVE(t, b1.Validate(), "r_str_not_in[1]", "not_in")
+
+	// pass: no forbidden values
+	b2 := validAllValidate()
+	b2.RStrNotIn = []string{"ok", "fine"}
+	if err := b2.Validate(); err != nil {
+		t.Errorf("r_str_not_in no forbidden values should pass, got: %v", err)
+	}
+
+	// pass: nil slice skips items validation
+	b3 := validAllValidate()
+	b3.RStrNotIn = nil
+	if err := b3.Validate(); err != nil {
+		t.Errorf("r_str_not_in nil should pass, got: %v", err)
+	}
+
+	// --- r_int_in: items must be 1, 2, or 3 ---
+
+	// fail: value not in allowed set
+	c1 := validAllValidate()
+	c1.RIntIn = []int32{4}
+	assertVE(t, c1.Validate(), "r_int_in[0]", "in")
+
+	// pass: all elements in allowed set
+	c2 := validAllValidate()
+	c2.RIntIn = []int32{1, 2, 3, 1}
+	if err := c2.Validate(); err != nil {
+		t.Errorf("r_int_in all valid should pass, got: %v", err)
+	}
+
+	// --- r_uint_not_in: items must not be 0 ---
+
+	// fail: zero value present
+	d1 := validAllValidate()
+	d1.RUintNotIn = []uint32{1, 0}
+	assertVE(t, d1.Validate(), "r_uint_not_in[1]", "not_in")
+
+	// pass: no zero values
+	d2 := validAllValidate()
+	d2.RUintNotIn = []uint32{1, 2, 3}
+	if err := d2.Validate(); err != nil {
+		t.Errorf("r_uint_not_in no zero values should pass, got: %v", err)
 	}
 }

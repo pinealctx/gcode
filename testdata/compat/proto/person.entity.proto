@@ -31,7 +31,7 @@ message Person {
   float rating = 8;
   int64 created_at = 9 [(gcode.field).gorm.column = "created_ts"];
   bytes avatar = 10;
-  optional string nickname = 11;
+  optional string nickname = 11 [(gcode.field).json.omitempty = true];
   optional int32 level = 12;
   optional bool verified = 13;
   optional float score = 14;
@@ -39,7 +39,7 @@ message Person {
   optional Status prev_status = 16;
   optional bytes fingerprint = 17;
   string email = 18;
-  string role = 19;
+  string role = 19 [(gcode.field).json.ignore = true];
   int32 type_id = 20;
 }
 

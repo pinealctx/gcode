@@ -615,11 +615,12 @@ func TestApplyToNoContext(t *testing.T) {
 func TestConditionFieldsPopulatedByFlatten(t *testing.T) {
 	t.Parallel()
 
-	// Verify conditionFieldsFor correctly identifies non-optional fields.
+	// Verify conditionFieldsFor returns ConditionFields directly from the model.
 	msg := model.Message{
-		Name:         "UserUpdateByID",
-		FullName:     "test.UserUpdateByID",
-		UpdateSource: "User",
+		Name:            "UserUpdateByID",
+		FullName:        "test.UserUpdateByID",
+		UpdateSource:    "User",
+		ConditionFields: []string{"id"},
 		Fields: []model.Field{
 			{Name: "id", Cardinality: model.CardinalitySingular, Optional: false, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}},
 			{Name: "name", Cardinality: model.CardinalitySingular, Optional: true, Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString}},

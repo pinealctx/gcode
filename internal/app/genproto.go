@@ -34,37 +34,28 @@ func RunGenProto(ctx context.Context, args []string) error {
 	}
 
 	if len(scanResult.Files) == 0 {
-		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, source.ErrNoProtoFiles)
+		return fmt.Errorf("no .proto files found in %q: %w", cfg.InputDir, ErrNoProtoFiles)
 	}
 
-	// Exclude previously generated intermediate protos from parsing to avoid
-	// symbol conflicts with their source schema files.
-	inputFiles := filterSourceProtos(scanResult.Files)
+	// Parse only .meta.proto schema files. protocompile resolves their imports
+	// (e.g. common.proto) automatically. Non-schema files (service protos, etc.)
+	// are intentionally excluded: they may import generated files that do not
+	// exist yet, and gen-proto does not need them.
+	metaFiles := filterMetaProtos(scanResult.Files)
+	if len(metaFiles) == 0 {
+		return nil // no schema files — nothing to generate
+	}
 
-	// Parse source files to discover schema files. Non-schema files that import
-	// generated files not yet on disk will cause parse failures; in that case
-	// fall back to parsing only .meta.proto files.
-	firstPass, err := parser.Parse(ctx, []string{scanResult.ImportPath}, inputFiles)
+	parsed, err := parser.Parse(ctx, []string{scanResult.ImportPath}, metaFiles)
 	if err != nil {
-		firstErr := err
-		metaFiles := filterMetaProtos(inputFiles)
-		if len(metaFiles) == 0 {
-			return fmt.Errorf("parse proto files: %w", firstErr)
-		}
-		firstPass, err = parser.Parse(ctx, []string{scanResult.ImportPath}, metaFiles)
-		if err != nil {
-			return fmt.Errorf("full parse failed (%v); meta-only parse also failed: %w", firstErr, err)
-		}
+		return fmt.Errorf("parse schema files: %w", err)
 	}
 
-	// Build type index and generate only from schema files.
-	typeIdx := typeSourceIndex(firstPass)
-
-	for _, f := range firstPass {
+	for _, f := range parsed {
 		if !f.IsSchema {
 			continue
 		}
-		if err := generateIntermediateProtos(f, scanResult.ImportPath, typeIdx); err != nil {
+		if err := generateIntermediateProtos(f, scanResult.ImportPath); err != nil {
 			return fmt.Errorf("generate intermediate protos for %q: %w", f.Path, err)
 		}
 	}
@@ -76,7 +67,7 @@ func RunGenProto(ctx context.Context, args []string) error {
 // *.update.proto for a schema file. Any previously generated intermediate proto
 // files for this base name are removed first, so that deleting an option from
 // the source proto does not leave stale generated files behind.
-func generateIntermediateProtos(f model.File, outputDir string, typeIdx map[string]string) error {
+func generateIntermediateProtos(f model.File, outputDir string) error {
 	// Collect all messages with options (including nested).
 	var updateMsgs []model.Message
 	var createMsgs []model.Message
@@ -104,7 +95,7 @@ func generateIntermediateProtos(f model.File, outputDir string, typeIdx map[stri
 	}
 
 	if len(updateMsgs) > 0 {
-		extImports := collectExternalImports(updateMsgs, typeIdx, f.Path)
+		extImports := schemaExternalImports(f)
 		content, err := buildUpdateProto(f, baseName, updateMsgs, extImports)
 		if err != nil {
 			return fmt.Errorf("build update proto: %w", err)
@@ -115,7 +106,7 @@ func generateIntermediateProtos(f model.File, outputDir string, typeIdx map[stri
 	}
 
 	if len(createMsgs) > 0 {
-		extImports := collectExternalImports(createMsgs, typeIdx, f.Path)
+		extImports := schemaExternalImports(f)
 		content, err := buildCreateProto(f, baseName, createMsgs, extImports)
 		if err != nil {
 			return fmt.Errorf("build create proto: %w", err)
@@ -239,11 +230,19 @@ func writeEntityMessage(sb *strings.Builder, msg model.Message) error {
 	return nil
 }
 
-// entityFieldLine renders a field for entity proto: gorm annotations, no validate.
+// entityFieldLine renders a field for entity proto: gorm and json annotations, no validate.
 // Preserves optional/repeated/HasPresence from the source field.
 func entityFieldLine(f model.Field, fieldNum int) (string, error) {
-	opts := gormFieldOpts(f)
-	return formatFieldDecl(f, f.Optional || f.HasPresence, fieldNum, opts), nil
+	var opts []string
+	if f.GormOptions != nil && f.GormOptions.Column != "" {
+		opts = append(opts, fmt.Sprintf("(gcode.field).gorm.column = %q", f.GormOptions.Column))
+	}
+	opts = appendJSONAnnotations(opts, f)
+	optStr := ""
+	if len(opts) > 0 {
+		optStr = " [" + strings.Join(opts, ", ") + "]"
+	}
+	return formatFieldDecl(f, f.Optional || f.HasPresence, fieldNum, optStr), nil
 }
 
 // formatFieldDecl renders a proto field declaration with the given options string.
@@ -269,6 +268,41 @@ func gormFieldOpts(f model.Field) string {
 		return " [(gcode.field).gorm.column = " + strconv.Quote(f.GormOptions.Column) + "]"
 	}
 	return ""
+}
+
+// appendJSONAnnotations appends json.ignore and json.omitempty gcode annotations.
+func appendJSONAnnotations(opts []string, f model.Field) []string {
+	if f.JSONOptions == nil {
+		return opts
+	}
+	if f.JSONOptions.Ignore {
+		opts = append(opts, "(gcode.field).json.ignore = true")
+	}
+	if f.JSONOptions.Omitempty {
+		opts = append(opts, "(gcode.field).json.omitempty = true")
+	}
+	return opts
+}
+
+// schemaExternalImports returns the import paths from a schema file that should
+// be propagated to generated create/update proto files. System imports
+// (buf/validate, gcode/options) are excluded: they are added explicitly by
+// the builders. References to other .meta.proto files are rewritten to
+// .entity.proto so that cross-schema type references resolve correctly in
+// the generated create/update protos (protobuf imports are not transitive).
+func schemaExternalImports(f model.File) []string {
+	var result []string
+	for _, imp := range f.Imports {
+		if imp.Path == "buf/validate/validate.proto" || imp.Path == "gcode/options.proto" {
+			continue
+		}
+		if strings.HasSuffix(imp.Path, ".meta.proto") {
+			result = append(result, metaToEntityImport(imp.Path))
+			continue
+		}
+		result = append(result, imp.Path)
+	}
+	return result
 }
 
 // buildUpdateProto generates the content of a *.update.proto file.
@@ -335,7 +369,17 @@ func buildUpdateMessage(msg model.Message, opt model.UpdateMessageOptions) (stri
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "message %s {\n", opt.Name)
-	fmt.Fprintf(&sb, "  option (gcode.update_source) = %q;\n\n", msg.Name)
+	// Write update_source_opts with source and condition_fields.
+	if len(opt.ConditionFields) > 0 {
+		quotedFields := make([]string, len(opt.ConditionFields))
+		for i, cf := range opt.ConditionFields {
+			quotedFields[i] = strconv.Quote(cf)
+		}
+		fmt.Fprintf(&sb, "  option (gcode.update_source_opts) = { source: %q, condition_fields: [%s] };\n\n",
+			msg.Name, strings.Join(quotedFields, ", "))
+	} else {
+		fmt.Fprintf(&sb, "  option (gcode.update_source_opts) = { source: %q };\n\n", msg.Name)
+	}
 
 	fieldNum := 1
 	for _, f := range msg.Fields {
@@ -386,16 +430,19 @@ func buildCreateMessage(msg model.Message, opt model.CreateMessageOptions) (stri
 	return sb.String(), nil
 }
 
-// derivedFieldLine renders a field for create/update proto with validate and
-// gorm annotations. Gorm annotations are preserved so that generated Go code
-// can use gorm column names in ToMap().
+// derivedFieldLine renders a field for create/update proto with gorm, json,
+// validate annotations, and validate_message. Gorm annotations are preserved
+// so that generated Go code can use gorm column names in ToMap().
 func derivedFieldLine(f model.Field, makeOptional bool, fieldNum int) (string, error) {
 	var opts []string
 	if f.GormOptions != nil && f.GormOptions.Column != "" {
 		opts = append(opts, fmt.Sprintf("(gcode.field).gorm.column = %q", f.GormOptions.Column))
 	}
+	opts = appendJSONAnnotations(opts, f)
 	opts = appendValidateAnnotations(opts, f)
-
+	if f.ValidateMessage != "" {
+		opts = append(opts, fmt.Sprintf("(gcode.field).validate_message = %q", f.ValidateMessage))
+	}
 	optStr := ""
 	if len(opts) > 0 {
 		optStr = " [" + strings.Join(opts, ", ") + "]"
@@ -441,6 +488,10 @@ func appendValidateAnnotations(opts []string, f model.Field) []string {
 			opts = appendFloatValidate(opts, v, "float")
 		case model.ScalarDouble:
 			opts = appendFloatValidate(opts, v, "double")
+		case model.ScalarBool:
+			// no validate constraints for bool
+		default:
+			panic(fmt.Sprintf("appendValidateAnnotations: unsupported scalar type %v", f.Type.Scalar))
 		}
 	case model.FieldKindEnum:
 		if v.DefinedOnly {
@@ -448,6 +499,8 @@ func appendValidateAnnotations(opts []string, f model.Field) []string {
 		}
 	case model.FieldKindMessage:
 		// required is already handled above.
+	default:
+		panic(fmt.Sprintf("appendValidateAnnotations: unsupported field kind %v", f.Type.Kind))
 	}
 
 	// Repeated constraints apply regardless of element type.
@@ -458,7 +511,7 @@ func appendValidateAnnotations(opts []string, f model.Field) []string {
 		opts = append(opts, fmt.Sprintf("(buf.validate.field).repeated.max_items = %d", *v.MaxItems))
 	}
 	if v.Items != nil && f.Cardinality == model.CardinalityRepeated {
-		opts = appendItemsValidate(opts, v.Items)
+		opts = appendItemsValidate(opts, v.Items, f.Type)
 	}
 
 	return opts
@@ -466,116 +519,165 @@ func appendValidateAnnotations(opts []string, f model.Field) []string {
 
 // appendStringValidate appends string constraint annotations.
 func appendStringValidate(opts []string, v *model.ValidateFieldOptions) []string {
+	return stringConstraints(opts, v, "(buf.validate.field).string")
+}
+
+// stringConstraints appends string constraint annotations with the given prefix.
+func stringConstraints(opts []string, v *model.ValidateFieldOptions, prefix string) []string {
 	if v.MinLen != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).string.min_len = %d", *v.MinLen))
+		opts = append(opts, fmt.Sprintf("%s.min_len = %d", prefix, *v.MinLen))
 	}
 	if v.MaxLen != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).string.max_len = %d", *v.MaxLen))
+		opts = append(opts, fmt.Sprintf("%s.max_len = %d", prefix, *v.MaxLen))
 	}
 	if v.Pattern != "" {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).string.pattern = %q", v.Pattern))
+		opts = append(opts, fmt.Sprintf("%s.pattern = %q", prefix, v.Pattern))
 	}
 	if v.Email {
-		opts = append(opts, "(buf.validate.field).string.email = true")
+		opts = append(opts, prefix+".email = true")
 	}
 	if v.URI {
-		opts = append(opts, "(buf.validate.field).string.uri = true")
+		opts = append(opts, prefix+".uri = true")
 	}
 	for _, s := range v.InStr {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).string.in = %q", s))
+		opts = append(opts, fmt.Sprintf("%s.in = %q", prefix, s))
 	}
 	for _, s := range v.NotInStr {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).string.not_in = %q", s))
+		opts = append(opts, fmt.Sprintf("%s.not_in = %q", prefix, s))
 	}
 	return opts
 }
 
 // appendBytesValidate appends bytes constraint annotations.
 func appendBytesValidate(opts []string, v *model.ValidateFieldOptions) []string {
+	return bytesConstraints(opts, v, "(buf.validate.field).bytes")
+}
+
+// bytesConstraints appends bytes constraint annotations with the given prefix.
+func bytesConstraints(opts []string, v *model.ValidateFieldOptions, prefix string) []string {
 	if v.MinLen != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).bytes.min_len = %d", *v.MinLen))
+		opts = append(opts, fmt.Sprintf("%s.min_len = %d", prefix, *v.MinLen))
 	}
 	if v.MaxLen != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).bytes.max_len = %d", *v.MaxLen))
+		opts = append(opts, fmt.Sprintf("%s.max_len = %d", prefix, *v.MaxLen))
 	}
 	return opts
 }
 
 // appendSignedIntValidate appends signed integer constraint annotations.
 func appendSignedIntValidate(opts []string, v *model.ValidateFieldOptions, scalar model.ScalarKind) []string {
-	typeName := string(scalar)
+	return signedIntConstraints(opts, v, string(scalar))
+}
+
+// signedIntConstraints appends signed integer constraint annotations.
+// typePath is the proto type path segment (e.g. "int32" or "repeated.items.int64").
+func signedIntConstraints(opts []string, v *model.ValidateFieldOptions, typePath string) []string {
 	if v.GTInt != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gt = %d", typeName, *v.GTInt))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gt = %d", typePath, *v.GTInt))
 	}
 	if v.GTEInt != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gte = %d", typeName, *v.GTEInt))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gte = %d", typePath, *v.GTEInt))
 	}
 	if v.LTInt != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lt = %d", typeName, *v.LTInt))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lt = %d", typePath, *v.LTInt))
 	}
 	if v.LTEInt != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lte = %d", typeName, *v.LTEInt))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lte = %d", typePath, *v.LTEInt))
 	}
 	for _, n := range v.InInt {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.in = %d", typeName, n))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.in = %d", typePath, n))
 	}
 	for _, n := range v.NotInInt {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.not_in = %d", typeName, n))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.not_in = %d", typePath, n))
 	}
 	return opts
 }
 
 // appendUnsignedIntValidate appends unsigned integer constraint annotations.
 func appendUnsignedIntValidate(opts []string, v *model.ValidateFieldOptions, scalar model.ScalarKind) []string {
-	typeName := string(scalar)
+	return unsignedIntConstraints(opts, v, string(scalar))
+}
+
+// unsignedIntConstraints appends unsigned integer constraint annotations.
+// typePath is the proto type path segment (e.g. "uint32" or "repeated.items.uint64").
+func unsignedIntConstraints(opts []string, v *model.ValidateFieldOptions, typePath string) []string {
 	if v.GTUint != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gt = %d", typeName, *v.GTUint))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gt = %d", typePath, *v.GTUint))
 	}
 	if v.GTEUint != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gte = %d", typeName, *v.GTEUint))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gte = %d", typePath, *v.GTEUint))
 	}
 	if v.LTUint != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lt = %d", typeName, *v.LTUint))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lt = %d", typePath, *v.LTUint))
 	}
 	if v.LTEUint != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lte = %d", typeName, *v.LTEUint))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lte = %d", typePath, *v.LTEUint))
 	}
 	for _, n := range v.InUint {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.in = %d", typeName, n))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.in = %d", typePath, n))
 	}
 	for _, n := range v.NotInUint {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.not_in = %d", typeName, n))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.not_in = %d", typePath, n))
 	}
 	return opts
 }
 
 // appendFloatValidate appends float/double constraint annotations.
 func appendFloatValidate(opts []string, v *model.ValidateFieldOptions, typeName string) []string {
+	return floatConstraints(opts, v, typeName)
+}
+
+// floatConstraints appends float/double constraint annotations.
+// typePath is the proto type path segment (e.g. "float" or "repeated.items.double").
+func floatConstraints(opts []string, v *model.ValidateFieldOptions, typePath string) []string {
 	if v.GTFloat != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gt = %s", typeName, formatFloat(*v.GTFloat)))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gt = %s", typePath, formatFloat(*v.GTFloat)))
 	}
 	if v.GTEFloat != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gte = %s", typeName, formatFloat(*v.GTEFloat)))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.gte = %s", typePath, formatFloat(*v.GTEFloat)))
 	}
 	if v.LTFloat != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lt = %s", typeName, formatFloat(*v.LTFloat)))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lt = %s", typePath, formatFloat(*v.LTFloat)))
 	}
 	if v.LTEFloat != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lte = %s", typeName, formatFloat(*v.LTEFloat)))
+		opts = append(opts, fmt.Sprintf("(buf.validate.field).%s.lte = %s", typePath, formatFloat(*v.LTEFloat)))
 	}
 	return opts
 }
 
-// appendItemsValidate appends repeated items constraint annotations.
-func appendItemsValidate(opts []string, items *model.ValidateFieldOptions) []string {
-	if items.MinLen != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).repeated.items.string.min_len = %d", *items.MinLen))
-	}
-	if items.GTEInt != nil {
-		opts = append(opts, fmt.Sprintf("(buf.validate.field).repeated.items.int32.gte = %d", *items.GTEInt))
-	}
-	if items.DefinedOnly {
-		opts = append(opts, "(buf.validate.field).repeated.items.enum.defined_only = true")
+// appendItemsValidate appends repeated items constraint annotations, dispatching
+// on the element type to generate type-correct proto annotations.
+func appendItemsValidate(opts []string, items *model.ValidateFieldOptions, elemType model.FieldType) []string {
+	const base = "(buf.validate.field).repeated.items"
+	switch elemType.Kind {
+	case model.FieldKindScalar:
+		switch elemType.Scalar {
+		case model.ScalarString:
+			return stringConstraints(opts, items, base+".string")
+		case model.ScalarBytes:
+			return bytesConstraints(opts, items, base+".bytes")
+		case model.ScalarInt32, model.ScalarInt64, model.ScalarSint32, model.ScalarSint64,
+			model.ScalarSfixed32, model.ScalarSfixed64:
+			return signedIntConstraints(opts, items, "repeated.items."+string(elemType.Scalar))
+		case model.ScalarUint32, model.ScalarUint64, model.ScalarFixed32, model.ScalarFixed64:
+			return unsignedIntConstraints(opts, items, "repeated.items."+string(elemType.Scalar))
+		case model.ScalarFloat:
+			return floatConstraints(opts, items, "repeated.items.float")
+		case model.ScalarDouble:
+			return floatConstraints(opts, items, "repeated.items.double")
+		case model.ScalarBool:
+			// no element-level constraints for bool
+		default:
+			panic(fmt.Sprintf("appendItemsValidate: unsupported scalar type %v", elemType.Scalar))
+		}
+	case model.FieldKindEnum:
+		if items.DefinedOnly {
+			opts = append(opts, base+".enum.defined_only = true")
+		}
+	case model.FieldKindMessage:
+		// no element-level constraints for message type
+	default:
+		panic(fmt.Sprintf("appendItemsValidate: unsupported field kind %v", elemType.Kind))
 	}
 	return opts
 }
@@ -594,58 +696,22 @@ func protoTypeName(f model.Field) string {
 	switch f.Type.Kind {
 	case model.FieldKindScalar:
 		return string(f.Type.Scalar)
-	case model.FieldKindEnum:
+	case model.FieldKindEnum, model.FieldKindMessage:
 		return f.Type.Name
 	default:
-		return f.Type.Name
+		panic(fmt.Sprintf("protoTypeName: unknown field kind %v", f.Type.Kind))
 	}
 }
 
-// typeSourceIndex builds a FullName → source proto file path mapping from all
-// parsed files. Used by collectExternalImports to resolve cross-file type
-// references in derived messages.
-func typeSourceIndex(files []model.File) map[string]string {
-	idx := make(map[string]string)
+// filterMetaProtos returns only files ending in .meta.proto.
+func filterMetaProtos(files []string) []string {
+	var result []string
 	for _, f := range files {
-		collectTypeSources(f.Messages, f.Enums, f.Path, idx)
-	}
-	return idx
-}
-
-// collectTypeSources recursively maps message and enum FullNames to their
-// source proto file path.
-func collectTypeSources(msgs []model.Message, enums []model.Enum, filePath string, idx map[string]string) {
-	for _, msg := range msgs {
-		idx[msg.FullName] = filePath
-		collectTypeSources(msg.Messages, msg.Enums, filePath, idx)
-	}
-	for _, enum := range enums {
-		idx[enum.FullName] = filePath
-	}
-}
-
-// collectExternalImports scans the fields of derived messages and returns
-// the import paths of proto files that define referenced enum or message types
-// from other files.
-func collectExternalImports(msgs []model.Message, typeIdx map[string]string, selfPath string) []string {
-	seen := make(map[string]bool)
-	var imports []string
-	for _, msg := range msgs {
-		for _, f := range msg.Fields {
-			if f.Type.Kind != model.FieldKindEnum && f.Type.Kind != model.FieldKindMessage {
-				continue
-			}
-			srcFile, ok := typeIdx[f.Type.FullName]
-			if !ok || srcFile == selfPath {
-				continue
-			}
-			if !seen[srcFile] {
-				seen[srcFile] = true
-				imports = append(imports, srcFile)
-			}
+		if strings.HasSuffix(f, ".meta.proto") {
+			result = append(result, f)
 		}
 	}
-	return imports
+	return result
 }
 
 // protoBaseName strips the .proto (and optional .meta) suffix from a relative
@@ -666,45 +732,6 @@ var protoIdentifierRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // into generated proto source.
 func isProtoIdentifier(s string) bool {
 	return protoIdentifierRe.MatchString(s)
-}
-
-// generatedProtoSuffixes lists filename suffixes of intermediate protos generated
-// by gen-proto. These are excluded from the parser input to avoid symbol conflicts
-// with their source schema files.
-var generatedProtoSuffixes = []string{
-	".entity.proto",
-	".create.proto",
-	".update.proto",
-}
-
-// filterSourceProtos removes previously generated intermediate proto files
-// from the input list, keeping only source proto files for parsing.
-func filterSourceProtos(files []string) []string {
-	var result []string
-	for _, f := range files {
-		excluded := false
-		for _, suffix := range generatedProtoSuffixes {
-			if strings.HasSuffix(f, suffix) {
-				excluded = true
-				break
-			}
-		}
-		if !excluded {
-			result = append(result, f)
-		}
-	}
-	return result
-}
-
-// filterMetaProtos returns only files ending in .meta.proto.
-func filterMetaProtos(files []string) []string {
-	var result []string
-	for _, f := range files {
-		if strings.HasSuffix(f, ".meta.proto") {
-			result = append(result, f)
-		}
-	}
-	return result
 }
 
 // metaToEntityImport rewrites a .meta.proto import path to .entity.proto.

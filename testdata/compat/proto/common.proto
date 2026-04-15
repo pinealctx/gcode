@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package compat;
+
+option go_package = "github.com/pinealctx/gcode/testdata/compat/dao;dao";
+
+import "buf/validate/validate.proto";
+
+// ItemKind categorizes an item by its type.
+// Defined in a separate file to test cross-file enum import in gen-proto.
+enum ItemKind {
+  ITEM_KIND_UNSPECIFIED = 0;
+  ITEM_KIND_PHYSICAL    = 1;
+  ITEM_KIND_DIGITAL     = 2;
+}
+
+// Dimensions holds physical size information shared across item types.
+// Defined in a separate file to test cross-file message import in gen-proto.
+message Dimensions {
+  float width  = 1 [(buf.validate.field).float.gte = 0];
+  float height = 2 [(buf.validate.field).float.gte = 0];
+}

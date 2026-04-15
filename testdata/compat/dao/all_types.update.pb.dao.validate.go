@@ -3,6 +3,48 @@
 
 package dao
 
+import (
+	"fmt"
+	"github.com/pinealctx/gcode/validateruntime"
+)
+
 func (x *AllScalarsUpdate) Validate() error {
+	return nil
+}
+
+func (x *AllRepeatedUpdate) Validate() error {
+	for i, v := range x.RSint32 {
+		if v < -100 {
+			return &validateruntime.ValidationError{Field: fmt.Sprintf("r_sint32[%d]", i), Rule: "gte", Message: validateruntime.MsgOr("", "must be >= -100")}
+		}
+	}
+	for i, v := range x.RSfixed32 {
+		if v >= 0 {
+			return &validateruntime.ValidationError{Field: fmt.Sprintf("r_sfixed32[%d]", i), Rule: "lt", Message: validateruntime.MsgOr("", "must be < 0")}
+		}
+	}
+	for i, v := range x.RDouble {
+		if v <= 0.5 {
+			return &validateruntime.ValidationError{Field: fmt.Sprintf("r_double[%d]", i), Rule: "gt", Message: validateruntime.MsgOr("", "must be > 0.5")}
+		}
+	}
+	for i, v := range x.RBytes {
+		if len(v) < 1 {
+			return &validateruntime.ValidationError{Field: fmt.Sprintf("r_bytes[%d]", i), Rule: "min_len", Message: validateruntime.MsgOr("", "length must be >= 1")}
+		}
+	}
+	for _, v := range x.RMessage {
+		if err := v.Validate(); err != nil {
+			return err
+		}
+	}
+	for i, v := range x.REnum {
+		switch v {
+		case Status_STATUS_UNSPECIFIED, Status_STATUS_ACTIVE, Status_STATUS_INACTIVE:
+		// ok
+		default:
+			return &validateruntime.ValidationError{Field: fmt.Sprintf("r_enum[%d]", i), Rule: "defined_only", Message: validateruntime.MsgOr("", "must be a defined enum value")}
+		}
+	}
 	return nil
 }

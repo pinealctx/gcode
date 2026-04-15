@@ -63,13 +63,13 @@ func (r *embeddedResolver) FindFileByPath(path string) (protocompile.SearchResul
 // gcodeExtensions holds the compiled extension descriptors for gcode options.
 // It is initialized once by buildGcodeExtensions and reused across Parse calls.
 type gcodeExtensions struct {
-	schemaExt        protoreflect.ExtensionType // extend google.protobuf.FileOptions    { SchemaFileOptions  schema = 50000 }
-	messageExt       protoreflect.ExtensionType // extend google.protobuf.MessageOptions { GcodeMessageOptions message = 50001 }
-	fieldExt         protoreflect.ExtensionType // extend google.protobuf.FieldOptions  { GcodeFieldOptions   field   = 50002 }
-	updateMessageExt protoreflect.ExtensionType // extend google.protobuf.MessageOptions { repeated UpdateMessageOptions update_message = 50003 }
-	createMessageExt protoreflect.ExtensionType // extend google.protobuf.MessageOptions { repeated CreateMessageOptions create_message = 50004 }
-	updateSourceExt  protoreflect.ExtensionType // extend google.protobuf.MessageOptions { string update_source = 50005 }
-	createSourceExt  protoreflect.ExtensionType // extend google.protobuf.MessageOptions { string create_source = 50006 }
+	schemaExt           protoreflect.ExtensionType // extend google.protobuf.FileOptions    { SchemaFileOptions      schema            = 50000 }
+	messageExt          protoreflect.ExtensionType // extend google.protobuf.MessageOptions { GcodeMessageOptions    message           = 50001 }
+	fieldExt            protoreflect.ExtensionType // extend google.protobuf.FieldOptions  { GcodeFieldOptions      field             = 50002 }
+	updateMessageExt    protoreflect.ExtensionType // extend google.protobuf.MessageOptions { repeated UpdateMessageOptions update_message = 50003 }
+	createMessageExt    protoreflect.ExtensionType // extend google.protobuf.MessageOptions { repeated CreateMessageOptions create_message = 50004 }
+	updateSourceOptsExt protoreflect.ExtensionType // extend google.protobuf.MessageOptions { UpdateSourceOptions update_source_opts = 50007 }
+	createSourceExt     protoreflect.ExtensionType // extend google.protobuf.MessageOptions { string create_source   = 50006 }
 }
 
 // buildGcodeExtensions compiles gcode_options.proto in isolation and extracts
@@ -125,7 +125,8 @@ func compileGcodeExtensions() (*gcodeExtensions, error) {
 	}
 
 	exts := fd.Extensions()
-	var schemaExt, msgExt, fieldExt, updateMsgExt, createMsgExt, updateSrcExt, createSrcExt protoreflect.ExtensionDescriptor
+	var schemaExt, msgExt, fieldExt, updateMsgExt, createMsgExt, updateSrcOptsExt, createSrcExt protoreflect.ExtensionDescriptor
+	// protobuf descriptor API uses Len()/Get(i); no range iterator available.
 	for i := 0; i < exts.Len(); i++ {
 		ext := exts.Get(i)
 		switch ext.Name() {
@@ -139,8 +140,8 @@ func compileGcodeExtensions() (*gcodeExtensions, error) {
 			updateMsgExt = ext
 		case "create_message":
 			createMsgExt = ext
-		case "update_source":
-			updateSrcExt = ext
+		case "update_source_opts":
+			updateSrcOptsExt = ext
 		case "create_source":
 			createSrcExt = ext
 		}
@@ -151,19 +152,19 @@ func compileGcodeExtensions() (*gcodeExtensions, error) {
 	if msgExt == nil || fieldExt == nil {
 		return nil, fmt.Errorf("gcode options proto: missing expected extensions (message=%v, field=%v)", msgExt, fieldExt)
 	}
-	if updateMsgExt == nil || createMsgExt == nil || updateSrcExt == nil || createSrcExt == nil {
-		return nil, fmt.Errorf("gcode options proto: missing phase4 extensions (update_message=%v, create_message=%v, update_source=%v, create_source=%v)",
-			updateMsgExt, createMsgExt, updateSrcExt, createSrcExt)
+	if updateMsgExt == nil || createMsgExt == nil || updateSrcOptsExt == nil || createSrcExt == nil {
+		return nil, fmt.Errorf("gcode options proto: missing phase4 extensions (update_message=%v, create_message=%v, update_source_opts=%v, create_source=%v)",
+			updateMsgExt, createMsgExt, updateSrcOptsExt, createSrcExt)
 	}
 
 	return &gcodeExtensions{
-		schemaExt:        dynamicpb.NewExtensionType(schemaExt),
-		messageExt:       dynamicpb.NewExtensionType(msgExt),
-		fieldExt:         dynamicpb.NewExtensionType(fieldExt),
-		updateMessageExt: dynamicpb.NewExtensionType(updateMsgExt),
-		createMessageExt: dynamicpb.NewExtensionType(createMsgExt),
-		updateSourceExt:  dynamicpb.NewExtensionType(updateSrcExt),
-		createSourceExt:  dynamicpb.NewExtensionType(createSrcExt),
+		schemaExt:           dynamicpb.NewExtensionType(schemaExt),
+		messageExt:          dynamicpb.NewExtensionType(msgExt),
+		fieldExt:            dynamicpb.NewExtensionType(fieldExt),
+		updateMessageExt:    dynamicpb.NewExtensionType(updateMsgExt),
+		createMessageExt:    dynamicpb.NewExtensionType(createMsgExt),
+		updateSourceOptsExt: dynamicpb.NewExtensionType(updateSrcOptsExt),
+		createSourceExt:     dynamicpb.NewExtensionType(createSrcExt),
 	}, nil
 }
 
@@ -300,6 +301,7 @@ func readUpdateMessageOptions(opts proto.Message, ext protoreflect.ExtensionType
 		return nil, nil
 	}
 	result := make([]model.UpdateMessageOptions, 0, listVal.Len())
+	// protobuf descriptor API uses Len()/Get(i); no range iterator available.
 	for i := 0; i < listVal.Len(); i++ {
 		item, ok := listVal.Get(i).Message().(*dynamicpb.Message)
 		if !ok || item == nil {
@@ -336,6 +338,7 @@ func readCreateMessageOptions(opts proto.Message, ext protoreflect.ExtensionType
 		return nil, nil
 	}
 	result := make([]model.CreateMessageOptions, 0, listVal.Len())
+	// protobuf descriptor API uses Len()/Get(i); no range iterator available.
 	for i := 0; i < listVal.Len(); i++ {
 		item, ok := listVal.Get(i).Message().(*dynamicpb.Message)
 		if !ok || item == nil {
@@ -354,7 +357,7 @@ func readCreateMessageOptions(opts proto.Message, ext protoreflect.ExtensionType
 	return result, nil
 }
 
-// readStringMessageOption extracts a string message-level option (e.g. update_source, create_source).
+// readStringMessageOption extracts a string message-level option (e.g. create_source).
 // Returns empty string if not set.
 func readStringMessageOption(opts proto.Message, ext protoreflect.ExtensionType) string {
 	if opts == nil {
@@ -373,6 +376,29 @@ func readStringMessageOption(opts proto.Message, ext protoreflect.ExtensionType)
 		return ""
 	}
 	return s
+}
+
+// readUpdateSourceOptions extracts the UpdateSourceOptions message-level option.
+// Returns the source name and condition_fields. Returns ("", nil) if not set.
+func readUpdateSourceOptions(opts proto.Message, ext protoreflect.ExtensionType) (string, []string) {
+	if opts == nil {
+		return "", nil
+	}
+	msgOpts, ok := opts.(*descriptorpb.MessageOptions)
+	if !ok || msgOpts == nil {
+		return "", nil
+	}
+	if !proto.HasExtension(msgOpts, ext) {
+		return "", nil
+	}
+	val := proto.GetExtension(msgOpts, ext)
+	msg, ok := val.(*dynamicpb.Message)
+	if !ok || msg == nil {
+		return "", nil
+	}
+	source := getStringField(msg, "source")
+	conditionFields := getStringListField(msg, "condition_fields")
+	return source, conditionFields
 }
 
 // getStringListField retrieves a repeated string field by name from a *dynamicpb.Message.
@@ -440,6 +466,7 @@ func compileValidateExtensions() (*validateExtensions, error) {
 
 	exts := fd.Extensions()
 	var fieldExt protoreflect.ExtensionDescriptor
+	// protobuf descriptor API uses Len()/Get(i); no range iterator available.
 	for i := 0; i < exts.Len(); i++ {
 		ext := exts.Get(i)
 		if ext.Name() == "field" {
@@ -520,6 +547,7 @@ func getListField(msg *dynamicpb.Message, name protoreflect.Name) []protoreflect
 		return nil
 	}
 	result := make([]protoreflect.Value, list.Len())
+	// protobuf descriptor API uses Len()/Get(i); no range iterator available.
 	for i := 0; i < list.Len(); i++ {
 		result[i] = list.Get(i)
 	}

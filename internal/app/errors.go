@@ -19,4 +19,6 @@ var (
 	ErrNameEmpty = AppError("name must not be empty")
 	// ErrInvalidName indicates an update_message or create_message annotation name is not a valid proto identifier.
 	ErrInvalidName = AppError("not a valid proto identifier")
+	// ErrNoProtoFiles indicates the input directory contains no .proto files.
+	ErrNoProtoFiles = AppError("no .proto files found")
 )

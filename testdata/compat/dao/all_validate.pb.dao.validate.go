@@ -103,6 +103,48 @@ func (x *AllValidate) Validate() error {
 			return &validateruntime.ValidationError{Field: fmt.Sprintf("r_items[%d]", i), Rule: "gte", Message: validateruntime.MsgOr("", "must be >= 0")}
 		}
 	}
+	for i, v := range x.RStrIn {
+		{
+			found := false
+			for _, sv := range []string{"foo", "bar"} {
+				if v == sv {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return &validateruntime.ValidationError{Field: fmt.Sprintf("r_str_in[%d]", i), Rule: "in", Message: validateruntime.MsgOr("", "must be one of [foo, bar]")}
+			}
+		}
+	}
+	for i, v := range x.RStrNotIn {
+		for _, sv := range []string{"bad"} {
+			if v == sv {
+				return &validateruntime.ValidationError{Field: fmt.Sprintf("r_str_not_in[%d]", i), Rule: "not_in", Message: validateruntime.MsgOr("", "must not be one of [bad]")}
+			}
+		}
+	}
+	for i, v := range x.RIntIn {
+		{
+			found := false
+			for _, iv := range []int32{1, 2, 3} {
+				if v == iv {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return &validateruntime.ValidationError{Field: fmt.Sprintf("r_int_in[%d]", i), Rule: "in", Message: validateruntime.MsgOr("", "must be one of [1, 2, 3]")}
+			}
+		}
+	}
+	for i, v := range x.RUintNotIn {
+		for _, uv := range []uint32{0} {
+			if v == uv {
+				return &validateruntime.ValidationError{Field: fmt.Sprintf("r_uint_not_in[%d]", i), Rule: "not_in", Message: validateruntime.MsgOr("", "must not be one of [0]")}
+			}
+		}
+	}
 	if x.IGtLt <= -10 {
 		return &validateruntime.ValidationError{Field: "i_gt_lt", Rule: "gt", Message: validateruntime.MsgOr("", "must be > -10")}
 	}

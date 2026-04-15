@@ -356,6 +356,10 @@ const av: AllValidate = {
   fLt: 50.0,
   dGt: 0.0,
   sPattern: "Hello",
+  rStrIn: ["foo", "bar"],
+  rStrNotIn: ["ok"],
+  rIntIn: [1, 2],
+  rUintNotIn: [1, 2],
 };
 assertEqual(av.uGte, 1, "AllValidate.uGte assigned correctly");
 assertEqual(av.sIn, "a", "AllValidate.sIn assigned correctly");

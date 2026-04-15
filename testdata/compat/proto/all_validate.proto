@@ -52,6 +52,23 @@ message AllValidate {
     (buf.validate.field).repeated.items.int32.gte = 0
   ];
 
+  // items in/not_in constraints
+  repeated string r_str_in     = 19 [
+    (buf.validate.field).repeated.items.string.in = "foo",
+    (buf.validate.field).repeated.items.string.in = "bar"
+  ];
+  repeated string r_str_not_in = 20 [
+    (buf.validate.field).repeated.items.string.not_in = "bad"
+  ];
+  repeated int32  r_int_in     = 21 [
+    (buf.validate.field).repeated.items.int32.in = 1,
+    (buf.validate.field).repeated.items.int32.in = 2,
+    (buf.validate.field).repeated.items.int32.in = 3
+  ];
+  repeated uint32 r_uint_not_in = 22 [
+    (buf.validate.field).repeated.items.uint32.not_in = 0
+  ];
+
   // exclusive bounds for signed int
   int32  i_gt_lt  = 14 [
     (buf.validate.field).int32.gt = -10,

@@ -8,6 +8,11 @@ func (x *AllScalars) Validate() error {
 }
 
 func (x *AllRepeated) Validate() error {
+	for _, v := range x.RMessage {
+		if err := v.Validate(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

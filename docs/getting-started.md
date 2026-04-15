@@ -220,12 +220,17 @@ service PersonService {
 gcode gen-proto -in proto/
 ```
 
+> **Schema file naming rule**: `gen-proto` identifies schema files exclusively by the `.meta.proto` suffix. This is the only naming convention it enforces. Files without this suffix — including `common.proto`, service protos, and any other shared definition files — are not processed by `gen-proto` directly. They are resolved automatically as dependencies when protocompile parses the `.meta.proto` files.
+>
+> If a `.meta.proto` file imports `common.proto`, the generated `*.create.proto` and `*.update.proto` will automatically include `import "common.proto"` — no manual import management needed.
+
 Result:
 
 ```
 proto/
   person.meta.proto         ← schema source (unchanged)
-  person_service.proto      ← original (unchanged)
+  common.proto              ← shared definitions (unchanged, not processed by gen-proto)
+  person_service.proto      ← service definition (unchanged, not processed by gen-proto)
   person.entity.proto       ← generated: Person message (no validate, with gorm)
   person.update.proto       ← generated: PersonUpdateByName message (with validate)
   person.create.proto       ← generated: PersonCreate message (with validate)
@@ -842,4 +847,3 @@ The following proto features are not supported. When unsupported features are en
 | Well-known types not supported | Medium | `google.protobuf.*` types (e.g. `Timestamp`) cause an error |
 | proto2 not supported | Low | Only `syntax = "proto3"` is accepted |
 | HTTP path params not supported | Low | Generated handlers bind from request body only. Extract path params (e.g. `/users/:id`) manually in the service layer. |
-| `repeated` enum `defined_only` not enforced | Low | The `defined_only` constraint is silently skipped for repeated enum fields |

@@ -18,14 +18,14 @@ message PersonCreate {
   optional bool active = 3;
   optional Status status = 4 [(buf.validate.field).enum.defined_only = true];
   optional float rating = 5;
-  string nickname = 6 [(buf.validate.field).string.min_len = 1, (buf.validate.field).string.max_len = 10];
+  string nickname = 6 [(gcode.field).json.omitempty = true, (buf.validate.field).string.min_len = 1, (buf.validate.field).string.max_len = 10];
   optional int32 level = 7;
   optional bool verified = 8;
   optional float score = 9;
   optional int64 updated_at = 10;
   optional Status prev_status = 11;
-  optional string email = 12 [(buf.validate.field).string.email = true];
-  optional string role = 13 [(buf.validate.field).string.in = "admin", (buf.validate.field).string.in = "user", (buf.validate.field).string.in = "guest"];
+  optional string email = 12 [(buf.validate.field).string.email = true, (gcode.field).validate_message = "invalid email address"];
+  optional string role = 13 [(gcode.field).json.ignore = true, (buf.validate.field).string.in = "admin", (buf.validate.field).string.in = "user", (buf.validate.field).string.in = "guest"];
   optional int32 type_id = 14 [(buf.validate.field).int32.not_in = 0, (buf.validate.field).int32.not_in = -1];
 }
 

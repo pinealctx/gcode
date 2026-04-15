@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/pinealctx/gcode/internal/source"
 )
 
 // TestRunE2EAnnotations is the end-to-end acceptance test for phase 2.
@@ -286,8 +284,8 @@ func TestRun_EmptyDirectory(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty directory, got nil")
 	}
-	if !errors.Is(err, source.ErrNoProtoFiles) {
-		t.Errorf("expected source.ErrNoProtoFiles, got %T: %v", err, err)
+	if !errors.Is(err, ErrNoProtoFiles) {
+		t.Errorf("expected ErrNoProtoFiles, got %T: %v", err, err)
 	}
 }
 

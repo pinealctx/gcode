@@ -11,7 +11,6 @@ import (
 	"github.com/pinealctx/gcode/internal/config"
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/parser"
-	"github.com/pinealctx/gcode/internal/source"
 )
 
 // writeFile writes content to path, creating parent dirs as needed.
@@ -75,7 +74,7 @@ func TestRunGenProto_UpdateMessage(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -110,8 +109,8 @@ message User {
 	if !strings.Contains(s, "message UserUpdateByID") {
 		t.Errorf("missing message UserUpdateByID in:\n%s", s)
 	}
-	if !strings.Contains(s, `(gcode.update_source) = "User"`) {
-		t.Errorf("missing update_source annotation in:\n%s", s)
+	if !strings.Contains(s, `option (gcode.update_source_opts) = { source: "User", condition_fields: ["id"] }`) {
+		t.Errorf("missing update_source_opts annotation in:\n%s", s)
 	}
 	// id is condition field → non-optional
 	if !strings.Contains(s, "int64 id = 1") {
@@ -139,12 +138,59 @@ message User {
 	compileProtoDir(t, inDir)
 }
 
+func TestRunGenProto_UpdateMessage_NoConditionFields(t *testing.T) {
+	t.Parallel()
+
+	inDir := t.TempDir()
+
+	writeFile(t, filepath.Join(inDir, "log.meta.proto"), `syntax = "proto3";
+package test.log;
+import "gcode/options.proto";
+
+option (gcode.schema) = {};
+
+message LogEntry {
+  string message = 1;
+  int32  level   = 2;
+
+  option (gcode.update_message) = {
+    name: "LogEntryUpdate"
+  };
+}
+`)
+
+	if err := RunGenProto(t.Context(), []string{"-in", inDir}); err != nil {
+		t.Fatalf("RunGenProto returned error: %v", err)
+	}
+
+	updatePath := filepath.Join(inDir, "log.update.proto")
+	content, err := os.ReadFile(updatePath)
+	if err != nil {
+		t.Fatalf("log.update.proto not generated: %v", err)
+	}
+	s := string(content)
+
+	// No condition_fields → update_source_opts should omit condition_fields.
+	if !strings.Contains(s, `option (gcode.update_source_opts) = { source: "LogEntry" }`) {
+		t.Errorf("missing update_source_opts (no condition_fields) in:\n%s", s)
+	}
+	// All fields should be optional when there are no condition_fields.
+	if !strings.Contains(s, "optional string message") {
+		t.Errorf("message should be optional in:\n%s", s)
+	}
+	if !strings.Contains(s, "optional int32 level") {
+		t.Errorf("level should be optional in:\n%s", s)
+	}
+
+	compileProtoDir(t, inDir)
+}
+
 func TestRunGenProto_CreateMessage(t *testing.T) {
 	t.Parallel()
 
 	inDir := t.TempDir()
 
-	writeFile(t, filepath.Join(inDir, "product.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "product.meta.proto"), `syntax = "proto3";
 package test.product;
 import "gcode/options.proto";
 
@@ -205,7 +251,7 @@ func TestRunGenProto_MultipleOptions(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -276,7 +322,8 @@ message Plain {
 		t.Fatalf("RunGenProto returned error: %v", err)
 	}
 
-	// No intermediate protos generated (file lacks gcode.schema option).
+	// No intermediate protos generated: plain.proto is not a .meta.proto file,
+	// so filterMetaProtos returns empty and RunGenProto returns nil immediately.
 	if _, err := os.Stat(filepath.Join(inDir, "plain.update.proto")); err == nil {
 		t.Errorf("plain.update.proto should not be generated")
 	}
@@ -293,7 +340,7 @@ func TestRunGenProto_MessageTypeFieldAllowed(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	writeFile(t, filepath.Join(inDir, "order.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "order.meta.proto"), `syntax = "proto3";
 package test;
 import "gcode/options.proto";
 
@@ -339,7 +386,7 @@ func TestRunGenProto_EnumField(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	writeFile(t, filepath.Join(inDir, "item.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "item.meta.proto"), `syntax = "proto3";
 package test.item;
 import "gcode/options.proto";
 
@@ -400,7 +447,7 @@ enum Status {
 `)
 
 	// item.proto uses Status and has an update_message annotation.
-	writeFile(t, filepath.Join(inDir, "item.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "item.meta.proto"), `syntax = "proto3";
 package test.item;
 import "common.proto";
 import "gcode/options.proto";
@@ -460,7 +507,7 @@ message Address {
 `)
 
 	// order.proto uses Address and has a create_message annotation.
-	writeFile(t, filepath.Join(inDir, "order.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "order.meta.proto"), `syntax = "proto3";
 package test.order;
 import "address.proto";
 import "gcode/options.proto";
@@ -535,8 +582,8 @@ func TestRunGenProto_EmptyDirectory(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty directory, got nil")
 	}
-	if !errors.Is(err, source.ErrNoProtoFiles) {
-		t.Errorf("expected source.ErrNoProtoFiles, got %T: %v", err, err)
+	if !errors.Is(err, ErrNoProtoFiles) {
+		t.Errorf("expected ErrNoProtoFiles, got %T: %v", err, err)
 	}
 }
 
@@ -618,6 +665,23 @@ func TestProtoFieldLine_NonOptionalScalar(t *testing.T) {
 	}
 }
 
+func TestProtoFieldLine_OptionalScalar(t *testing.T) {
+	t.Parallel()
+
+	f := model.Field{
+		Name:        "name",
+		Cardinality: model.CardinalitySingular,
+		Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
+	}
+	line, err := protoFieldLine(f, true, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if line != "optional string name = 2;" {
+		t.Errorf("got %q, want %q", line, "optional string name = 2;")
+	}
+}
+
 func TestProtoBaseName_Subdirectory(t *testing.T) {
 	t.Parallel()
 
@@ -627,101 +691,21 @@ func TestProtoBaseName_Subdirectory(t *testing.T) {
 	}
 }
 
-func TestTypeSourceIndex(t *testing.T) {
+func TestProtoBaseName_MetaSuffix(t *testing.T) {
 	t.Parallel()
 
-	files := []model.File{
-		{
-			Path: "common.proto",
-			Enums: []model.Enum{
-				{Name: "Status", FullName: "test.Status"},
-			},
-			Messages: []model.Message{
-				{Name: "Address", FullName: "test.Address"},
-			},
-		},
-		{
-			Path: "item.proto",
-			Messages: []model.Message{
-				{Name: "Item", FullName: "test.Item",
-					Enums: []model.Enum{
-						{Name: "Kind", FullName: "test.Item.Kind"},
-					},
-				},
-			},
-		},
-	}
-
-	idx := typeSourceIndex(files)
-
-	if idx["test.Status"] != "common.proto" {
-		t.Errorf("test.Status → %q, want %q", idx["test.Status"], "common.proto")
-	}
-	if idx["test.Address"] != "common.proto" {
-		t.Errorf("test.Address → %q, want %q", idx["test.Address"], "common.proto")
-	}
-	if idx["test.Item"] != "item.proto" {
-		t.Errorf("test.Item → %q, want %q", idx["test.Item"], "item.proto")
-	}
-	if idx["test.Item.Kind"] != "item.proto" {
-		t.Errorf("test.Item.Kind → %q, want %q", idx["test.Item.Kind"], "item.proto")
+	got := protoBaseName("person.meta.proto")
+	if got != "person" {
+		t.Errorf("got %q, want %q", got, "person")
 	}
 }
 
-func TestCollectExternalImports(t *testing.T) {
+func TestProtoBaseName_RootDir(t *testing.T) {
 	t.Parallel()
 
-	typeIdx := map[string]string{
-		"test.Status":  "common.proto",
-		"test.Address": "address.proto",
-		"test.Item":    "item.proto",
-	}
-
-	msgs := []model.Message{
-		{
-			Name: "Item",
-			Fields: []model.Field{
-				{Name: "id", Type: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64}},
-				{Name: "status", Type: model.FieldType{Kind: model.FieldKindEnum, FullName: "test.Status", Name: "Status"}},
-				{Name: "addr", Type: model.FieldType{Kind: model.FieldKindMessage, FullName: "test.Address", Name: "Address"}},
-			},
-		},
-	}
-
-	imports := collectExternalImports(msgs, typeIdx, "item.proto")
-
-	if len(imports) != 2 {
-		t.Fatalf("got %d imports, want 2: %v", len(imports), imports)
-	}
-	got := map[string]bool{}
-	for _, imp := range imports {
-		got[imp] = true
-	}
-	if !got["common.proto"] || !got["address.proto"] {
-		t.Errorf("expected common.proto and address.proto, got %v", imports)
-	}
-}
-
-func TestCollectExternalImports_SameFile(t *testing.T) {
-	t.Parallel()
-
-	typeIdx := map[string]string{
-		"test.Status": "item.proto",
-	}
-
-	msgs := []model.Message{
-		{
-			Name: "Item",
-			Fields: []model.Field{
-				{Name: "status", Type: model.FieldType{Kind: model.FieldKindEnum, FullName: "test.Status", Name: "Status"}},
-			},
-		},
-	}
-
-	// Status is defined in the same file — should NOT produce extra imports.
-	imports := collectExternalImports(msgs, typeIdx, "item.proto")
-	if len(imports) != 0 {
-		t.Errorf("expected no imports for same-file types, got %v", imports)
+	got := protoBaseName("user.proto")
+	if got != "user" {
+		t.Errorf("got %q, want %q", got, "user")
 	}
 }
 
@@ -732,6 +716,9 @@ func TestRunGenProto_NonExistentDirectory(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for non-existent directory, got nil")
 	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("expected fs.ErrNotExist in chain, got %T: %v", err, err)
+	}
 }
 
 func TestRunGenProto_StaleIntermediateProtosCleaned(t *testing.T) {
@@ -740,7 +727,7 @@ func TestRunGenProto_StaleIntermediateProtosCleaned(t *testing.T) {
 	inDir := t.TempDir()
 
 	// Write a proto with update_message option.
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -766,7 +753,7 @@ message User {
 	}
 
 	// Overwrite with a proto that has no update_message (but keeps schema).
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -793,7 +780,7 @@ func TestRunGenProto_StaleCreateProtosCleaned(t *testing.T) {
 	inDir := t.TempDir()
 
 	// Write a proto with create_message option.
-	writeFile(t, filepath.Join(inDir, "product.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "product.meta.proto"), `syntax = "proto3";
 package test.product;
 import "gcode/options.proto";
 
@@ -819,7 +806,7 @@ message Product {
 	}
 
 	// Overwrite with a proto that has no create_message (but keeps schema).
-	writeFile(t, filepath.Join(inDir, "product.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "product.meta.proto"), `syntax = "proto3";
 package test.product;
 import "gcode/options.proto";
 
@@ -846,7 +833,7 @@ func TestRunGenProto_StaleCleanupPartial(t *testing.T) {
 	inDir := t.TempDir()
 
 	// First run: proto has both update and create options.
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -878,7 +865,7 @@ message User {
 	}
 
 	// Second run: remove only create_message option, keep update_message.
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -918,7 +905,7 @@ func TestRunGenProto_RemoveFailureReturnsError(t *testing.T) {
 	inDir := t.TempDir()
 
 	// First run: generate user.update.proto.
-	writeFile(t, filepath.Join(inDir, "user.proto"), `syntax = "proto3";
+	writeFile(t, filepath.Join(inDir, "user.meta.proto"), `syntax = "proto3";
 package test.user;
 import "gcode/options.proto";
 
@@ -1050,3 +1037,121 @@ func TestBuildCreateMessage_InvalidName(t *testing.T) {
 		}
 	}
 }
+
+func TestAppendItemsValidate_DispatchesByElemType(t *testing.T) {
+	t.Parallel()
+
+	gteVal := int64(-100)
+	ltVal := int64(0)
+	gtFloat := 0.5
+	minLenVal := uint64(1)
+
+	tests := []struct {
+		name     string
+		items    *model.ValidateFieldOptions
+		elemType model.FieldType
+		want     string
+	}{
+		{
+			name:     "string items min_len",
+			items:    &model.ValidateFieldOptions{MinLen: &minLenVal},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
+			want:     "(buf.validate.field).repeated.items.string.min_len = 1",
+		},
+		{
+			name:     "sint32 items gte",
+			items:    &model.ValidateFieldOptions{GTEInt: &gteVal},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarSint32},
+			want:     "(buf.validate.field).repeated.items.sint32.gte = -100",
+		},
+		{
+			name:     "sfixed32 items lt",
+			items:    &model.ValidateFieldOptions{LTInt: &ltVal},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarSfixed32},
+			want:     "(buf.validate.field).repeated.items.sfixed32.lt = 0",
+		},
+		{
+			name:     "double items gt",
+			items:    &model.ValidateFieldOptions{GTFloat: &gtFloat},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarDouble},
+			want:     "(buf.validate.field).repeated.items.double.gt = 0.5",
+		},
+		{
+			name:     "bytes items min_len",
+			items:    &model.ValidateFieldOptions{MinLen: &minLenVal},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarBytes},
+			want:     "(buf.validate.field).repeated.items.bytes.min_len = 1",
+		},
+		{
+			name:     "enum items defined_only",
+			items:    &model.ValidateFieldOptions{DefinedOnly: true},
+			elemType: model.FieldType{Kind: model.FieldKindEnum, Name: "Status"},
+			want:     "(buf.validate.field).repeated.items.enum.defined_only = true",
+		},
+		{
+			name:     "message items no constraints",
+			items:    &model.ValidateFieldOptions{DefinedOnly: true},
+			elemType: model.FieldType{Kind: model.FieldKindMessage, Name: "Address"},
+			want:     "",
+		},
+		{
+			name:     "bool items no constraints",
+			items:    &model.ValidateFieldOptions{DefinedOnly: true},
+			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarBool},
+			want:     "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var opts []string
+			opts = appendItemsValidate(opts, tt.items, tt.elemType)
+			if tt.want == "" {
+				if len(opts) != 0 {
+					t.Errorf("expected no output, got %v", opts)
+				}
+				return
+			}
+			if len(opts) != 1 || opts[0] != tt.want {
+				t.Errorf("got %v, want [%s]", opts, tt.want)
+			}
+		})
+	}
+}
+
+func TestAppendItemsValidate_PanicsOnUnknownScalar(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for unknown scalar type")
+		}
+		msg, ok := r.(string)
+		if !ok || !strings.Contains(msg, "unsupported scalar type") {
+			t.Errorf("unexpected panic message: %v", r)
+		}
+	}()
+	var opts []string
+	items := &model.ValidateFieldOptions{MinLen: uint64Ptr(1)}
+	appendItemsValidate(opts, items, model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarKind("unknown")}) //nolint:govet // intentionally invalid ScalarKind to trigger panic guard
+}
+
+func TestAppendItemsValidate_PanicsOnUnknownKind(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for unknown field kind")
+		}
+		msg, ok := r.(string)
+		if !ok || !strings.Contains(msg, "unsupported field kind") {
+			t.Errorf("unexpected panic message: %v", r)
+		}
+	}()
+	var opts []string
+	items := &model.ValidateFieldOptions{DefinedOnly: true}
+	appendItemsValidate(opts, items, model.FieldType{Kind: model.FieldKind("unknown"), Name: "X"}) //nolint:govet // intentionally invalid FieldKind to trigger panic guard
+}
+
+func uint64Ptr(v uint64) *uint64 { return &v }

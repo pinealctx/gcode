@@ -42,6 +42,9 @@ func writeToMapMethod(b *strings.Builder, msg transform.GoMessage) {
 		} else if f.Cardinality == model.CardinalityRepeated {
 			// Repeated field: include when non-nil/non-empty.
 			fmt.Fprintf(b, "if len(%s) > 0 {\num[%q] = %s\n}\n", fieldExpr, columnKey, fieldExpr)
+		} else if f.HasPresence {
+			// Optional bytes: nil means "not provided", include only when non-nil.
+			fmt.Fprintf(b, "if %s != nil {\num[%q] = %s\n}\n", fieldExpr, columnKey, fieldExpr)
 		} else {
 			// Non-optional scalar/enum fields are always included in the map, even
 			// when zero-valued. In practice, gen-proto generates all non-condition
