@@ -657,14 +657,20 @@ message BatchRequest {
 
 #### items — apply constraints to each element
 
-`items` supports the same constraints as the corresponding scalar type:
+`items` supports the same constraints as the corresponding scalar type, including `in`/`not_in`:
 
 ```proto
 message TagList {
   repeated string tags = 1 [
     (buf.validate.field).repeated.min_items = 1,
     (buf.validate.field).repeated.items.string.min_len = 1,   // each tag non-empty
-    (buf.validate.field).repeated.items.string.max_len = 50   // each tag max 50 bytes
+    (buf.validate.field).repeated.items.string.max_len = 50,  // each tag max 50 bytes
+    (buf.validate.field).repeated.items.string.not_in = "admin"  // each tag not "admin"
+  ];
+  repeated int32 scores = 2 [
+    (buf.validate.field).repeated.items.int32.in = 1,  // each score must be 1, 2, or 3
+    (buf.validate.field).repeated.items.int32.in = 2,
+    (buf.validate.field).repeated.items.int32.in = 3
   ];
 }
 ```

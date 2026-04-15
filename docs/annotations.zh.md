@@ -658,14 +658,20 @@ message BatchRequest {
 
 #### items — 对每个元素应用约束
 
-`items` 下可使用与对应类型相同的约束：
+`items` 下可使用与对应类型相同的约束，包括 `in`/`not_in`：
 
 ```proto
 message TagList {
   repeated string tags = 1 [
     (buf.validate.field).repeated.min_items = 1,
     (buf.validate.field).repeated.items.string.min_len = 1,   // 每个 tag 非空
-    (buf.validate.field).repeated.items.string.max_len = 50   // 每个 tag 最长 50 字节
+    (buf.validate.field).repeated.items.string.max_len = 50,  // 每个 tag 最长 50 字节
+    (buf.validate.field).repeated.items.string.not_in = "admin"  // 每个 tag 不能是 "admin"
+  ];
+  repeated int32 scores = 2 [
+    (buf.validate.field).repeated.items.int32.in = 1,  // 每个分数必须是 1、2 或 3
+    (buf.validate.field).repeated.items.int32.in = 2,
+    (buf.validate.field).repeated.items.int32.in = 3
   ];
 }
 ```

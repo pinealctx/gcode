@@ -847,4 +847,3 @@ The following proto features are not supported. When unsupported features are en
 | Well-known types not supported | Medium | `google.protobuf.*` types (e.g. `Timestamp`) cause an error |
 | proto2 not supported | Low | Only `syntax = "proto3"` is accepted |
 | HTTP path params not supported | Low | Generated handlers bind from request body only. Extract path params (e.g. `/users/:id`) manually in the service layer. |
-| `repeated` enum `defined_only` not enforced | Low | The `defined_only` constraint is silently skipped for repeated enum fields |
