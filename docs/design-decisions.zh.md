@@ -355,3 +355,22 @@
 - `ToEntity()`、`ApplyTo()`、`ToMap()` 和 `GormMessageOptions` 无需任何改动即可继续工作
 - render 层有两个独立关注点：衍生关系（通过 `update_source`/`create_source`）和 validate 规则（通过字段注解）——两者均为显式
 - 未来如果设计出更好的衍生关系声明机制，可以移除这些注解，但当前推迟处理
+
+---
+
+## D18：Go 生成使用平铺输出 package 目录
+
+**问题**：Go 生成是否应该保留源 proto 的目录结构？
+
+**约束**：
+- Go 的 package 边界由目录决定。
+- 当前 Go render 层对同 package 跨文件引用生成未限定类型名，如 `Address`，而不是 `common.Address`。
+- 当前生成器没有记录每个类型所属的输出目录、import path、import alias 或 qualified Go 类型名。
+- 保留 proto 子目录会把一个逻辑 `go_package` 拆成多个 Go package 目录，可能导致生成代码无法编译。
+
+**决策**：Go 生成把所有 Go 文件写入 `-out` 指定的单一目录。输出文件名基于 proto basename。一次生成中，同 basename proto 文件通过 `ErrOutputFilenameCollision` 报错拒绝。
+
+**影响**：
+- 同 `go_package` 的跨文件引用可以编译，因为所有生成 Go 文件位于同一个 Go package 目录。
+- 用户在一次 Go 生成中必须避免同 basename proto 文件，即使它们位于不同源子目录。
+- 支持保留 Go 输出目录结构需要未来完整设计跨目录 import 和 qualified type；当前不做半成品实现。

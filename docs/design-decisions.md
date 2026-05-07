@@ -355,3 +355,22 @@ Two-layer error code mechanism:
 - `ToEntity()`, `ApplyTo()`, `ToMap()`, and `GormMessageOptions` continue to work without changes
 - The render layer has two distinct concerns: derivation identity (via `update_source`/`create_source`) and validate rules (via field annotations) — both are explicit
 - Future removal of these annotations is possible if a better mechanism for derivation identity is designed, but is deferred until then
+
+---
+
+## D18: Go generation uses a flat output package directory
+
+**Problem**: Should Go generation preserve the source proto directory structure in the output directory?
+
+**Constraints**:
+- Go package boundaries are directory-based.
+- The current Go render layer emits same-package cross-file references as unqualified type names, such as `Address`, not `common.Address`.
+- The generator does not currently track per-type output directories, import paths, import aliases, or qualified Go type names.
+- Preserving proto subdirectories would split one logical `go_package` into multiple Go package directories and can make generated code fail to compile.
+
+**Decision**: Go generation writes all generated Go files into the single directory passed via `-out`. Output filenames are derived from the proto basename. Same-basename proto files are rejected in one generation run with `ErrOutputFilenameCollision`.
+
+**Consequences**:
+- Same-`go_package` cross-file references compile because all generated Go files live in the same Go package directory.
+- Users must avoid same-basename proto files in one Go generation run, even if they are in different source subdirectories.
+- Supporting preserved Go output directories requires a future design for cross-directory imports and qualified type names; it is intentionally not implemented as a partial fix.

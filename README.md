@@ -148,6 +148,7 @@ This generates `.pb.ts` files with TypeScript interfaces, enums, and validation 
 | No streaming RPC                    | Exits with error when `stream` keyword is encountered                         |
 | No path params                      | HTTP handlers use `c.ShouldBindJSON` uniformly; URL path parameters not supported |
 | No `map`, `oneof`, well-known types | Proto files using these features may produce incorrect code                   |
+| Flat Go output directory            | Go generation writes all generated Go files into one output package directory. Proto files with the same basename are not supported in one generation run, even when they are in different source subdirectories. |
 | Cross-package references untested   | Same-package cross-file works; cross-package not fully tested                 |
 | proto3 only                         | proto2 syntax is not supported                                                |
 
