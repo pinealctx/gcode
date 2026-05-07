@@ -848,3 +848,4 @@ npm test
 | 不支持 well-known types | 中 | `google.protobuf.*` 类型（如 `Timestamp`）会报错 |
 | 不支持 proto2 | 低 | 仅接受 `syntax = "proto3"` |
 | HTTP path param 不支持 | 低 | 生成的 handler 仅从请求体绑定数据，路径参数（如 `/users/:id`）需在 service 层手动提取 |
+| Go 输出目录平铺 | 低 | Go 生成会把所有 Go 文件写入同一个输出 package 目录。一次生成中不支持同 basename 的 proto 文件，即使它们位于不同源子目录。 |

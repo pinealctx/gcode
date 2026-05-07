@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -364,10 +365,9 @@ message User { int32 id = 1; }
 	}
 }
 
-// TestRun_SubdirectorySameBasename verifies that two proto files in different
-// subdirectories with the same basename are generated into separate output paths
-// (sub1/user.pb.dao.go and sub2/user.pb.dao.go) without collision.
-func TestRun_SubdirectorySameBasename(t *testing.T) {
+// TestRun_SubdirectorySameBasenameCollision verifies that Go generation keeps a
+// flat output directory and rejects same-basename proto files before writing.
+func TestRun_SubdirectorySameBasenameCollision(t *testing.T) {
 	t.Parallel()
 
 	inputDir := t.TempDir()
@@ -394,34 +394,80 @@ message UserB { int32 id = 1; }
 `)
 
 	err := Run(t.Context(), []string{"-in", inputDir, "-out", outputDir})
-	if err != nil {
-		t.Fatalf("Run returned unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected output filename collision, got nil")
+	}
+	if !errors.Is(err, ErrOutputFilenameCollision) {
+		t.Errorf("expected ErrOutputFilenameCollision, got %T: %v", err, err)
+	}
+	entries, readErr := os.ReadDir(outputDir)
+	if readErr != nil {
+		t.Fatalf("ReadDir: %v", readErr)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected empty output dir on collision, got %d entries", len(entries))
+	}
+}
+
+func TestRun_SubdirectoryCrossFileReferenceCompiles(t *testing.T) {
+	t.Parallel()
+
+	inputDir := t.TempDir()
+	outputDir := t.TempDir()
+
+	commonDir := filepath.Join(inputDir, "common")
+	userDir := filepath.Join(inputDir, "user")
+	if err := os.MkdirAll(commonDir, 0o755); err != nil {
+		t.Fatalf("mkdir common: %v", err)
+	}
+	if err := os.MkdirAll(userDir, 0o755); err != nil {
+		t.Fatalf("mkdir user: %v", err)
 	}
 
-	// Verify both DAO files exist with correct package and struct definitions.
-	type subCheck struct {
-		sub        string
-		structName string
+	writeFile(t, filepath.Join(commonDir, "common.proto"), `syntax = "proto3";
+package demo;
+option go_package = "example.com/demo;demo";
+message Address { string city = 1; }
+`)
+	writeFile(t, filepath.Join(userDir, "user.proto"), `syntax = "proto3";
+package demo;
+option go_package = "example.com/demo;demo";
+import "common/common.proto";
+message User { Address address = 1; }
+`)
+
+	if err := Run(t.Context(), []string{"-in", inputDir, "-out", outputDir}); err != nil {
+		t.Fatalf("Run() error: %v", err)
 	}
-	for _, sc := range []subCheck{{"sub1", "UserA"}, {"sub2", "UserB"}} {
-		daoPath := filepath.Join(outputDir, sc.sub, "user.pb.dao.go")
-		data, readErr := os.ReadFile(daoPath)
-		if readErr != nil {
-			t.Fatalf("failed to read %s: %v", daoPath, readErr)
-		}
-		s := string(data)
-		if !strings.Contains(s, "package testpb") {
-			t.Errorf("%s: missing package declaration", daoPath)
-		}
-		if !strings.Contains(s, "type "+sc.structName+" struct") {
-			t.Errorf("%s: missing %s struct", daoPath, sc.structName)
+	for _, name := range []string{"common.pb.dao.go", "common.pb.dao.validate.go", "user.pb.dao.go", "user.pb.dao.validate.go"} {
+		if _, err := os.Stat(filepath.Join(outputDir, name)); err != nil {
+			t.Fatalf("expected generated file %q: %v", name, err)
 		}
 	}
-	// Verify validate files also exist in subdirectories.
-	for _, sub := range []string{"sub1", "sub2"} {
-		valPath := filepath.Join(outputDir, sub, "user.pb.dao.validate.go")
-		if _, statErr := os.Stat(valPath); statErr != nil {
-			t.Errorf("expected file %q to exist: %v", valPath, statErr)
+	if _, err := os.Stat(filepath.Join(outputDir, "common", "common.pb.dao.go")); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("unexpected nested Go output file, stat error = %v", err)
+	}
+
+	moduleRoot, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatalf("module root: %v", err)
+	}
+	writeFile(t, filepath.Join(outputDir, "go.mod"), `module example.com/demo
+
+go 1.23
+
+require github.com/pinealctx/gcode v0.0.0
+
+replace github.com/pinealctx/gcode => `+filepath.ToSlash(moduleRoot)+`
+`)
+
+	for _, args := range [][]string{{"mod", "tidy"}, {"test", "./..."}} {
+		cmd := exec.CommandContext(t.Context(), "go", args...)
+		cmd.Dir = outputDir
+		cmd.Env = append(os.Environ(), "GOWORK=off")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("go %s failed: %v\n%s", strings.Join(args, " "), err, out)
 		}
 	}
 }

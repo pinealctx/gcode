@@ -847,3 +847,4 @@ The following proto features are not supported. When unsupported features are en
 | Well-known types not supported | Medium | `google.protobuf.*` types (e.g. `Timestamp`) cause an error |
 | proto2 not supported | Low | Only `syntax = "proto3"` is accepted |
 | HTTP path params not supported | Low | Generated handlers bind from request body only. Extract path params (e.g. `/users/:id`) manually in the service layer. |
+| Flat Go output directory | Low | Go generation writes all generated Go files into one output package directory. Proto files with the same basename are rejected in one generation run, even when they are in different source subdirectories. |

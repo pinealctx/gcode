@@ -183,39 +183,38 @@ func filterMetaProtoSources(files []string) []string {
 	return result
 }
 
-// outputFileName derives the .pb.dao.go output filename from a proto file path,
-// preserving the directory structure to avoid collisions from same-name protos
-// in different subdirectories.
-// e.g. "subdir/person.proto" → "subdir/person.pb.dao.go"
+// outputFileName derives the .pb.dao.go output filename from a proto file path.
+// Go generation writes all files into one output package directory, so only the
+// proto basename is used. Same-basename proto files are rejected by
+// checkOutputCollisions before writing.
+// e.g. "subdir/person.proto" → "person.pb.dao.go"
 func outputFileName(protoPath string) string {
-	name := strings.TrimSuffix(protoPath, ".proto")
+	base := filepath.Base(protoPath)
+	name := strings.TrimSuffix(base, ".proto")
 	return name + ".pb.dao.go"
 }
 
-// validateOutputFileName derives the .pb.dao.validate.go output filename from a proto file path,
-// preserving the directory structure to avoid collisions from same-name protos
-// in different subdirectories.
-// e.g. "subdir/person.proto" → "subdir/person.pb.dao.validate.go"
+// validateOutputFileName derives the .pb.dao.validate.go output filename from a proto file path.
+// e.g. "subdir/person.proto" → "person.pb.dao.validate.go"
 func validateOutputFileName(protoPath string) string {
-	name := strings.TrimSuffix(protoPath, ".proto")
+	base := filepath.Base(protoPath)
+	name := strings.TrimSuffix(base, ".proto")
 	return name + ".pb.dao.validate.go"
 }
 
-// rpcOutputFileName derives the .pb.rpc.go output filename from a proto file path,
-// preserving the directory structure to avoid collisions from same-name protos
-// in different subdirectories.
-// e.g. "subdir/user_service.proto" → "subdir/user_service.pb.rpc.go"
+// rpcOutputFileName derives the .pb.rpc.go output filename from a proto file path.
+// e.g. "subdir/user_service.proto" → "user_service.pb.rpc.go"
 func rpcOutputFileName(protoPath string) string {
-	name := strings.TrimSuffix(protoPath, ".proto")
+	base := filepath.Base(protoPath)
+	name := strings.TrimSuffix(base, ".proto")
 	return name + ".pb.rpc.go"
 }
 
-// httpOutputFileName derives the .pb.http.go output filename from a proto file path,
-// preserving the directory structure to avoid collisions from same-name protos
-// in different subdirectories.
-// e.g. "subdir/user_service.proto" → "subdir/user_service.pb.http.go"
+// httpOutputFileName derives the .pb.http.go output filename from a proto file path.
+// e.g. "subdir/user_service.proto" → "user_service.pb.http.go"
 func httpOutputFileName(protoPath string) string {
-	name := strings.TrimSuffix(protoPath, ".proto")
+	base := filepath.Base(protoPath)
+	name := strings.TrimSuffix(base, ".proto")
 	return name + ".pb.http.go"
 }
 

@@ -129,6 +129,12 @@ All functions call `go/format.Source` at the end to ensure consistent code style
 
 Proto leading comments are passed through to all generated code: structs/fields/enums (`*.pb.dao.go`), service interfaces/methods (`*.pb.rpc.go`), and HTTP handlers (`*.pb.http.go`).
 
+Go generation writes all generated Go files into the single directory specified
+by `-out`. This matches the render layer's same-package type model: cross-file
+types in the same `go_package` are emitted as unqualified Go names. Proto files
+with the same basename are rejected in one generation run because they would
+produce the same flat output filenames.
+
 ### tsrender
 
 Renders `transform.GoFile` to TypeScript source code. Uses a `TypeRegistry` to resolve cross-file type references and generate ES module import statements.
