@@ -717,6 +717,38 @@ func TestNewHandlerWithOptions_PreValidateHookErrorPreventsValidateAndService(t 
 	}
 }
 
+func TestNewHandlerWithOptions_PreValidateHookPanic_IsPanicx(t *testing.T) {
+	t.Parallel()
+
+	var capturedErr error
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Next()
+		if len(c.Errors) > 0 {
+			capturedErr = c.Errors.Last().Err
+		}
+		c.JSON(http.StatusOK, httpruntime.ErrResponse(capturedErr))
+	})
+
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	hook := func(_ context.Context, _ *echoReq) error {
+		panic("hook boom") //nolint // intentional panic to test hook recovery
+	}
+	r.POST("/", httpruntime.NewHandlerWithOptions(method, httpruntime.WithPreValidateHook[echoReq, echoResp](hook)))
+
+	postJSON(t, r, `{"msg":"hello"}`)
+
+	if capturedErr == nil {
+		t.Fatal("capturedErr is nil, expected a panic error")
+	}
+	if !errors.Is(capturedErr, panicx.ErrPanic) {
+		t.Errorf("errors.Is(err, panicx.ErrPanic) = false, want true; err = %v", capturedErr)
+	}
+}
+
 func TestNewHandlerWithOptions_PreValidateHooksRunInRegistrationOrder(t *testing.T) {
 	t.Parallel()
 
