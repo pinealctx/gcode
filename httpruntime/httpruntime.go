@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pinealctx/x/errorx"
 	"github.com/pinealctx/x/handlerx"
+	"github.com/pinealctx/x/panicx"
 
 	"github.com/pinealctx/gcode/validateruntime"
 )
@@ -169,7 +170,8 @@ func NewHandler[Req any, Resp any](
 //
 // Pre-validation hooks run after JSON binding and before Validate(), in the
 // order they are registered. Hook errors are recorded with c.Error and stop the
-// request before validation or service execution.
+// request before validation or service execution. Hook panics are recovered and
+// converted to panicx.ErrPanic-compatible errors.
 func NewHandlerWithOptions[Req any, Resp any](
 	method func(ctx context.Context, req *Req) (*Resp, error),
 	opts ...HandlerOption[Req, Resp],
@@ -193,11 +195,9 @@ func NewHandlerWithOptions[Req any, Resp any](
 			return
 		}
 		ctx := c.Request.Context()
-		for _, hook := range cfg.preValidateHooks {
-			if err := hook(ctx, &req); err != nil {
-				_ = c.Error(err)
-				return
-			}
+		if err := runPreValidateHooks(ctx, &req, cfg.preValidateHooks); err != nil {
+			_ = c.Error(err)
+			return
 		}
 		if v, ok := any(&req).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
@@ -262,4 +262,27 @@ func DefaultErrorHandler() gin.HandlerFunc {
 			c.JSON(http.StatusOK, ErrResponse(err))
 		}
 	}
+}
+
+// runPreValidateHooks executes hooks in order, returning the first error encountered.
+// Panics are recovered and converted to panicx.ErrPanic-compatible errors.
+// This function is used internally by NewHandlerWithOptions to run pre-validation hooks.
+// Hook panics are converted to errors to prevent them from bypassing the runtime's
+// recovery interceptor, ensuring consistent error handling and response formatting.
+func runPreValidateHooks[Req any](
+	ctx context.Context,
+	req *Req,
+	hooks []PreValidateHook[Req],
+) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = panicx.NewPanicError(r)
+		}
+	}()
+	for _, hook := range hooks {
+		if err := hook(ctx, req); err != nil {
+			return err
+		}
+	}
+	return nil
 }
