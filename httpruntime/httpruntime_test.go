@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -598,6 +599,238 @@ func TestNewHandler_NoValidate_NoError(t *testing.T) {
 	resp := decodeResponse(t, w)
 	if resp.Code != httpruntime.CodeOK {
 		t.Errorf("Code = %d, want CodeOK for type without Validate()", resp.Code)
+	}
+}
+
+type orderedValidateReq struct {
+	Name   string    `json:"name"`
+	Events *[]string `json:"-"`
+}
+
+func (r *orderedValidateReq) Validate() error {
+	if r.Events != nil {
+		*r.Events = append(*r.Events, "validate")
+	}
+	if r.Name == "" {
+		return &validateruntime.ValidationError{Field: "name", Rule: "required", Message: "name is required"}
+	}
+	return nil
+}
+
+func newHandlerEngineWithOptions[Req any, Resp any](
+	method func(ctx context.Context, req *Req) (*Resp, error),
+	opts ...httpruntime.HandlerOption[Req, Resp],
+) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(httpruntime.DefaultErrorHandler())
+	r.POST("/", httpruntime.NewHandlerWithOptions(method, opts...))
+	return r
+}
+
+func TestNewHandlerWithOptions_PreValidateHookRunsBeforeValidate(t *testing.T) {
+	t.Parallel()
+
+	var events []string
+	method := func(_ context.Context, req *orderedValidateReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Name}, nil
+	}
+	hook := func(_ context.Context, req *orderedValidateReq) error {
+		req.Events = &events
+		events = append(events, "hook")
+		return nil
+	}
+	r := newHandlerEngineWithOptions(method, httpruntime.WithPreValidateHook[orderedValidateReq, echoResp](hook))
+
+	w := postJSON(t, r, `{"name":"alice"}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeOK {
+		t.Fatalf("Code = %d, want CodeOK", resp.Code)
+	}
+	if !slices.Equal(events, []string{"hook", "validate"}) {
+		t.Errorf("events = %v, want [hook validate]", events)
+	}
+}
+
+func TestNewHandlerWithOptions_PreValidateHookCanMutateRequest(t *testing.T) {
+	t.Parallel()
+
+	var seen string
+	method := func(_ context.Context, req *validateReq) (*echoResp, error) {
+		seen = req.Name
+		return &echoResp{Echo: req.Name}, nil
+	}
+	hook := func(_ context.Context, req *validateReq) error {
+		req.Name = "patched"
+		return nil
+	}
+	r := newHandlerEngineWithOptions(method, httpruntime.WithPreValidateHook[validateReq, echoResp](hook))
+
+	w := postJSON(t, r, `{"name":""}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeOK {
+		t.Fatalf("Code = %d, want CodeOK", resp.Code)
+	}
+	if seen != "patched" {
+		t.Errorf("service saw name = %q, want patched", seen)
+	}
+}
+
+type blockingValidateReq struct {
+	Name string `json:"name"`
+	Seen *bool  `json:"-"`
+}
+
+func (r *blockingValidateReq) Validate() error {
+	if r.Seen != nil {
+		*r.Seen = true
+	}
+	return nil
+}
+
+func TestNewHandlerWithOptions_PreValidateHookErrorPreventsValidateAndService(t *testing.T) {
+	t.Parallel()
+
+	var validated bool
+	var served bool
+	hookErr := errors.New("hook failed")
+	method := func(_ context.Context, _ *blockingValidateReq) (*echoResp, error) {
+		served = true
+		return &echoResp{}, nil
+	}
+	hook := func(_ context.Context, req *blockingValidateReq) error {
+		req.Seen = &validated
+		return hookErr
+	}
+	r := newHandlerEngineWithOptions(method, httpruntime.WithPreValidateHook[blockingValidateReq, echoResp](hook))
+
+	w := postJSON(t, r, `{"name":"alice"}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeDefaultErr {
+		t.Fatalf("Code = %d, want CodeDefaultErr", resp.Code)
+	}
+	if validated {
+		t.Error("Validate ran after hook error, want skipped")
+	}
+	if served {
+		t.Error("service ran after hook error, want skipped")
+	}
+}
+
+func TestNewHandlerWithOptions_PreValidateHooksRunInRegistrationOrder(t *testing.T) {
+	t.Parallel()
+
+	var order []int
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	r := newHandlerEngineWithOptions(
+		method,
+		httpruntime.WithPreValidateHook[echoReq, echoResp](func(_ context.Context, _ *echoReq) error {
+			order = append(order, 1)
+			return nil
+		}),
+		httpruntime.WithPreValidateHook[echoReq, echoResp](func(_ context.Context, _ *echoReq) error {
+			order = append(order, 2)
+			return nil
+		}),
+		httpruntime.WithPreValidateHook[echoReq, echoResp](func(_ context.Context, _ *echoReq) error {
+			order = append(order, 3)
+			return nil
+		}),
+	)
+
+	w := postJSON(t, r, `{"msg":"hello"}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeOK {
+		t.Fatalf("Code = %d, want CodeOK", resp.Code)
+	}
+	if !slices.Equal(order, []int{1, 2, 3}) {
+		t.Errorf("order = %v, want [1 2 3]", order)
+	}
+}
+
+func TestNewHandlerWithOptions_PreValidateHookReceivesRequestContext(t *testing.T) {
+	t.Parallel()
+
+	type contextKey struct{}
+	const want = "request-id"
+	var got string
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	hook := func(ctx context.Context, _ *echoReq) error {
+		if v, ok := ctx.Value(contextKey{}).(string); ok {
+			got = v
+		}
+		return nil
+	}
+	r := newHandlerEngineWithOptions(method, httpruntime.WithPreValidateHook[echoReq, echoResp](hook))
+
+	w := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{"msg":"hello"}`))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req = req.WithContext(context.WithValue(req.Context(), contextKey{}, want))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeOK {
+		t.Fatalf("Code = %d, want CodeOK", resp.Code)
+	}
+	if got != want {
+		t.Errorf("hook context value = %q, want %q", got, want)
+	}
+}
+
+func TestWithPreValidateHook_NilHookPanics(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("WithPreValidateHook(nil) did not panic")
+		}
+	}()
+
+	httpruntime.WithPreValidateHook[echoReq, echoResp](nil)
+}
+
+func TestNewHandlerWithOptions_NilOptionPanics(t *testing.T) {
+	t.Parallel()
+
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewHandlerWithOptions with nil option did not panic")
+		}
+	}()
+
+	httpruntime.NewHandlerWithOptions(method, nil)
+}
+
+func TestNewHandler_BackwardCompatibleThroughWithInterceptors(t *testing.T) {
+	t.Parallel()
+
+	var intercepted bool
+	interceptor := func(ctx context.Context, req *echoReq, next handlerx.Handler[*echoReq, *echoResp]) (*echoResp, error) {
+		intercepted = true
+		return next(ctx, req)
+	}
+	method := func(_ context.Context, req *echoReq) (*echoResp, error) {
+		return &echoResp{Echo: req.Msg}, nil
+	}
+	r := newHandlerEngineForNewHandler(method, interceptor)
+
+	w := postJSON(t, r, `{"msg":"hello"}`)
+	resp := decodeResponse(t, w)
+	if resp.Code != httpruntime.CodeOK {
+		t.Fatalf("Code = %d, want CodeOK", resp.Code)
+	}
+	if !intercepted {
+		t.Error("interceptor did not run through NewHandler")
 	}
 }
 
