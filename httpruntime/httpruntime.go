@@ -75,6 +75,41 @@ const (
 // client-visible message that does not expose internal Go type or field details.
 var errBadRequest = errorx.New(BizCode(CodeBadRequest), "malformed request body")
 
+// PreValidateHook runs after JSON binding and before request validation.
+// Hooks may mutate req; later hooks, Validate, and the service method observe
+// those changes.
+type PreValidateHook[Req any] func(ctx context.Context, req *Req) error
+
+type handlerConfig[Req any, Resp any] struct {
+	preValidateHooks []PreValidateHook[Req]
+	interceptors     []handlerx.Interceptor[*Req, *Resp]
+}
+
+// HandlerOption configures a handler built by NewHandlerWithOptions.
+type HandlerOption[Req any, Resp any] func(*handlerConfig[Req, Resp])
+
+// WithPreValidateHook registers hook to run after JSON binding and before
+// request validation. Hooks run in registration order.
+func WithPreValidateHook[Req any, Resp any](hook PreValidateHook[Req]) HandlerOption[Req, Resp] {
+	if hook == nil {
+		panic("httpruntime: pre-validate hook must not be nil")
+	}
+	return func(cfg *handlerConfig[Req, Resp]) {
+		cfg.preValidateHooks = append(cfg.preValidateHooks, hook)
+	}
+}
+
+// WithInterceptors registers handlerx interceptors for the service method.
+// Interceptors run inside the runtime recovery interceptor, preserving the
+// behavior of NewHandler.
+func WithInterceptors[Req any, Resp any](
+	xs ...handlerx.Interceptor[*Req, *Resp],
+) HandlerOption[Req, Resp] {
+	return func(cfg *handlerConfig[Req, Resp]) {
+		cfg.interceptors = append(cfg.interceptors, xs...)
+	}
+}
+
 // OKResponse constructs a success Response with code CodeOK (0) and the given data.
 func OKResponse(data any) Response {
 	return Response{Code: CodeOK, Data: data}
@@ -125,9 +160,31 @@ func NewHandler[Req any, Resp any](
 	method func(ctx context.Context, req *Req) (*Resp, error),
 	interceptors ...handlerx.Interceptor[*Req, *Resp],
 ) gin.HandlerFunc {
-	all := make([]handlerx.Interceptor[*Req, *Resp], 0, 1+len(interceptors))
+	return NewHandlerWithOptions(method, WithInterceptors[Req, Resp](interceptors...))
+}
+
+// NewHandlerWithOptions creates a gin.HandlerFunc that binds JSON, runs
+// pre-validation hooks, validates, and calls the service method through a
+// handlerx interceptor chain.
+//
+// Pre-validation hooks run after JSON binding and before Validate(), in the
+// order they are registered. Hook errors are recorded with c.Error and stop the
+// request before validation or service execution.
+func NewHandlerWithOptions[Req any, Resp any](
+	method func(ctx context.Context, req *Req) (*Resp, error),
+	opts ...HandlerOption[Req, Resp],
+) gin.HandlerFunc {
+	var cfg handlerConfig[Req, Resp]
+	for _, opt := range opts {
+		if opt == nil {
+			panic("httpruntime: handler option must not be nil")
+		}
+		opt(&cfg)
+	}
+
+	all := make([]handlerx.Interceptor[*Req, *Resp], 0, 1+len(cfg.interceptors))
 	all = append(all, handlerx.WithRecovery[*Req, *Resp]())
-	all = append(all, interceptors...)
+	all = append(all, cfg.interceptors...)
 	h := handlerx.Chain(handlerx.Handler[*Req, *Resp](method), all...)
 	return func(c *gin.Context) {
 		var req Req
@@ -135,13 +192,20 @@ func NewHandler[Req any, Resp any](
 			_ = c.Error(errBadRequest)
 			return
 		}
+		ctx := c.Request.Context()
+		for _, hook := range cfg.preValidateHooks {
+			if err := hook(ctx, &req); err != nil {
+				_ = c.Error(err)
+				return
+			}
+		}
 		if v, ok := any(&req).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				_ = c.Error(err)
 				return
 			}
 		}
-		resp, err := h(c.Request.Context(), &req)
+		resp, err := h(ctx, &req)
 		if err != nil {
 			_ = c.Error(err)
 			return

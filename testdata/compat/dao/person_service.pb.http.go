@@ -15,8 +15,16 @@ func CreatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor
 	return httpruntime.NewHandler(svc.CreatePerson, interceptors...)
 }
 
+func CreatePersonHandlerWithOptions(svc PersonService, opts ...httpruntime.HandlerOption[PersonCreate, CreatePersonResponse]) gin.HandlerFunc {
+	return httpruntime.NewHandlerWithOptions(svc.CreatePerson, opts...)
+}
+
 func GetPersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*GetPersonRequest, *GetPersonResponse]) gin.HandlerFunc {
 	return httpruntime.NewHandler(svc.GetPerson, interceptors...)
+}
+
+func GetPersonHandlerWithOptions(svc PersonService, opts ...httpruntime.HandlerOption[GetPersonRequest, GetPersonResponse]) gin.HandlerFunc {
+	return httpruntime.NewHandlerWithOptions(svc.GetPerson, opts...)
 }
 
 // UpdatePerson updates an existing person record by name.
@@ -24,6 +32,14 @@ func UpdatePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor
 	return httpruntime.NewHandler(svc.UpdatePerson, interceptors...)
 }
 
+func UpdatePersonHandlerWithOptions(svc PersonService, opts ...httpruntime.HandlerOption[PersonUpdateByName, UpdatePersonResponse]) gin.HandlerFunc {
+	return httpruntime.NewHandlerWithOptions(svc.UpdatePerson, opts...)
+}
+
 func DeletePersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*DeletePersonRequest, *DeletePersonResponse]) gin.HandlerFunc {
 	return httpruntime.NewHandler(svc.DeletePerson, interceptors...)
+}
+
+func DeletePersonHandlerWithOptions(svc PersonService, opts ...httpruntime.HandlerOption[DeletePersonRequest, DeletePersonResponse]) gin.HandlerFunc {
+	return httpruntime.NewHandlerWithOptions(svc.DeletePerson, opts...)
 }

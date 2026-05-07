@@ -45,6 +45,8 @@ func TestHTTPFileSingleServiceSingleRPC(t *testing.T) {
 		"import httpruntime": `"github.com/pinealctx/gcode/httpruntime"`,
 		"handler func":       "func CreateUserHandler(svc UserService, interceptors ...handlerx.Interceptor[*CreateUserRequest, *CreateUserResponse]) gin.HandlerFunc",
 		"NewHandler call":    "return httpruntime.NewHandler(svc.CreateUser, interceptors...)",
+		"options func":       "func CreateUserHandlerWithOptions(svc UserService, opts ...httpruntime.HandlerOption[CreateUserRequest, CreateUserResponse]) gin.HandlerFunc",
+		"options call":       "return httpruntime.NewHandlerWithOptions(svc.CreateUser, opts...)",
 	})
 }
 
@@ -78,9 +80,12 @@ func TestHTTPFileMultipleServicesMultipleRPCs(t *testing.T) {
 	src := string(got)
 
 	containsAll(t, src, map[string]string{
-		"CreateUserHandler": "func CreateUserHandler(svc UserService, interceptors ...handlerx.Interceptor[*CreateUserRequest, *CreateUserResponse]) gin.HandlerFunc",
-		"GetUserHandler":    "func GetUserHandler(svc UserService, interceptors ...handlerx.Interceptor[*GetUserRequest, *GetUserResponse]) gin.HandlerFunc",
-		"PlaceOrderHandler": "func PlaceOrderHandler(svc OrderService, interceptors ...handlerx.Interceptor[*PlaceOrderRequest, *PlaceOrderResponse]) gin.HandlerFunc",
+		"CreateUserHandler":            "func CreateUserHandler(svc UserService, interceptors ...handlerx.Interceptor[*CreateUserRequest, *CreateUserResponse]) gin.HandlerFunc",
+		"CreateUserHandlerWithOptions": "func CreateUserHandlerWithOptions(svc UserService, opts ...httpruntime.HandlerOption[CreateUserRequest, CreateUserResponse]) gin.HandlerFunc",
+		"GetUserHandler":               "func GetUserHandler(svc UserService, interceptors ...handlerx.Interceptor[*GetUserRequest, *GetUserResponse]) gin.HandlerFunc",
+		"GetUserHandlerWithOptions":    "func GetUserHandlerWithOptions(svc UserService, opts ...httpruntime.HandlerOption[GetUserRequest, GetUserResponse]) gin.HandlerFunc",
+		"PlaceOrderHandler":            "func PlaceOrderHandler(svc OrderService, interceptors ...handlerx.Interceptor[*PlaceOrderRequest, *PlaceOrderResponse]) gin.HandlerFunc",
+		"PlaceOrderHandlerWithOptions": "func PlaceOrderHandlerWithOptions(svc OrderService, opts ...httpruntime.HandlerOption[PlaceOrderRequest, PlaceOrderResponse]) gin.HandlerFunc",
 	})
 }
 
@@ -172,6 +177,9 @@ func TestHTTPFileHandlerSignatureFormat(t *testing.T) {
 	if !strings.Contains(src, "func GetPersonHandler(svc PersonService, interceptors ...handlerx.Interceptor[*GetPersonRequest, *GetPersonResponse]) gin.HandlerFunc") {
 		t.Errorf("expected handler signature in output:\n%s", src)
 	}
+	if !strings.Contains(src, "func GetPersonHandlerWithOptions(svc PersonService, opts ...httpruntime.HandlerOption[GetPersonRequest, GetPersonResponse]) gin.HandlerFunc") {
+		t.Errorf("expected handler with options signature in output:\n%s", src)
+	}
 }
 
 // TestHTTPFileHandlerDelegation verifies that the generated handler delegates to
@@ -201,6 +209,9 @@ func TestHTTPFileHandlerDelegation(t *testing.T) {
 	// Generated handler must delegate to NewHandler.
 	if !strings.Contains(src, "httpruntime.NewHandler(svc.DoFoo, interceptors...)") {
 		t.Errorf("expected NewHandler delegation in output:\n%s", src)
+	}
+	if !strings.Contains(src, "httpruntime.NewHandlerWithOptions(svc.DoFoo, opts...)") {
+		t.Errorf("expected NewHandlerWithOptions delegation in output:\n%s", src)
 	}
 	// Inline logic and direct response helpers must NOT appear — all handled inside NewHandler.
 	for _, token := range []string{
@@ -287,6 +298,7 @@ func TestHTTPFileServiceCommentNotWritten(t *testing.T) {
 	containsAll(t, src, map[string]string{
 		"method comment": "// GetUser retrieves a user.",
 		"handler func":   "func GetUserHandler(svc UserService, interceptors ...handlerx.Interceptor[*GetUserRequest, *GetUserResponse]) gin.HandlerFunc",
+		"options func":   "func GetUserHandlerWithOptions(svc UserService, opts ...httpruntime.HandlerOption[GetUserRequest, GetUserResponse]) gin.HandlerFunc",
 	})
 }
 

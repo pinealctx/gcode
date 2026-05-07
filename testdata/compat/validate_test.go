@@ -3,6 +3,7 @@
 package compat_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/pinealctx/gcode/testdata/compat/dao"
@@ -293,4 +294,173 @@ func TestValidate_Update_NicknameOptional(t *testing.T) {
 	if err := p3.Validate(); err != nil {
 		t.Errorf("empty nickname should skip check, got: %v", err)
 	}
+}
+
+// --- T7: enum defined_only cross-file scenarios ---
+
+// TestValidate_EnumDefinedOnly_AllValidValues verifies that every defined enum
+// value passes the defined_only check. The Status enum is defined in
+// person.meta.proto and used in person.entity.proto — cross-file resolution
+// depends on the global EnumIndex built from all input files.
+func TestValidate_EnumDefinedOnly_AllValidValues(t *testing.T) {
+	t.Parallel()
+	for _, s := range []dao.Status{
+		dao.Status_STATUS_UNSPECIFIED,
+		dao.Status_STATUS_ACTIVE,
+		dao.Status_STATUS_INACTIVE,
+	} {
+		p := validPersonCreate()
+		p.Status = ptrStatus(s)
+		if err := p.Validate(); err != nil {
+			t.Errorf("Status=%v should pass defined_only, got: %v", s, err)
+		}
+	}
+}
+
+// TestValidate_EnumDefinedOnly_NilSkipsCheck verifies that nil *Status
+// skips defined_only — PersonCreate.Status is *Status (optional pointer).
+func TestValidate_EnumDefinedOnly_NilSkipsCheck(t *testing.T) {
+	t.Parallel()
+	p := validPersonCreate()
+	p.Status = nil
+	if err := p.Validate(); err != nil {
+		t.Errorf("nil Status should skip defined_only, got: %v", err)
+	}
+}
+
+// TestValidate_Update_EnumDefinedOnly_AllValidValues tests the same cross-file
+// defined_only scenario on PersonUpdateByName.
+func TestValidate_Update_EnumDefinedOnly_AllValidValues(t *testing.T) {
+	t.Parallel()
+	for _, s := range []dao.Status{
+		dao.Status_STATUS_UNSPECIFIED,
+		dao.Status_STATUS_ACTIVE,
+		dao.Status_STATUS_INACTIVE,
+	} {
+		u := validPersonUpdate()
+		u.Status = ptrStatus(s)
+		if err := u.Validate(); err != nil {
+			t.Errorf("Status=%v should pass defined_only, got: %v", s, err)
+		}
+	}
+}
+
+// TestValidate_Update_EnumDefinedOnly_NilSkipsCheck verifies nil *Status
+// skips defined_only on PersonUpdateByName.
+func TestValidate_Update_EnumDefinedOnly_NilSkipsCheck(t *testing.T) {
+	t.Parallel()
+	u := validPersonUpdate()
+	u.Status = nil
+	if err := u.Validate(); err != nil {
+		t.Errorf("nil Status should skip defined_only, got: %v", err)
+	}
+}
+
+// --- T5 Gap 1: ignore_fields validate-level assertions ---
+
+// TestValidate_Create_IgnoreFields_NoConstraintFired verifies that
+// PersonCreate's Validate() works correctly when all present (non-ignored)
+// fields are set to valid values. Fields excluded by ignore_fields
+// (address, scores, tags, avatar, fingerprint, created_at) do not exist in
+// the struct, so their constraints can never fire.
+func TestValidate_Create_IgnoreFields_NoConstraintFired(t *testing.T) {
+	t.Parallel()
+	if err := validPersonCreate().Validate(); err != nil {
+		t.Errorf("all-present-fields-valid PersonCreate should pass, got: %v", err)
+	}
+}
+
+// TestValidate_Update_IgnoreFields_NoConstraintFired verifies the same
+// ignore_fields guarantee for PersonUpdateByName (ignores address, scores,
+// tags, avatar, fingerprint).
+func TestValidate_Update_IgnoreFields_NoConstraintFired(t *testing.T) {
+	t.Parallel()
+	if err := validPersonUpdate().Validate(); err != nil {
+		t.Errorf("all-present-fields-valid PersonUpdateByName should pass, got: %v", err)
+	}
+}
+
+// TestValidate_Create_IgnoreFields_NonIgnoredStillEnforced verifies that
+// constraints on non-ignored fields remain active. Age is present in both
+// PersonCreate and Person with gte=0 — violating it must still fail.
+func TestValidate_Create_IgnoreFields_NonIgnoredStillEnforced(t *testing.T) {
+	t.Parallel()
+	p := validPersonCreate()
+	p.Age = int32Ptr(-1)
+	assertVE(t, p.Validate(), "age", "gte")
+}
+
+// TestValidate_Update_IgnoreFields_NonIgnoredStillEnforced verifies that
+// non-ignored field constraints still fire on PersonUpdateByName.
+func TestValidate_Update_IgnoreFields_NonIgnoredStillEnforced(t *testing.T) {
+	t.Parallel()
+	u := validPersonUpdate()
+	u.Age = int32Ptr(-1)
+	assertVE(t, u.Validate(), "age", "gte")
+
+	u2 := validPersonUpdate()
+	u2.Age = int32Ptr(151)
+	assertVE(t, u2.Validate(), "age", "lte")
+}
+
+// TestValidate_Create_OptionalNilSkips verifies that nil optional pointer fields
+// (*string, *int32, *Status) on PersonCreate skip all validation, mirroring
+// TestValidate_Update_OptionalFieldsSkipped on the update path.
+func TestValidate_Create_OptionalNilSkips(t *testing.T) {
+	t.Parallel()
+	// Name and Age are optional (*string, *int32); nil must skip all constraints.
+	c := &dao.PersonCreate{Nickname: "ali", Name: nil, Age: nil}
+	if err := c.Validate(); err != nil {
+		t.Errorf("nil optional Name/Age/Status should skip constraints, got: %v", err)
+	}
+}
+
+// --- T5 Gap 2: required/condition field exact boundary values ---
+
+// TestValidate_Create_NicknameBoundaryValues verifies PersonCreate.nickname
+// (required_fields, min_len=1, max_len=10) at exact boundary lengths.
+func TestValidate_Create_NicknameBoundaryValues(t *testing.T) {
+	t.Parallel()
+	// Exactly min_len=1 should pass
+	p1 := validPersonCreate()
+	p1.Nickname = "a"
+	if err := p1.Validate(); err != nil {
+		t.Errorf("nickname len=1 (exact min_len) should pass, got: %v", err)
+	}
+
+	// Exactly max_len=10 should pass
+	p2 := validPersonCreate()
+	p2.Nickname = "1234567890"
+	if err := p2.Validate(); err != nil {
+		t.Errorf("nickname len=10 (exact max_len) should pass, got: %v", err)
+	}
+
+	// One over max_len should fail
+	p3 := validPersonCreate()
+	p3.Nickname = "12345678901"
+	assertVE(t, p3.Validate(), "nickname", "max_len")
+}
+
+// TestValidate_Update_NameBoundaryValues verifies PersonUpdateByName.name
+// (condition_fields, min_len=1, max_len=100) at exact boundary lengths.
+func TestValidate_Update_NameBoundaryValues(t *testing.T) {
+	t.Parallel()
+	// Exactly min_len=1 should pass
+	u1 := validPersonUpdate()
+	u1.Name = "a"
+	if err := u1.Validate(); err != nil {
+		t.Errorf("name len=1 (exact min_len) should pass, got: %v", err)
+	}
+
+	// Exactly max_len=100 should pass
+	u2 := validPersonUpdate()
+	u2.Name = strings.Repeat("a", 100)
+	if err := u2.Validate(); err != nil {
+		t.Errorf("name len=100 (exact max_len) should pass, got: %v", err)
+	}
+
+	// One over max_len should fail
+	u3 := validPersonUpdate()
+	u3.Name = strings.Repeat("a", 101)
+	assertVE(t, u3.Validate(), "name", "max_len")
 }

@@ -1,10 +1,13 @@
 .claude
+.codex
+.agents
 .vscode
 __pycache__
 .doc
 .mcp.json
 .process
 CLAUDE.md
+AGENTS.md
 node_modules
 /gen
 package-lock.json

@@ -47,5 +47,10 @@ func writeServiceHandlers(b *strings.Builder, svc transform.GoService) {
 			m.GoName, svc.GoName, m.RequestType, m.ResponseType)
 		fmt.Fprintf(b, "\treturn httpruntime.NewHandler(svc.%s, interceptors...)\n", m.GoName)
 		b.WriteString("}\n\n")
+
+		fmt.Fprintf(b, "func %sHandlerWithOptions(svc %s, opts ...httpruntime.HandlerOption[%s, %s]) gin.HandlerFunc {\n",
+			m.GoName, svc.GoName, m.RequestType, m.ResponseType)
+		fmt.Fprintf(b, "\treturn httpruntime.NewHandlerWithOptions(svc.%s, opts...)\n", m.GoName)
+		b.WriteString("}\n\n")
 	}
 }
