@@ -792,6 +792,7 @@ export const StatusName: Record<Status, string> = {
 export const PersonRules = {
   name: { required: false, type: "string", minLength: 1, maxLength: 100 },
   age: { required: false, type: "integer", minimum: 0, maximum: 150 },
+  status: { required: false, type: "enum", notIn: [0], definedOnly: true },
   email: { required: false, type: "string", format: "email" },
 } as const
 ```
