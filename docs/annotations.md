@@ -691,11 +691,16 @@ enum Status {
 }
 
 message User {
-  Status status = 1 [(buf.validate.field).enum.defined_only = true];
+  Status status = 1 [
+    (buf.validate.field).enum.defined_only = true,
+    (buf.validate.field).enum.not_in = 0
+  ];
 }
 ```
 
 Triggered when: `status` value is not in `{0, 1, 2}` (prevents passing undefined integer values).
+
+`not_in` can be combined with `defined_only` to reject defined sentinel values such as `STATUS_UNSPECIFIED = 0`.
 
 ---
 

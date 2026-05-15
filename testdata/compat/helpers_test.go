@@ -65,4 +65,7 @@ func assertAllValidateEqual(t *testing.T, want, got *dao.AllValidate) {
 			}
 		}
 	}
+	if got.EStatus != want.EStatus {
+		t.Errorf("EStatus: got %v, want %v", got.EStatus, want.EStatus)
+	}
 }

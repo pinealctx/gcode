@@ -928,6 +928,17 @@ message Filter {
   uint64 flags = 6 [
     (buf.validate.field).uint64.not_in = 0
   ];
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_ACTIVE = 1;
+    STATUS_INACTIVE = 2;
+    STATUS_DELETED = 3;
+  }
+  Status e_status = 7 [
+    (buf.validate.field).enum.defined_only = true,
+    (buf.validate.field).enum.not_in = 0,
+    (buf.validate.field).enum.not_in = 3
+  ];
 }
 `)
 
@@ -983,6 +994,17 @@ message Filter {
 	}
 	if len(fields[5].ValidateOptions.NotInUint) != 1 || fields[5].ValidateOptions.NotInUint[0] != 0 {
 		t.Errorf("flags: NotInUint = %v, want [0]", fields[5].ValidateOptions.NotInUint)
+	}
+
+	// e_status: DefinedOnly = true, NotInEnum = [0, 3]
+	if fields[6].ValidateOptions == nil {
+		t.Fatal("e_status enum: ValidateOptions should not be nil")
+	}
+	if !fields[6].ValidateOptions.DefinedOnly {
+		t.Error("e_status enum: DefinedOnly = false, want true")
+	}
+	if len(fields[6].ValidateOptions.NotInEnum) != 2 || fields[6].ValidateOptions.NotInEnum[0] != 0 || fields[6].ValidateOptions.NotInEnum[1] != 3 {
+		t.Errorf("e_status enum: NotInEnum = %v, want [0 3]", fields[6].ValidateOptions.NotInEnum)
 	}
 }
 

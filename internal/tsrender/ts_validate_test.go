@@ -240,6 +240,7 @@ func TestValidationEnumRules(t *testing.T) {
 					Type:        model.FieldType{Kind: model.FieldKindEnum, FullName: "test.Status"},
 					ValidateOptions: &model.ValidateFieldOptions{
 						DefinedOnly: true,
+						NotInEnum:   []int32{0},
 					},
 				},
 			},
@@ -247,7 +248,7 @@ func TestValidationEnumRules(t *testing.T) {
 	}
 
 	s := renderRules(msg)
-	assertContains(t, s, `status: { required: false, type: "enum", definedOnly: true }`)
+	assertContains(t, s, `status: { required: false, type: "enum", notIn: [0], definedOnly: true }`)
 }
 
 func TestValidationRepeatedRules(t *testing.T) {
@@ -474,6 +475,7 @@ func TestValidationRepeatedWithEnumItems(t *testing.T) {
 						MaxItems: uintPtr(10),
 						Items: &model.ValidateFieldOptions{
 							DefinedOnly: true,
+							NotInEnum:   []int32{0},
 						},
 					},
 				},
@@ -482,7 +484,7 @@ func TestValidationRepeatedWithEnumItems(t *testing.T) {
 	}
 
 	s := renderRules(msg)
-	assertContains(t, s, `statuses: { required: false, type: "array", minItems: 1, maxItems: 10, items: { type: "enum", definedOnly: true } }`)
+	assertContains(t, s, `statuses: { required: false, type: "array", minItems: 1, maxItems: 10, items: { type: "enum", notIn: [0], definedOnly: true } }`)
 }
 
 func TestValidationTypeUnknown(t *testing.T) {

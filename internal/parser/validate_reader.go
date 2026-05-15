@@ -129,8 +129,8 @@ func parseFieldConstraints(fc *dynamicpb.Message, kind protoreflect.Kind, fieldF
 	case protoreflect.EnumKind:
 		enumRules := getMessageField(fc, "enum")
 		if enumRules != nil {
-			opts.DefinedOnly = getBoolField(enumRules, "defined_only")
-			if opts.DefinedOnly {
+			parseEnumRules(enumRules, opts)
+			if opts.DefinedOnly || len(opts.NotInEnum) > 0 {
 				hasAny = true
 			}
 		}
@@ -321,6 +321,19 @@ func parseFloatRules(r *dynamicpb.Message, opts *model.ValidateFieldOptions) {
 	}
 }
 
+// parseEnumRules fills enum constraints.
+func parseEnumRules(r *dynamicpb.Message, opts *model.ValidateFieldOptions) {
+	opts.DefinedOnly = getBoolField(r, "defined_only")
+	notInVals := getListField(r, "not_in")
+	if len(notInVals) > 0 {
+		vals := make([]int32, len(notInVals))
+		for i, v := range notInVals {
+			vals[i] = int32(v.Int())
+		}
+		opts.NotInEnum = vals
+	}
+}
+
 // parseBytesRules fills bytes constraints.
 func parseBytesRules(r *dynamicpb.Message, opts *model.ValidateFieldOptions, fieldFullName string) error {
 	if hasField(r, "min_len") {
@@ -434,8 +447,8 @@ func parseItemConstraints(fc *dynamicpb.Message, fieldFullName string) (*model.V
 		hasAny = true
 	}
 	if r := getMessageField(fc, "enum"); r != nil {
-		opts.DefinedOnly = getBoolField(r, "defined_only")
-		if opts.DefinedOnly {
+		parseEnumRules(r, opts)
+		if opts.DefinedOnly || len(opts.NotInEnum) > 0 {
 			hasAny = true
 		}
 	}

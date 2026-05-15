@@ -35,6 +35,6 @@ message AllRepeatedUpdate {
   repeated double r_double = 3 [(buf.validate.field).repeated.items.double.gt = 0.5];
   repeated bytes r_bytes = 4 [(buf.validate.field).repeated.items.bytes.min_len = 1];
   repeated Address r_message = 5;
-  repeated Status r_enum = 6 [(buf.validate.field).repeated.items.enum.defined_only = true];
+  repeated Status r_enum = 6 [(buf.validate.field).repeated.items.enum.defined_only = true, (buf.validate.field).repeated.items.enum.not_in = 0];
 }
 

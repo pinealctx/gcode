@@ -39,7 +39,10 @@ message AllValidate {
 
   string s_uri   = 10 [(buf.validate.field).string.uri = true];
 
-  optional Status o_status = 11 [(buf.validate.field).enum.defined_only = true];
+  optional Status o_status = 11 [
+    (buf.validate.field).enum.defined_only = true,
+    (buf.validate.field).enum.not_in = 0
+  ];
 
   bytes  b_minmax = 12 [
     (buf.validate.field).bytes.min_len = 1,
@@ -85,4 +88,9 @@ message AllValidate {
   double d_gt     = 17 [(buf.validate.field).double.gt = -1.0];
   // pattern for string
   string s_pattern = 18 [(buf.validate.field).string.pattern = "^[A-Z][a-z]+$"];
+
+  Status e_status = 23 [
+    (buf.validate.field).enum.not_in = 0,
+    (buf.validate.field).enum.not_in = 2
+  ];
 }

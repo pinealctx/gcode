@@ -494,9 +494,7 @@ func appendValidateAnnotations(opts []string, f model.Field) []string {
 			panic(fmt.Sprintf("appendValidateAnnotations: unsupported scalar type %v", f.Type.Scalar))
 		}
 	case model.FieldKindEnum:
-		if v.DefinedOnly {
-			opts = append(opts, "(buf.validate.field).enum.defined_only = true")
-		}
+		opts = enumConstraints(opts, v, "(buf.validate.field).enum")
 	case model.FieldKindMessage:
 		// required is already handled above.
 	default:
@@ -671,13 +669,21 @@ func appendItemsValidate(opts []string, items *model.ValidateFieldOptions, elemT
 			panic(fmt.Sprintf("appendItemsValidate: unsupported scalar type %v", elemType.Scalar))
 		}
 	case model.FieldKindEnum:
-		if items.DefinedOnly {
-			opts = append(opts, base+".enum.defined_only = true")
-		}
+		opts = enumConstraints(opts, items, base+".enum")
 	case model.FieldKindMessage:
 		// no element-level constraints for message type
 	default:
 		panic(fmt.Sprintf("appendItemsValidate: unsupported field kind %v", elemType.Kind))
+	}
+	return opts
+}
+
+func enumConstraints(opts []string, v *model.ValidateFieldOptions, prefix string) []string {
+	if v.DefinedOnly {
+		opts = append(opts, prefix+".defined_only = true")
+	}
+	for _, n := range v.NotInEnum {
+		opts = append(opts, fmt.Sprintf("%s.not_in = %d", prefix, n))
 	}
 	return opts
 }

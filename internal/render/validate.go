@@ -492,26 +492,45 @@ func writeFloatValidation(b *strings.Builder, fieldExpr, fieldName, vm string, v
 
 // writeEnumValidation writes enum field constraints.
 func writeEnumValidation(b *strings.Builder, fieldExpr, fieldName, vm string, vo *model.ValidateFieldOptions, f transform.GoField, enumByGoName map[string]transform.GoEnum) {
-	if vo == nil || !vo.DefinedOnly {
+	if vo == nil {
 		return
 	}
-	// Look up enum by stripping pointer/slice prefix from GoType.
-	enumGoName := stripTypePrefix(f.GoType)
-	enum, ok := enumByGoName[enumGoName]
-	if !ok || len(enum.Values) == 0 {
-		return
+
+	if len(vo.NotInEnum) > 0 {
+		writeEnumNotInCheck(b, fieldExpr, fieldName, vm, vo.NotInEnum)
 	}
-	b.WriteString("switch " + fieldExpr + " {\n")
-	b.WriteString("case ")
-	for i, v := range enum.Values {
+
+	if vo.DefinedOnly {
+		enum, ok := lookupEnum(f, enumByGoName)
+		if !ok {
+			return
+		}
+		b.WriteString("switch " + fieldExpr + " {\n")
+		b.WriteString("case ")
+		for i, v := range enum.Values {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(v.GoName)
+		}
+		b.WriteString(":\n// ok\n")
+		fmt.Fprintf(b, "default:\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"defined_only\", Message: validateruntime.MsgOr(%q, \"must be a defined enum value\")}\n}\n",
+			fieldName, vm)
+	}
+}
+
+func writeEnumNotInCheck(b *strings.Builder, fieldExpr, fieldName, vm string, vals []int32) {
+	fmt.Fprintf(b, "for _, v := range []int32{")
+	for i, v := range vals {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		b.WriteString(v.GoName)
+		fmt.Fprintf(b, "%d", v)
 	}
-	b.WriteString(":\n// ok\n")
-	fmt.Fprintf(b, "default:\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"defined_only\", Message: validateruntime.MsgOr(%q, \"must be a defined enum value\")}\n}\n",
-		fieldName, vm)
+	b.WriteString("} {\n")
+	display := buildInt32List(vals)
+	fmt.Fprintf(b, "if int32(%s) == v {\nreturn &validateruntime.ValidationError{Field: %q, Rule: \"not_in\", Message: validateruntime.MsgOr(%q, \"must not be one of %s\")}\n}\n}\n",
+		fieldExpr, fieldName, vm, display)
 }
 
 // writeMessageFieldValidation writes message field required + recursive Validate().
@@ -737,14 +756,27 @@ func writeItemsFloatValidation(b *strings.Builder, elemField, vm string, items *
 	}
 }
 
-// writeItemsEnumValidation writes enum element defined_only constraint.
+// writeItemsEnumValidation writes enum element constraints.
 func writeItemsEnumValidation(b *strings.Builder, elemField, vm string, items *model.ValidateFieldOptions, f transform.GoField, enumByGoName map[string]transform.GoEnum) {
+	if len(items.NotInEnum) > 0 {
+		display := buildInt32List(items.NotInEnum)
+		b.WriteString("for _, ev := range []int32{")
+		for i, n := range items.NotInEnum {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(b, "%d", n)
+		}
+		b.WriteString("} {\n")
+		fmt.Fprintf(b, "if int32(v) == ev {\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"not_in\", Message: validateruntime.MsgOr(%q, \"must not be one of %s\")}\n}\n}\n",
+			elemField, vm, display)
+	}
+
 	if !items.DefinedOnly {
 		return
 	}
-	enumGoName := stripTypePrefix(f.GoType)
-	enum, ok := enumByGoName[enumGoName]
-	if !ok || len(enum.Values) == 0 {
+	enum, ok := lookupEnum(f, enumByGoName)
+	if !ok {
 		return
 	}
 	b.WriteString("switch v {\n case ")
@@ -757,6 +789,16 @@ func writeItemsEnumValidation(b *strings.Builder, elemField, vm string, items *m
 	b.WriteString(":\n// ok\n")
 	fmt.Fprintf(b, "default:\nreturn &validateruntime.ValidationError{Field: %s, Rule: \"defined_only\", Message: validateruntime.MsgOr(%q, \"must be a defined enum value\")}\n}\n",
 		elemField, vm)
+}
+
+func lookupEnum(f transform.GoField, enumByGoName map[string]transform.GoEnum) (transform.GoEnum, bool) {
+	// Look up enum by stripping pointer/slice prefix from GoType.
+	enumGoName := stripTypePrefix(f.GoType)
+	enum, ok := enumByGoName[enumGoName]
+	if !ok || len(enum.Values) == 0 {
+		return transform.GoEnum{}, false
+	}
+	return enum, true
 }
 
 // --- helpers ---
@@ -807,6 +849,14 @@ func buildStringList(vals []string) string {
 }
 
 func buildInt64List(vals []int64) string {
+	parts := make([]string, len(vals))
+	for i, v := range vals {
+		parts[i] = fmt.Sprintf("%d", v)
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+func buildInt32List(vals []int32) string {
 	parts := make([]string, len(vals))
 	for i, v := range vals {
 		parts[i] = fmt.Sprintf("%d", v)

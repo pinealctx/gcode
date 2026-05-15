@@ -12,24 +12,25 @@ import (
 func validAllValidate() *dao.AllValidate {
 	status := dao.Status_STATUS_ACTIVE
 	return &dao.AllValidate{
-		UGte:     1,                     // gte=1: exactly at boundary
-		ULte:     1000,                  // lte=1000: exactly at boundary
-		UIn:      2,                     // in=[1,2,3]
-		UNotIn:   5,                     // not_in=[0]: any non-zero value
-		FGt:      0.1,                   // gt=0
-		DLte:     0.5,                   // lte=1.0
-		SIn:      "b",                   // in=[a,b,c]
-		SNotIn:   "z",                   // not_in=[x,y]
-		IIn:      1,                     // in=[1,2,-1]
-		SUri:     "https://example.com", // valid URI
-		OStatus:  &status,               // defined_only
-		BMinmax:  []byte{0x01},          // min_len=1, max_len=100
-		RItems:   []int32{0, 1, 2},      // items.gte=0
-		IGtLt:    0,                     // gt=-10, lt=10: 0 is in range
-		UGtLt:    50,                    // gt=5, lt=100: 50 is in range
-		FLt:      50.0,                  // lt=99.5: 50 < 99.5
-		DGt:      0.0,                   // gt=-1.0: 0 > -1
-		SPattern: "Hello",              // pattern=^[A-Z][a-z]+$
+		UGte:     1,                        // gte=1: exactly at boundary
+		ULte:     1000,                     // lte=1000: exactly at boundary
+		UIn:      2,                        // in=[1,2,3]
+		UNotIn:   5,                        // not_in=[0]: any non-zero value
+		FGt:      0.1,                      // gt=0
+		DLte:     0.5,                      // lte=1.0
+		SIn:      "b",                      // in=[a,b,c]
+		SNotIn:   "z",                      // not_in=[x,y]
+		IIn:      1,                        // in=[1,2,-1]
+		SUri:     "https://example.com",    // valid URI
+		OStatus:  &status,                  // defined_only
+		BMinmax:  []byte{0x01},             // min_len=1, max_len=100
+		RItems:   []int32{0, 1, 2},         // items.gte=0
+		IGtLt:    0,                        // gt=-10, lt=10: 0 is in range
+		UGtLt:    50,                       // gt=5, lt=100: 50 is in range
+		FLt:      50.0,                     // lt=99.5: 50 < 99.5
+		DGt:      0.0,                      // gt=-1.0: 0 > -1
+		SPattern: "Hello",                  // pattern=^[A-Z][a-z]+$
+		EStatus:  dao.Status_STATUS_ACTIVE, // not_in=[0,2]
 	}
 }
 
@@ -260,7 +261,7 @@ func TestAllValidate_SUri(t *testing.T) {
 	}
 }
 
-// TestAllValidate_OStatus verifies optional enum defined_only constraint.
+// TestAllValidate_OStatus verifies optional enum defined_only and not_in constraints.
 func TestAllValidate_OStatus(t *testing.T) {
 	t.Parallel()
 
@@ -271,25 +272,50 @@ func TestAllValidate_OStatus(t *testing.T) {
 		t.Errorf("nil o_status should skip check, got: %v", err)
 	}
 
-	// pass: all defined values
+	// fail: forbidden defined enum value triggers not_in before defined_only.
+	forbidden := dao.Status_STATUS_UNSPECIFIED
+	a2 := validAllValidate()
+	a2.OStatus = &forbidden
+	assertVE(t, a2.Validate(), "o_status", "not_in")
+
+	// pass: allowed defined values
 	for _, v := range []dao.Status{
-		dao.Status_STATUS_UNSPECIFIED,
 		dao.Status_STATUS_ACTIVE,
 		dao.Status_STATUS_INACTIVE,
 	} {
 		s := v
-		a2 := validAllValidate()
-		a2.OStatus = &s
-		if err := a2.Validate(); err != nil {
-			t.Errorf("o_status=%v should pass defined_only, got: %v", v, err)
+		a3 := validAllValidate()
+		a3.OStatus = &s
+		if err := a3.Validate(); err != nil {
+			t.Errorf("o_status=%v should pass enum rules, got: %v", v, err)
 		}
 	}
 
 	// fail: undefined enum value triggers defined_only
 	invalid := dao.Status(999)
-	a3 := validAllValidate()
-	a3.OStatus = &invalid
-	assertVE(t, a3.Validate(), "o_status", "defined_only")
+	a4 := validAllValidate()
+	a4.OStatus = &invalid
+	assertVE(t, a4.Validate(), "o_status", "defined_only")
+}
+
+// TestAllValidate_EStatus verifies enum not_in supports multiple forbidden values.
+func TestAllValidate_EStatus(t *testing.T) {
+	t.Parallel()
+
+	for _, v := range []dao.Status{
+		dao.Status_STATUS_UNSPECIFIED,
+		dao.Status_STATUS_INACTIVE,
+	} {
+		a := validAllValidate()
+		a.EStatus = v
+		assertVE(t, a.Validate(), "e_status", "not_in")
+	}
+
+	a := validAllValidate()
+	a.EStatus = dao.Status_STATUS_ACTIVE
+	if err := a.Validate(); err != nil {
+		t.Errorf("e_status active should pass, got: %v", err)
+	}
 }
 
 // TestAllValidate_BMinmax verifies bytes min_len/max_len constraints.
@@ -457,7 +483,7 @@ func TestAllRepeatedUpdate_Valid(t *testing.T) {
 		RSfixed32: []int32{-1, -5},
 		RDouble:   []float64{0.6, 1.0},
 		RBytes:    [][]byte{{0x01}, {0x02}},
-		REnum:     []dao.Status{dao.Status_STATUS_UNSPECIFIED, dao.Status_STATUS_ACTIVE},
+		REnum:     []dao.Status{dao.Status_STATUS_ACTIVE, dao.Status_STATUS_INACTIVE},
 	}
 	if err := u.Validate(); err != nil {
 		t.Errorf("expected nil, got %v", err)
@@ -484,13 +510,16 @@ func TestAllRepeatedUpdate_ItemsConstraints(t *testing.T) {
 	u4 := &dao.AllRepeatedUpdate{RBytes: [][]byte{{}}}
 	assertVE(t, u4.Validate(), "r_bytes[0]", "min_len")
 
+	// fail: forbidden defined enum value triggers not_in.
+	u0 := &dao.AllRepeatedUpdate{REnum: []dao.Status{dao.Status_STATUS_UNSPECIFIED}}
+	assertVE(t, u0.Validate(), "r_enum[0]", "not_in")
+
 	// fail: undefined enum value (defined_only)
 	u5 := &dao.AllRepeatedUpdate{REnum: []dao.Status{dao.Status(999)}}
 	assertVE(t, u5.Validate(), "r_enum[0]", "defined_only")
 
-	// pass: all defined enum values accepted
+	// pass: allowed defined enum values accepted
 	for _, v := range []dao.Status{
-		dao.Status_STATUS_UNSPECIFIED,
 		dao.Status_STATUS_ACTIVE,
 		dao.Status_STATUS_INACTIVE,
 	} {

@@ -39,6 +39,7 @@ type AllValidate struct {
 	DGt float64 `json:"dGt"`
 	// pattern for string
 	SPattern string `json:"sPattern"`
+	EStatus  Status `json:"eStatus"`
 }
 
 // Size returns the protobuf wire size of AllValidate.
@@ -128,6 +129,9 @@ func (x *AllValidate) Size() int {
 	}
 	if len(x.SPattern) > 0 {
 		n += 2 + runtime.SizeString(x.SPattern)
+	}
+	if x.EStatus != 0 {
+		n += 2 + runtime.SizeEnum(int32(x.EStatus))
 	}
 	return n
 }
@@ -251,6 +255,10 @@ func (x *AllValidate) MarshalAppend(b []byte) ([]byte, error) {
 	if len(x.SPattern) > 0 {
 		b = runtime.AppendTag(b, 18, runtime.WireBytes)
 		b = runtime.AppendString(b, x.SPattern)
+	}
+	if x.EStatus != 0 {
+		b = runtime.AppendTag(b, 23, runtime.WireVarint)
+		b = runtime.AppendVarint(b, uint64(x.EStatus))
 	}
 	return b, nil
 }
@@ -721,6 +729,25 @@ func (x *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				return 0, fmt.Errorf("field 18: %w", runtime.ErrTruncated)
 			}
 			x.SPattern = string(payload)
+			off += n
+		case 23:
+			if seen[0]&131072 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 23: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 131072
+			if wireType != runtime.WireVarint {
+				return 0, fmt.Errorf("field 23: %w", runtime.ErrWireType)
+			}
+			v, n := runtime.ConsumeVarint(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 23: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 23: %w", runtime.ErrTruncated)
+			}
+			x.EStatus = Status(v)
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)

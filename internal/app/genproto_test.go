@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1050,55 +1051,56 @@ func TestAppendItemsValidate_DispatchesByElemType(t *testing.T) {
 		name     string
 		items    *model.ValidateFieldOptions
 		elemType model.FieldType
-		want     string
+		want     []string
 	}{
 		{
 			name:     "string items min_len",
 			items:    &model.ValidateFieldOptions{MinLen: &minLenVal},
 			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarString},
-			want:     "(buf.validate.field).repeated.items.string.min_len = 1",
+			want:     []string{"(buf.validate.field).repeated.items.string.min_len = 1"},
 		},
 		{
 			name:     "sint32 items gte",
 			items:    &model.ValidateFieldOptions{GTEInt: &gteVal},
 			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarSint32},
-			want:     "(buf.validate.field).repeated.items.sint32.gte = -100",
+			want:     []string{"(buf.validate.field).repeated.items.sint32.gte = -100"},
 		},
 		{
 			name:     "sfixed32 items lt",
 			items:    &model.ValidateFieldOptions{LTInt: &ltVal},
 			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarSfixed32},
-			want:     "(buf.validate.field).repeated.items.sfixed32.lt = 0",
+			want:     []string{"(buf.validate.field).repeated.items.sfixed32.lt = 0"},
 		},
 		{
 			name:     "double items gt",
 			items:    &model.ValidateFieldOptions{GTFloat: &gtFloat},
 			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarDouble},
-			want:     "(buf.validate.field).repeated.items.double.gt = 0.5",
+			want:     []string{"(buf.validate.field).repeated.items.double.gt = 0.5"},
 		},
 		{
 			name:     "bytes items min_len",
 			items:    &model.ValidateFieldOptions{MinLen: &minLenVal},
 			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarBytes},
-			want:     "(buf.validate.field).repeated.items.bytes.min_len = 1",
+			want:     []string{"(buf.validate.field).repeated.items.bytes.min_len = 1"},
 		},
 		{
-			name:     "enum items defined_only",
-			items:    &model.ValidateFieldOptions{DefinedOnly: true},
+			name:     "enum items defined_only and not_in",
+			items:    &model.ValidateFieldOptions{DefinedOnly: true, NotInEnum: []int32{0}},
 			elemType: model.FieldType{Kind: model.FieldKindEnum, Name: "Status"},
-			want:     "(buf.validate.field).repeated.items.enum.defined_only = true",
+			want: []string{
+				"(buf.validate.field).repeated.items.enum.defined_only = true",
+				"(buf.validate.field).repeated.items.enum.not_in = 0",
+			},
 		},
 		{
 			name:     "message items no constraints",
 			items:    &model.ValidateFieldOptions{DefinedOnly: true},
 			elemType: model.FieldType{Kind: model.FieldKindMessage, Name: "Address"},
-			want:     "",
 		},
 		{
 			name:     "bool items no constraints",
 			items:    &model.ValidateFieldOptions{DefinedOnly: true},
 			elemType: model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarBool},
-			want:     "",
 		},
 	}
 
@@ -1107,14 +1109,14 @@ func TestAppendItemsValidate_DispatchesByElemType(t *testing.T) {
 			t.Parallel()
 			var opts []string
 			opts = appendItemsValidate(opts, tt.items, tt.elemType)
-			if tt.want == "" {
+			if len(tt.want) == 0 {
 				if len(opts) != 0 {
 					t.Errorf("expected no output, got %v", opts)
 				}
 				return
 			}
-			if len(opts) != 1 || opts[0] != tt.want {
-				t.Errorf("got %v, want [%s]", opts, tt.want)
+			if !slices.Equal(opts, tt.want) {
+				t.Errorf("got %v, want %v", opts, tt.want)
 			}
 		})
 	}

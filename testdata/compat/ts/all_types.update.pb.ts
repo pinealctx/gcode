@@ -32,6 +32,6 @@ export const AllRepeatedUpdateRules = {
   rDouble: { required: false, type: "array", items: { type: "number", exclusiveMinimum: 0.5 } },
   rBytes: { required: false, type: "array", items: { type: "string", minLength: 1 } },
   rMessage: { required: false, type: "array" },
-  rEnum: { required: false, type: "array", items: { type: "enum", definedOnly: true } }
+  rEnum: { required: false, type: "array", items: { type: "enum", notIn: [0], definedOnly: true } }
 } as const
 
