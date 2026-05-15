@@ -27,6 +27,7 @@ export interface AllValidate {
   fLt: number
   dGt: number
   sPattern: string
+  eStatus: Status
 }
 
 export const AllValidateRules = {
@@ -40,7 +41,7 @@ export const AllValidateRules = {
   sNotIn: { required: false, type: "string", notIn: ["x", "y"] },
   iIn: { required: false, type: "integer", enum: [1, 2, -1] },
   sUri: { required: false, type: "string", format: "uri" },
-  oStatus: { required: false, type: "enum", definedOnly: true },
+  oStatus: { required: false, type: "enum", notIn: [0], definedOnly: true },
   bMinmax: { required: false, type: "string", minLength: 1, maxLength: 100 },
   rItems: { required: false, type: "array", minItems: 1, maxItems: 5, items: { type: "integer", minimum: 0 } },
   rStrIn: { required: false, type: "array", items: { type: "string", enum: ["foo", "bar"] } },
@@ -51,6 +52,7 @@ export const AllValidateRules = {
   uGtLt: { required: false, type: "integer", exclusiveMinimum: 5, exclusiveMaximum: 100 },
   fLt: { required: false, type: "number", exclusiveMaximum: 99.5 },
   dGt: { required: false, type: "number", exclusiveMinimum: -1 },
-  sPattern: { required: false, type: "string", pattern: "^[A-Z][a-z]+$" }
+  sPattern: { required: false, type: "string", pattern: "^[A-Z][a-z]+$" },
+  eStatus: { required: false, type: "enum", notIn: [0, 2] }
 } as const
 

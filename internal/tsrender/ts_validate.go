@@ -330,6 +330,15 @@ func appendConstraintParts(parts []string, vo *model.ValidateFieldOptions) []str
 		parts = append(parts, fmt.Sprintf("exclusiveMaximum: %g", *vo.LTFloat))
 	}
 
+	// Enum constraints
+	if len(vo.NotInEnum) > 0 {
+		elems := make([]string, len(vo.NotInEnum))
+		for i, v := range vo.NotInEnum {
+			elems[i] = fmt.Sprintf("%d", v)
+		}
+		parts = append(parts, "notIn: ["+strings.Join(elems, ", ")+"]")
+	}
+
 	return parts
 }
 

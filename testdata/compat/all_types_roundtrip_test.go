@@ -31,6 +31,7 @@ func TestAllValidateRoundTrip(t *testing.T) {
 		OStatus: &status,
 		BMinmax: []byte{0xDE, 0xAD},
 		RItems:  []int32{0, 1, 100},
+		EStatus: dao.Status_STATUS_ACTIVE,
 	}
 
 	wire, err := orig.MarshalBinary()

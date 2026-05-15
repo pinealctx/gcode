@@ -1304,7 +1304,7 @@ func TestValidateFileEnumDefinedOnly(t *testing.T) {
 							Cardinality:     model.CardinalitySingular,
 							Type:            model.FieldType{Kind: model.FieldKindEnum, FullName: ".foopb.Status"},
 							JSONName:        "status",
-							ValidateOptions: &model.ValidateFieldOptions{DefinedOnly: true},
+							ValidateOptions: &model.ValidateFieldOptions{DefinedOnly: true, NotInEnum: []int32{0, 2}},
 						},
 						GoName: "Status", GoType: "Status",
 					},
@@ -1330,6 +1330,9 @@ func TestValidateFileEnumDefinedOnly(t *testing.T) {
 
 	containsAll(t, src, map[string]string{
 		"switch":        "switch x.Status",
+		"not_in loop":   "for _, v := range []int32{0, 2}",
+		"not_in cast":   "if int32(x.Status) == v",
+		"not_in rule":   `Rule: "not_in"`,
 		"active case":   "Status_STATUS_ACTIVE",
 		"inactive case": "Status_STATUS_INACTIVE",
 		"defined_only":  `Rule: "defined_only"`,

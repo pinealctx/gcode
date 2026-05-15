@@ -723,6 +723,7 @@ For detailed documentation and examples, see [Annotations Reference](annotations
 | `(buf.validate.field).repeated.max_items` | repeated      | Maximum element count                              |
 | `(buf.validate.field).repeated.items.*`   | repeated      | Apply constraints to each element                  |
 | `(buf.validate.field).enum.defined_only`  | enum          | Only allow defined enum values                     |
+| `(buf.validate.field).enum.not_in`        | enum          | Disallowed enum numbers                            |
 | `(buf.validate.field).required`           | message/bytes | Disallow nil / empty                               |
 | `(buf.validate.field).message.required`   | message       | Nested message must not be nil                     |
 

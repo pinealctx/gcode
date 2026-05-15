@@ -724,6 +724,7 @@ interceptor 按传入顺序执行，位于内置 panic 恢复层的内侧。serv
 | `(buf.validate.field).repeated.max_items` | repeated      | 最多元素数                     |
 | `(buf.validate.field).repeated.items.*`   | repeated      | 对每个元素应用约束             |
 | `(buf.validate.field).enum.defined_only`  | enum          | 只允许已定义的枚举值           |
+| `(buf.validate.field).enum.not_in`        | enum          | 排除指定枚举数值               |
 | `(buf.validate.field).required`           | message/bytes | 不允许 nil / 空                |
 | `(buf.validate.field).message.required`   | message       | 嵌套 message 不允许 nil        |
 

@@ -692,11 +692,16 @@ enum Status {
 }
 
 message User {
-  Status status = 1 [(buf.validate.field).enum.defined_only = true];
+  Status status = 1 [
+    (buf.validate.field).enum.defined_only = true,
+    (buf.validate.field).enum.not_in = 0
+  ];
 }
 ```
 
 触发条件：`status` 的值不在 `{0, 1, 2}` 中（防止传入未定义的整数值）。
+
+`not_in` 可与 `defined_only` 组合，用于拒绝 `STATUS_UNSPECIFIED = 0` 这类已定义的哨兵值。
 
 ---
 

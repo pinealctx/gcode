@@ -39,6 +39,11 @@ func (x *AllRepeatedUpdate) Validate() error {
 		}
 	}
 	for i, v := range x.REnum {
+		for _, ev := range []int32{0} {
+			if int32(v) == ev {
+				return &validateruntime.ValidationError{Field: fmt.Sprintf("r_enum[%d]", i), Rule: "not_in", Message: validateruntime.MsgOr("", "must not be one of [0]")}
+			}
+		}
 		switch v {
 		case Status_STATUS_UNSPECIFIED, Status_STATUS_ACTIVE, Status_STATUS_INACTIVE:
 		// ok

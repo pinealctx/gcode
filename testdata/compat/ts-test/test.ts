@@ -38,7 +38,7 @@ import {
 
 import { type AllScalarsCreate } from "../ts/all_types.create.pb.ts";
 
-import { type AllScalarsUpdate } from "../ts/all_types.update.pb.ts";
+import { type AllScalarsUpdate, AllRepeatedUpdateRules } from "../ts/all_types.update.pb.ts";
 
 // --- helpers ---
 
@@ -245,6 +245,10 @@ assertEqual((AllValidateRules.sUri as { format: string }).format, "uri", "AllVal
 
 // optional enum defined_only
 assertEqual(AllValidateRules.oStatus.definedOnly, true, "AllValidateRules.oStatus.definedOnly === true");
+assert((AllValidateRules.oStatus as { notIn: readonly number[] }).notIn.includes(0), "AllValidateRules.oStatus.notIn includes 0");
+assert((AllValidateRules.eStatus as { notIn: readonly number[] }).notIn.includes(0), "AllValidateRules.eStatus.notIn includes 0");
+assert((AllValidateRules.eStatus as { notIn: readonly number[] }).notIn.includes(2), "AllValidateRules.eStatus.notIn includes 2");
+assert((AllRepeatedUpdateRules.rEnum.items as { notIn: readonly number[] }).notIn.includes(0), "AllRepeatedUpdateRules.rEnum.items.notIn includes 0");
 
 // bytes min/max len
 assertEqual((AllValidateRules.bMinmax as { type: string }).type, "string", "AllValidateRules.bMinmax.type === string");
@@ -356,6 +360,7 @@ const av: AllValidate = {
   fLt: 50.0,
   dGt: 0.0,
   sPattern: "Hello",
+  eStatus: Status.STATUS_ACTIVE,
   rStrIn: ["foo", "bar"],
   rStrNotIn: ["ok"],
   rIntIn: [1, 2],
@@ -376,7 +381,7 @@ assertEqual(treeLeaf.child.child.value, "deepest", "TreeNode.child.child.value d
 
 // --- summary ---
 
-assertEqual(passed, 107, "expected exactly 107 assertions before count guard");
+assertEqual(passed, 111, "expected exactly 111 assertions before count guard");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {

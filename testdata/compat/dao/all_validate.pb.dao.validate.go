@@ -77,6 +77,11 @@ func (x *AllValidate) Validate() error {
 		}
 	}
 	if x.OStatus != nil {
+		for _, v := range []int32{0} {
+			if int32(*x.OStatus) == v {
+				return &validateruntime.ValidationError{Field: "o_status", Rule: "not_in", Message: validateruntime.MsgOr("", "must not be one of [0]")}
+			}
+		}
 		switch *x.OStatus {
 		case Status_STATUS_UNSPECIFIED, Status_STATUS_ACTIVE, Status_STATUS_INACTIVE:
 		// ok
@@ -166,6 +171,11 @@ func (x *AllValidate) Validate() error {
 	if x.SPattern != "" {
 		if !validateruntime.MatchPattern(x.SPattern, "^[A-Z][a-z]+$") {
 			return &validateruntime.ValidationError{Field: "s_pattern", Rule: "pattern", Message: validateruntime.MsgOr("", "must match pattern ^[A-Z][a-z]+$")}
+		}
+	}
+	for _, v := range []int32{0, 2} {
+		if int32(x.EStatus) == v {
+			return &validateruntime.ValidationError{Field: "e_status", Rule: "not_in", Message: validateruntime.MsgOr("", "must not be one of [0, 2]")}
 		}
 	}
 	return nil

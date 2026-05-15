@@ -277,4 +277,5 @@ type ValidateFieldOptions struct {
 
 	// Enum constraints
 	DefinedOnly bool
+	NotInEnum   []int32 // enum not_in set
 }
