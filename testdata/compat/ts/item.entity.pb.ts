@@ -8,6 +8,7 @@ export interface Item {
   name: string
   kind: ItemKind
   dimensions: Dimensions
-  createdAt: string
+  createdAt: number
+  externalId: string
 }
 

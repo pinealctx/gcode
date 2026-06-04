@@ -18,21 +18,26 @@ message Item {
     gorm: { table: "items" }
   };
 
-  int64      id         = 1;
+  int64 id = 1 [
+    (gcode.field).json.integer_format = INTEGER_FORMAT_STRING
+  ];
   string     name       = 2 [(buf.validate.field).string = {min_len: 1, max_len: 200}];
   ItemKind   kind       = 3 [(buf.validate.field).enum.defined_only = true];
   Dimensions dimensions = 4 [(buf.validate.field).required = true];
   int64      created_at = 5;
+  uint64 external_id = 6 [
+    (gcode.field).json.integer_format = INTEGER_FORMAT_STRING
+  ];
 
   option (gcode.update_message) = {
     name: "ItemUpdate"
     condition_fields: ["id"]
-    ignore_fields: ["created_at"]
+    ignore_fields: ["created_at", "external_id"]
   };
 
   option (gcode.create_message) = {
     name: "ItemCreate"
-    ignore_fields: ["id", "created_at"]
+    ignore_fields: ["id", "created_at", "external_id"]
     required_fields: ["name", "kind"]
   };
 }

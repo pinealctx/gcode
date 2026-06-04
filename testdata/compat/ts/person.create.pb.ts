@@ -13,7 +13,7 @@ export interface PersonCreate {
   level?: number
   verified?: boolean
   score?: number
-  updatedAt?: string
+  updatedAt?: number
   prevStatus?: Status
   email?: string
   role?: string

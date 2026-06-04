@@ -226,7 +226,7 @@ func TestTSFileMessageField(t *testing.T) {
 	assertContains(t, s, "export interface Person {\n  name: string\n  address?: Address\n}\n")
 }
 
-func TestTSFileInt64AsString(t *testing.T) {
+func TestTSFileInt64DefaultsToNumber(t *testing.T) {
 	t.Parallel()
 
 	gf := transform.GoFile{
@@ -250,9 +250,40 @@ func TestTSFileInt64AsString(t *testing.T) {
 	}
 
 	s := string(out)
+	assertContains(t, s, "  id: number\n")
+	assertContains(t, s, "  uid: number\n")
+	assertContains(t, s, "  sfid: number\n")
+}
+
+func TestTSFileIntegerFormatString(t *testing.T) {
+	t.Parallel()
+
+	id := scalarField("id", "id", model.ScalarInt64)
+	id.JSONOptions = &model.JSONFieldOptions{IntegerFormat: model.IntegerFormatString}
+	uid := scalarField("uid", "uid", model.ScalarUint64)
+	uid.JSONOptions = &model.JSONFieldOptions{IntegerFormat: model.IntegerFormatString}
+	gf := transform.GoFile{
+		Source:  "int64.proto",
+		Package: "test",
+		Messages: []transform.GoMessage{
+			{
+				GoName: "Msg",
+				Fields: []transform.GoField{
+					id,
+					uid,
+				},
+			},
+		},
+	}
+
+	out, err := TSFile(gf, nil)
+	if err != nil {
+		t.Fatalf("TSFile returned error: %v", err)
+	}
+
+	s := string(out)
 	assertContains(t, s, "  id: string\n")
 	assertContains(t, s, "  uid: string\n")
-	assertContains(t, s, "  sfid: string\n")
 }
 
 func TestTSFileBytesAsString(t *testing.T) {

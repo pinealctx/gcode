@@ -57,7 +57,7 @@ func tsScalarType(kind model.ScalarKind) string {
 		return "number"
 	case model.ScalarInt64, model.ScalarSint64, model.ScalarSfixed64,
 		model.ScalarUint64, model.ScalarFixed64:
-		return "string"
+		return "number"
 	case model.ScalarBool:
 		return "boolean"
 	case model.ScalarString, model.ScalarBytes:
@@ -74,7 +74,11 @@ func tsFieldType(f transform.GoField, protoPkg string) string {
 	var base string
 	switch f.Type.Kind {
 	case model.FieldKindScalar:
-		base = tsScalarType(f.Type.Scalar)
+		if f.JSONOptions != nil && f.JSONOptions.IntegerFormat == model.IntegerFormatString {
+			base = "string"
+		} else {
+			base = tsScalarType(f.Type.Scalar)
+		}
 	case model.FieldKindEnum, model.FieldKindMessage:
 		base = naming.GoTypeName(f.Type.FullName, protoPkg)
 	default:

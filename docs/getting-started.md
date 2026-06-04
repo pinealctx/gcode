@@ -807,7 +807,7 @@ import { Status } from "./person.pb.js"
 | Proto type                    | TypeScript type     | Notes                        |
 | ----------------------------- | ------------------- | ---------------------------- |
 | int32, uint32, float, double  | `number`            |                              |
-| int64, uint64                 | `string`            | Avoids JS precision loss     |
+| int64, uint64, sint64, fixed64, sfixed64 | `number` | Use `json.integer_format = INTEGER_FORMAT_STRING` for large opaque IDs |
 | bool                          | `boolean`           |                              |
 | string                        | `string`            |                              |
 | bytes                         | `string`            | base64 encoded               |

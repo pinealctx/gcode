@@ -9,12 +9,12 @@ export interface PersonUpdateByName {
   active?: boolean
   status?: Status
   rating?: number
-  createdAt?: string
+  createdAt?: number
   nickname?: string
   level?: number
   verified?: boolean
   score?: number
-  updatedAt?: string
+  updatedAt?: number
   prevStatus?: Status
   email?: string
   role?: string

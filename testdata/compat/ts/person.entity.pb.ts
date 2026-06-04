@@ -27,13 +27,13 @@ export interface Person {
   scores: number[]
   tags: string[]
   rating: number
-  createdAt: string
+  createdAt: number
   avatar: string
   nickname?: string
   level?: number
   verified?: boolean
   score?: number
-  updatedAt?: string
+  updatedAt?: number
   prevStatus?: Status
   fingerprint?: string
   email: string

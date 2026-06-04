@@ -45,6 +45,15 @@ const (
 	ScalarBytes    ScalarKind = "bytes"
 )
 
+// IntegerFormat describes how a 64-bit integer scalar is represented in JSON.
+type IntegerFormat string
+
+const (
+	IntegerFormatUnspecified IntegerFormat = ""
+	IntegerFormatNumber      IntegerFormat = "number"
+	IntegerFormatString      IntegerFormat = "string"
+)
+
 // File represents a parsed protobuf file after normalization into the stage1 semantic model.
 type File struct {
 	Path           string
@@ -211,8 +220,9 @@ type GormFieldOptions struct {
 
 // JSONFieldOptions holds JSON tag annotations for a field.
 type JSONFieldOptions struct {
-	Omitempty bool
-	Ignore    bool
+	Omitempty     bool
+	Ignore        bool
+	IntegerFormat IntegerFormat
 }
 
 // Comment preserves normalized comment lines associated with a declaration.

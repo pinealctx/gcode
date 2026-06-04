@@ -332,15 +332,15 @@ func BenchmarkDeepClonePerson(b *testing.B) {
 	nickname := "nick"
 	level := int32(5)
 	orig := &dao.Person{
-		Name:      "Alice",
-		Age:       30,
-		Nickname:  &nickname,
-		Level:     &level,
-		Scores:    []int32{1, 2, 3, 4, 5},
-		Tags:      []string{"a", "b", "c"},
-		Avatar:    []byte{1, 2, 3, 4},
-		Address:   &dao.Address{Street: "Main St", City: "Springfield"},
-		Status:    dao.Status_STATUS_ACTIVE,
+		Name:     "Alice",
+		Age:      30,
+		Nickname: &nickname,
+		Level:    &level,
+		Scores:   []int32{1, 2, 3, 4, 5},
+		Tags:     []string{"a", "b", "c"},
+		Avatar:   []byte{1, 2, 3, 4},
+		Address:  &dao.Address{Street: "Main St", City: "Springfield"},
+		Status:   dao.Status_STATUS_ACTIVE,
 	}
 	b.ReportAllocs()
 	for range b.N {

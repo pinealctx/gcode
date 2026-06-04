@@ -9,7 +9,7 @@ import (
 )
 
 type ItemUpdate struct {
-	Id         int64       `json:"id"`
+	Id         int64       `json:"id,string"`
 	Name       *string     `json:"name"`
 	Kind       *ItemKind   `json:"kind"`
 	Dimensions *Dimensions `json:"dimensions"`

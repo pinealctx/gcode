@@ -35,6 +35,9 @@ func tsValidationType(f transform.GoField) string {
 	}
 	switch f.Type.Kind {
 	case model.FieldKindScalar:
+		if f.JSONOptions != nil && f.JSONOptions.IntegerFormat == model.IntegerFormatString {
+			return "string"
+		}
 		return tsScalarValidationType(f.Type.Scalar)
 	case model.FieldKindEnum:
 		return "enum"

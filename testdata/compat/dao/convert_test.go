@@ -17,15 +17,15 @@ func TestToEntity_BasicConversion(t *testing.T) {
 	typeId := int32(42)
 
 	create := &PersonCreate{
-		Name:       &name,
-		Age:        &age,
-		Active:     &active,
-		Status:     &status,
-		Rating:     &rating,
-		Nickname:   "ali",
-		Email:      &email,
-		Role:       &role,
-		TypeId:     &typeId,
+		Name:     &name,
+		Age:      &age,
+		Active:   &active,
+		Status:   &status,
+		Rating:   &rating,
+		Nickname: "ali",
+		Email:    &email,
+		Role:     &role,
+		TypeId:   &typeId,
 	}
 
 	entity := create.ToEntity()
@@ -237,12 +237,12 @@ func TestApplyTo_OptionalApplied(t *testing.T) {
 	status := Status_STATUS_INACTIVE
 
 	update := &PersonUpdateByName{
-		Name:      "cond",
-		Age:       &age,
-		Active:    &active,
-		Nickname:  &nickname,
-		Email:     &email,
-		Status:    &status,
+		Name:     "cond",
+		Age:      &age,
+		Active:   &active,
+		Nickname: &nickname,
+		Email:    &email,
+		Status:   &status,
 	}
 
 	entity := &Person{

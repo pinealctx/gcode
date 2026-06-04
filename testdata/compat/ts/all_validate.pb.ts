@@ -6,7 +6,7 @@ import { Status } from "./person.entity.pb.js"
 /** AllValidate covers validate constraint types not present in person.proto. */
 export interface AllValidate {
   uGte: number
-  uLte: string
+  uLte: number
   uIn: number
   uNotIn: number
   fGt: number
