@@ -68,4 +68,21 @@ func assertAllValidateEqual(t *testing.T, want, got *dao.AllValidate) {
 	if got.EStatus != want.EStatus {
 		t.Errorf("EStatus: got %v, want %v", got.EStatus, want.EStatus)
 	}
+	if got.I64StringGt != want.I64StringGt {
+		t.Errorf("I64StringGt: got %d, want %d", got.I64StringGt, want.I64StringGt)
+	}
+	if (want.OptionalI64StringGt == nil) != (got.OptionalI64StringGt == nil) {
+		t.Errorf("OptionalI64StringGt nil mismatch: want %v, got %v", want.OptionalI64StringGt, got.OptionalI64StringGt)
+	} else if want.OptionalI64StringGt != nil && *got.OptionalI64StringGt != *want.OptionalI64StringGt {
+		t.Errorf("OptionalI64StringGt: got %d, want %d", *got.OptionalI64StringGt, *want.OptionalI64StringGt)
+	}
+	if got.U64StringLte != want.U64StringLte {
+		t.Errorf("U64StringLte: got %d, want %d", got.U64StringLte, want.U64StringLte)
+	}
+	if got.I64NumberGt != want.I64NumberGt {
+		t.Errorf("I64NumberGt: got %d, want %d", got.I64NumberGt, want.I64NumberGt)
+	}
+	if got.I64StringInNotIn != want.I64StringInNotIn {
+		t.Errorf("I64StringInNotIn: got %d, want %d", got.I64StringInNotIn, want.I64StringInNotIn)
+	}
 }

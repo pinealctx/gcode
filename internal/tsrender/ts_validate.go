@@ -2,10 +2,18 @@ package tsrender
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/transform"
+)
+
+type tsConstraintValueMode int
+
+const (
+	tsConstraintValueNumber tsConstraintValueMode = iota
+	tsConstraintValueIntegerString
 )
 
 // tsScalarValidationType maps a protobuf scalar kind to its TS validation "type" value.
@@ -35,8 +43,8 @@ func tsValidationType(f transform.GoField) string {
 	}
 	switch f.Type.Kind {
 	case model.FieldKindScalar:
-		if f.JSONOptions != nil && f.JSONOptions.IntegerFormat == model.IntegerFormatString {
-			return "string"
+		if isIntegerStringField(f) {
+			return "integerString"
 		}
 		return tsScalarValidationType(f.Type.Scalar)
 	case model.FieldKindEnum:
@@ -46,6 +54,44 @@ func tsValidationType(f transform.GoField) string {
 	default:
 		return "unknown"
 	}
+}
+
+func isIntegerStringField(f transform.GoField) bool {
+	return f.Type.Kind == model.FieldKindScalar &&
+		f.JSONOptions != nil &&
+		f.JSONOptions.IntegerFormat == model.IntegerFormatString
+}
+
+func tsIntegerFormat(scalar model.ScalarKind) string {
+	switch scalar {
+	case model.ScalarInt64:
+		return "int64"
+	case model.ScalarUint64:
+		return "uint64"
+	case model.ScalarSint64:
+		return "sint64"
+	case model.ScalarFixed64:
+		return "fixed64"
+	case model.ScalarSfixed64:
+		return "sfixed64"
+	default:
+		panic(fmt.Sprintf("tsIntegerFormat: unsupported integer_format scalar %q", scalar))
+	}
+}
+
+func tsConstraintMode(f transform.GoField) tsConstraintValueMode {
+	if isIntegerStringField(f) {
+		return tsConstraintValueIntegerString
+	}
+	return tsConstraintValueNumber
+}
+
+func appendTSValidationTypeParts(parts []string, f transform.GoField) []string {
+	parts = append(parts, fmt.Sprintf("type: %q", tsValidationType(f)))
+	if isIntegerStringField(f) {
+		parts = append(parts, fmt.Sprintf("integerFormat: %q", tsIntegerFormat(f.Type.Scalar)))
+	}
+	return parts
 }
 
 // writeTSValidationRules generates a validation rules constant for a message.
@@ -102,9 +148,9 @@ func writeTSFieldRules(b *strings.Builder, jsonName string, f transform.GoField,
 
 	// required and type are always emitted
 	parts = append(parts, fmt.Sprintf("required: %t", vo.Required))
-	parts = append(parts, fmt.Sprintf("type: %q", tsValidationType(f)))
+	parts = appendTSValidationTypeParts(parts, f)
 
-	parts = appendConstraintParts(parts, vo)
+	parts = appendConstraintParts(parts, vo, tsConstraintMode(f))
 
 	// Enum constraints
 	if vo.DefinedOnly {
@@ -187,10 +233,10 @@ func writeTSDerivedFieldRules(b *strings.Builder, jsonName string, f transform.G
 
 	var parts []string
 	parts = append(parts, fmt.Sprintf("required: %t", required))
-	parts = append(parts, fmt.Sprintf("type: %q", tsValidationType(f)))
+	parts = appendTSValidationTypeParts(parts, f)
 
 	if vo != nil {
-		parts = appendConstraintParts(parts, vo)
+		parts = appendConstraintParts(parts, vo, tsConstraintMode(f))
 		if vo.DefinedOnly {
 			parts = append(parts, "definedOnly: true")
 		}
@@ -231,7 +277,7 @@ func tsItemValidationType(parentField transform.GoField) string {
 // appendConstraintParts appends TS validation rule key-value pairs for the
 // constraint fields of vo that are shared between field-level and item-level rules:
 // string, signed integer, unsigned integer, and float constraints.
-func appendConstraintParts(parts []string, vo *model.ValidateFieldOptions) []string {
+func appendConstraintParts(parts []string, vo *model.ValidateFieldOptions, mode tsConstraintValueMode) []string {
 	// String constraints
 	if vo.MinLen != nil {
 		parts = append(parts, fmt.Sprintf("minLength: %d", *vo.MinLen))
@@ -265,56 +311,56 @@ func appendConstraintParts(parts []string, vo *model.ValidateFieldOptions) []str
 
 	// Signed integer constraints
 	if vo.GTEInt != nil {
-		parts = append(parts, fmt.Sprintf("minimum: %d", *vo.GTEInt))
+		parts = append(parts, tsSignedIntConstraintPart("minimum", *vo.GTEInt, mode))
 	}
 	if vo.LTEInt != nil {
-		parts = append(parts, fmt.Sprintf("maximum: %d", *vo.LTEInt))
+		parts = append(parts, tsSignedIntConstraintPart("maximum", *vo.LTEInt, mode))
 	}
 	if vo.GTInt != nil {
-		parts = append(parts, fmt.Sprintf("exclusiveMinimum: %d", *vo.GTInt))
+		parts = append(parts, tsSignedIntConstraintPart("exclusiveMinimum", *vo.GTInt, mode))
 	}
 	if vo.LTInt != nil {
-		parts = append(parts, fmt.Sprintf("exclusiveMaximum: %d", *vo.LTInt))
+		parts = append(parts, tsSignedIntConstraintPart("exclusiveMaximum", *vo.LTInt, mode))
 	}
 	if len(vo.InInt) > 0 {
 		elems := make([]string, len(vo.InInt))
 		for i, v := range vo.InInt {
-			elems[i] = fmt.Sprintf("%d", v)
+			elems[i] = tsSignedIntValue(v, mode)
 		}
 		parts = append(parts, "enum: ["+strings.Join(elems, ", ")+"]")
 	}
 	if len(vo.NotInInt) > 0 {
 		elems := make([]string, len(vo.NotInInt))
 		for i, v := range vo.NotInInt {
-			elems[i] = fmt.Sprintf("%d", v)
+			elems[i] = tsSignedIntValue(v, mode)
 		}
 		parts = append(parts, "notIn: ["+strings.Join(elems, ", ")+"]")
 	}
 
 	// Unsigned integer constraints
 	if vo.GTEUint != nil {
-		parts = append(parts, fmt.Sprintf("minimum: %d", *vo.GTEUint))
+		parts = append(parts, tsUnsignedIntConstraintPart("minimum", *vo.GTEUint, mode))
 	}
 	if vo.LTEUint != nil {
-		parts = append(parts, fmt.Sprintf("maximum: %d", *vo.LTEUint))
+		parts = append(parts, tsUnsignedIntConstraintPart("maximum", *vo.LTEUint, mode))
 	}
 	if vo.GTUint != nil {
-		parts = append(parts, fmt.Sprintf("exclusiveMinimum: %d", *vo.GTUint))
+		parts = append(parts, tsUnsignedIntConstraintPart("exclusiveMinimum", *vo.GTUint, mode))
 	}
 	if vo.LTUint != nil {
-		parts = append(parts, fmt.Sprintf("exclusiveMaximum: %d", *vo.LTUint))
+		parts = append(parts, tsUnsignedIntConstraintPart("exclusiveMaximum", *vo.LTUint, mode))
 	}
 	if len(vo.InUint) > 0 {
 		elems := make([]string, len(vo.InUint))
 		for i, v := range vo.InUint {
-			elems[i] = fmt.Sprintf("%d", v)
+			elems[i] = tsUnsignedIntValue(v, mode)
 		}
 		parts = append(parts, "enum: ["+strings.Join(elems, ", ")+"]")
 	}
 	if len(vo.NotInUint) > 0 {
 		elems := make([]string, len(vo.NotInUint))
 		for i, v := range vo.NotInUint {
-			elems[i] = fmt.Sprintf("%d", v)
+			elems[i] = tsUnsignedIntValue(v, mode)
 		}
 		parts = append(parts, "notIn: ["+strings.Join(elems, ", ")+"]")
 	}
@@ -345,6 +391,36 @@ func appendConstraintParts(parts []string, vo *model.ValidateFieldOptions) []str
 	return parts
 }
 
+func tsSignedIntConstraintPart(name string, value int64, mode tsConstraintValueMode) string {
+	return fmt.Sprintf("%s: %s", name, tsSignedIntValue(value, mode))
+}
+
+func tsUnsignedIntConstraintPart(name string, value uint64, mode tsConstraintValueMode) string {
+	return fmt.Sprintf("%s: %s", name, tsUnsignedIntValue(value, mode))
+}
+
+func tsSignedIntValue(value int64, mode tsConstraintValueMode) string {
+	switch mode {
+	case tsConstraintValueNumber:
+		return strconv.FormatInt(value, 10)
+	case tsConstraintValueIntegerString:
+		return fmt.Sprintf("%q", strconv.FormatInt(value, 10))
+	default:
+		panic(fmt.Sprintf("tsSignedIntValue: unhandled constraint value mode %d", mode))
+	}
+}
+
+func tsUnsignedIntValue(value uint64, mode tsConstraintValueMode) string {
+	switch mode {
+	case tsConstraintValueNumber:
+		return strconv.FormatUint(value, 10)
+	case tsConstraintValueIntegerString:
+		return fmt.Sprintf("%q", strconv.FormatUint(value, 10))
+	default:
+		panic(fmt.Sprintf("tsUnsignedIntValue: unhandled constraint value mode %d", mode))
+	}
+}
+
 // writeItemRules writes validation rules for repeated field items (inner constraints).
 // parentField is the repeated field whose items are being described; it is used to
 // emit the "type" property that identifies the element kind.
@@ -354,7 +430,7 @@ func writeItemRules(b *strings.Builder, vo *model.ValidateFieldOptions, parentFi
 	// type is always emitted first for items
 	parts = append(parts, fmt.Sprintf("type: %q", tsItemValidationType(parentField)))
 
-	parts = appendConstraintParts(parts, vo)
+	parts = appendConstraintParts(parts, vo, tsConstraintValueNumber)
 
 	// DefinedOnly for enum items
 	if vo.DefinedOnly {

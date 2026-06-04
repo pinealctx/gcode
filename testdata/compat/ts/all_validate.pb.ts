@@ -28,6 +28,11 @@ export interface AllValidate {
   dGt: number
   sPattern: string
   eStatus: Status
+  i64StringGt: string
+  optionalI64StringGt?: string
+  u64StringLte: string
+  i64NumberGt: number
+  i64StringInNotIn: string
 }
 
 export const AllValidateRules = {
@@ -53,6 +58,11 @@ export const AllValidateRules = {
   fLt: { required: false, type: "number", exclusiveMaximum: 99.5 },
   dGt: { required: false, type: "number", exclusiveMinimum: -1 },
   sPattern: { required: false, type: "string", pattern: "^[A-Z][a-z]+$" },
-  eStatus: { required: false, type: "enum", notIn: [0, 2] }
+  eStatus: { required: false, type: "enum", notIn: [0, 2] },
+  i64StringGt: { required: false, type: "integerString", integerFormat: "int64", exclusiveMinimum: "0" },
+  optionalI64StringGt: { required: false, type: "integerString", integerFormat: "int64", exclusiveMinimum: "0" },
+  u64StringLte: { required: false, type: "integerString", integerFormat: "uint64", maximum: "100" },
+  i64NumberGt: { required: false, type: "integer", exclusiveMinimum: 0 },
+  i64StringInNotIn: { required: false, type: "integerString", integerFormat: "int64", enum: ["1", "9007199254740993"], notIn: ["0", "-1"] }
 } as const
 

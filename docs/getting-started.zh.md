@@ -692,12 +692,13 @@ interceptor 按传入顺序执行，位于内置 panic 恢复层的内侧。serv
 
 ### field 级注解
 
-| 注解                             | 类型   | 说明                             |
-| -------------------------------- | ------ | -------------------------------- |
-| `(gcode.field).json.omitempty`   | bool   | 生成 `json:"field,omitempty"`    |
-| `(gcode.field).json.ignore`      | bool   | 生成 `json:"-"`                  |
-| `(gcode.field).gorm.column`      | string | 覆盖 gorm 列名                   |
-| `(gcode.field).validate_message` | string | 覆盖该字段所有约束的默认错误消息 |
+| 注解                                | 类型   | 说明                                                                            |
+| ----------------------------------- | ------ | ------------------------------------------------------------------------------- |
+| `(gcode.field).json.omitempty`      | bool   | 生成 `json:"field,omitempty"`                                                   |
+| `(gcode.field).json.ignore`         | bool   | 生成 `json:"-"`                                                                |
+| `(gcode.field).json.integer_format` | enum   | 设置为 `INTEGER_FORMAT_STRING` 时，将 singular 64-bit integer 表示为 JSON/TS string |
+| `(gcode.field).gorm.column`         | string | 覆盖 gorm 列名                                                                 |
+| `(gcode.field).validate_message`    | string | 覆盖该字段所有约束的默认错误消息                                                |
 
 ### validate 注解（buf/validate）
 
@@ -816,6 +817,8 @@ import { Status } from "./person.pb.js"
 | repeated T                    | `T[]`               |                             |
 | optional T                    | `T \| undefined`    | 简写：`field?: T`           |
 | message                       | `interface`         |                             |
+
+设置 `json.integer_format = INTEGER_FORMAT_STRING` 时，TypeScript interface 字段是 `string`。验证元数据 Rules 使用 `type: "integerString"` 和 `integerFormat`（`int64`、`uint64`、`sint64`、`fixed64`、`sfixed64`）表达语义。`minimum`、`exclusiveMinimum`、`maximum`、`exclusiveMaximum`、`enum`、`notIn` 等整数约束值会以十进制字符串输出，前端应使用 `BigInt` 或十进制字符串比较，不应使用 `Number`。
 
 ### 验证生成产物
 

@@ -17,21 +17,27 @@ func TestAllValidateRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	status := dao.Status_STATUS_ACTIVE
+	optionalI64StringGt := int64(9)
 	orig := &dao.AllValidate{
-		UGte:    5,
-		ULte:    500,
-		UIn:     3,
-		UNotIn:  7,
-		FGt:     1.5,
-		DLte:    0.75,
-		SIn:     "a",
-		SNotIn:  "z",
-		IIn:     -1,
-		SUri:    "https://example.com",
-		OStatus: &status,
-		BMinmax: []byte{0xDE, 0xAD},
-		RItems:  []int32{0, 1, 100},
-		EStatus: dao.Status_STATUS_ACTIVE,
+		UGte:                5,
+		ULte:                500,
+		UIn:                 3,
+		UNotIn:              7,
+		FGt:                 1.5,
+		DLte:                0.75,
+		SIn:                 "a",
+		SNotIn:              "z",
+		IIn:                 -1,
+		SUri:                "https://example.com",
+		OStatus:             &status,
+		BMinmax:             []byte{0xDE, 0xAD},
+		RItems:              []int32{0, 1, 100},
+		EStatus:             dao.Status_STATUS_ACTIVE,
+		I64StringGt:         7,
+		OptionalI64StringGt: &optionalI64StringGt,
+		U64StringLte:        99,
+		I64NumberGt:         8,
+		I64StringInNotIn:    9007199254740993,
 	}
 
 	wire, err := orig.MarshalBinary()

@@ -12,25 +12,29 @@ import (
 func validAllValidate() *dao.AllValidate {
 	status := dao.Status_STATUS_ACTIVE
 	return &dao.AllValidate{
-		UGte:     1,                        // gte=1: exactly at boundary
-		ULte:     1000,                     // lte=1000: exactly at boundary
-		UIn:      2,                        // in=[1,2,3]
-		UNotIn:   5,                        // not_in=[0]: any non-zero value
-		FGt:      0.1,                      // gt=0
-		DLte:     0.5,                      // lte=1.0
-		SIn:      "b",                      // in=[a,b,c]
-		SNotIn:   "z",                      // not_in=[x,y]
-		IIn:      1,                        // in=[1,2,-1]
-		SUri:     "https://example.com",    // valid URI
-		OStatus:  &status,                  // defined_only
-		BMinmax:  []byte{0x01},             // min_len=1, max_len=100
-		RItems:   []int32{0, 1, 2},         // items.gte=0
-		IGtLt:    0,                        // gt=-10, lt=10: 0 is in range
-		UGtLt:    50,                       // gt=5, lt=100: 50 is in range
-		FLt:      50.0,                     // lt=99.5: 50 < 99.5
-		DGt:      0.0,                      // gt=-1.0: 0 > -1
-		SPattern: "Hello",                  // pattern=^[A-Z][a-z]+$
-		EStatus:  dao.Status_STATUS_ACTIVE, // not_in=[0,2]
+		UGte:             1,                        // gte=1: exactly at boundary
+		ULte:             1000,                     // lte=1000: exactly at boundary
+		UIn:              2,                        // in=[1,2,3]
+		UNotIn:           5,                        // not_in=[0]: any non-zero value
+		FGt:              0.1,                      // gt=0
+		DLte:             0.5,                      // lte=1.0
+		SIn:              "b",                      // in=[a,b,c]
+		SNotIn:           "z",                      // not_in=[x,y]
+		IIn:              1,                        // in=[1,2,-1]
+		SUri:             "https://example.com",    // valid URI
+		OStatus:          &status,                  // defined_only
+		BMinmax:          []byte{0x01},             // min_len=1, max_len=100
+		RItems:           []int32{0, 1, 2},         // items.gte=0
+		IGtLt:            0,                        // gt=-10, lt=10: 0 is in range
+		UGtLt:            50,                       // gt=5, lt=100: 50 is in range
+		FLt:              50.0,                     // lt=99.5: 50 < 99.5
+		DGt:              0.0,                      // gt=-1.0: 0 > -1
+		SPattern:         "Hello",                  // pattern=^[A-Z][a-z]+$
+		EStatus:          dao.Status_STATUS_ACTIVE, // not_in=[0,2]
+		I64StringGt:      1,                        // gt=0 with json.integer_format=string
+		U64StringLte:     100,                      // lte=100 with json.integer_format=string
+		I64NumberGt:      1,                        // default int64 number, gt=0
+		I64StringInNotIn: 1,                        // in=[1,9007199254740993], not_in=[0,-1]
 	}
 }
 

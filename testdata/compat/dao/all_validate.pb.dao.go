@@ -40,6 +40,14 @@ type AllValidate struct {
 	// pattern for string
 	SPattern string `json:"sPattern"`
 	EStatus  Status `json:"eStatus"`
+	// integer_format string: range constraints are string metadata.
+	I64StringGt         int64  `json:"i64StringGt,string"`
+	OptionalI64StringGt *int64 `json:"optionalI64StringGt,string"`
+	U64StringLte        uint64 `json:"u64StringLte,string"`
+	// default int64 JSON number remains numeric metadata.
+	I64NumberGt int64 `json:"i64NumberGt"`
+	// integer_format string: in/not_in constraints are string metadata.
+	I64StringInNotIn int64 `json:"i64StringInNotIn,string"`
 }
 
 // Size returns the protobuf wire size of AllValidate.
@@ -132,6 +140,21 @@ func (x *AllValidate) Size() int {
 	}
 	if x.EStatus != 0 {
 		n += 2 + runtime.SizeEnum(int32(x.EStatus))
+	}
+	if x.I64StringGt != 0 {
+		n += 2 + runtime.SizeInt64(x.I64StringGt)
+	}
+	if x.OptionalI64StringGt != nil {
+		n += 2 + runtime.SizeInt64(*x.OptionalI64StringGt)
+	}
+	if x.U64StringLte != 0 {
+		n += 2 + runtime.SizeUint64(x.U64StringLte)
+	}
+	if x.I64NumberGt != 0 {
+		n += 2 + runtime.SizeInt64(x.I64NumberGt)
+	}
+	if x.I64StringInNotIn != 0 {
+		n += 2 + runtime.SizeInt64(x.I64StringInNotIn)
 	}
 	return n
 }
@@ -260,6 +283,26 @@ func (x *AllValidate) MarshalAppend(b []byte) ([]byte, error) {
 		b = runtime.AppendTag(b, 23, runtime.WireVarint)
 		b = runtime.AppendVarint(b, uint64(x.EStatus))
 	}
+	if x.I64StringGt != 0 {
+		b = runtime.AppendTag(b, 24, runtime.WireVarint)
+		b = runtime.AppendVarint(b, uint64(x.I64StringGt))
+	}
+	if x.OptionalI64StringGt != nil {
+		b = runtime.AppendTag(b, 25, runtime.WireVarint)
+		b = runtime.AppendVarint(b, uint64(*x.OptionalI64StringGt))
+	}
+	if x.U64StringLte != 0 {
+		b = runtime.AppendTag(b, 26, runtime.WireVarint)
+		b = runtime.AppendVarint(b, x.U64StringLte)
+	}
+	if x.I64NumberGt != 0 {
+		b = runtime.AppendTag(b, 27, runtime.WireVarint)
+		b = runtime.AppendVarint(b, uint64(x.I64NumberGt))
+	}
+	if x.I64StringInNotIn != 0 {
+		b = runtime.AppendTag(b, 28, runtime.WireVarint)
+		b = runtime.AppendVarint(b, uint64(x.I64StringInNotIn))
+	}
 	return b, nil
 }
 
@@ -296,6 +339,10 @@ func (x *AllValidate) DeepClone() *AllValidate {
 	if x.RUintNotIn != nil {
 		clone.RUintNotIn = make([]uint32, len(x.RUintNotIn))
 		copy(clone.RUintNotIn, x.RUintNotIn)
+	}
+	if x.OptionalI64StringGt != nil {
+		v := *x.OptionalI64StringGt
+		clone.OptionalI64StringGt = &v
 	}
 	return &clone
 }
@@ -748,6 +795,102 @@ func (x *AllValidate) unmarshalFrom(b []byte, lenient bool, depth int) (int, err
 				return 0, fmt.Errorf("field 23: %w", runtime.ErrTruncated)
 			}
 			x.EStatus = Status(v)
+			off += n
+		case 24:
+			if seen[0]&262144 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 24: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 262144
+			if wireType != runtime.WireVarint {
+				return 0, fmt.Errorf("field 24: %w", runtime.ErrWireType)
+			}
+			v, n := runtime.ConsumeVarint(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 24: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 24: %w", runtime.ErrTruncated)
+			}
+			x.I64StringGt = int64(v)
+			off += n
+		case 25:
+			if seen[0]&524288 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 25: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 524288
+			if wireType != runtime.WireVarint {
+				return 0, fmt.Errorf("field 25: %w", runtime.ErrWireType)
+			}
+			v, n := runtime.ConsumeVarint(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 25: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 25: %w", runtime.ErrTruncated)
+			}
+			tmp := int64(v)
+			x.OptionalI64StringGt = &tmp
+			off += n
+		case 26:
+			if seen[0]&1048576 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 26: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 1048576
+			if wireType != runtime.WireVarint {
+				return 0, fmt.Errorf("field 26: %w", runtime.ErrWireType)
+			}
+			v, n := runtime.ConsumeVarint(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 26: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 26: %w", runtime.ErrTruncated)
+			}
+			x.U64StringLte = v
+			off += n
+		case 27:
+			if seen[0]&2097152 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 27: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 2097152
+			if wireType != runtime.WireVarint {
+				return 0, fmt.Errorf("field 27: %w", runtime.ErrWireType)
+			}
+			v, n := runtime.ConsumeVarint(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 27: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 27: %w", runtime.ErrTruncated)
+			}
+			x.I64NumberGt = int64(v)
+			off += n
+		case 28:
+			if seen[0]&4194304 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 28: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 4194304
+			if wireType != runtime.WireVarint {
+				return 0, fmt.Errorf("field 28: %w", runtime.ErrWireType)
+			}
+			v, n := runtime.ConsumeVarint(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 28: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 28: %w", runtime.ErrTruncated)
+			}
+			x.I64StringInNotIn = int64(v)
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)

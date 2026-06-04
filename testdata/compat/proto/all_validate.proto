@@ -3,6 +3,7 @@ syntax = "proto3";
 package compat;
 
 import "buf/validate/validate.proto";
+import "gcode/options.proto";
 import "person.entity.proto";
 
 option go_package = "github.com/pinealctx/gcode/testdata/compat/dao;dao";
@@ -92,5 +93,31 @@ message AllValidate {
   Status e_status = 23 [
     (buf.validate.field).enum.not_in = 0,
     (buf.validate.field).enum.not_in = 2
+  ];
+
+  // integer_format string: range constraints are string metadata.
+  int64 i64_string_gt = 24 [
+    (gcode.field).json.integer_format = INTEGER_FORMAT_STRING,
+    (buf.validate.field).int64.gt = 0
+  ];
+  optional int64 optional_i64_string_gt = 25 [
+    (gcode.field).json.integer_format = INTEGER_FORMAT_STRING,
+    (buf.validate.field).int64.gt = 0
+  ];
+  uint64 u64_string_lte = 26 [
+    (gcode.field).json.integer_format = INTEGER_FORMAT_STRING,
+    (buf.validate.field).uint64.lte = 100
+  ];
+
+  // default int64 JSON number remains numeric metadata.
+  int64 i64_number_gt = 27 [(buf.validate.field).int64.gt = 0];
+
+  // integer_format string: in/not_in constraints are string metadata.
+  int64 i64_string_in_not_in = 28 [
+    (gcode.field).json.integer_format = INTEGER_FORMAT_STRING,
+    (buf.validate.field).int64.in = 1,
+    (buf.validate.field).int64.in = 9007199254740993,
+    (buf.validate.field).int64.not_in = 0,
+    (buf.validate.field).int64.not_in = -1
   ];
 }

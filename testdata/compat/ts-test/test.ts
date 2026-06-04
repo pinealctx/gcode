@@ -283,6 +283,21 @@ assertEqual((AllValidateRules.iGtLt as { exclusiveMaximum: number }).exclusiveMa
 assertEqual((AllValidateRules.uGtLt as { exclusiveMinimum: number }).exclusiveMinimum, 5, "AllValidateRules.uGtLt.exclusiveMinimum === 5");
 assertEqual((AllValidateRules.uGtLt as { exclusiveMaximum: number }).exclusiveMaximum, 100, "AllValidateRules.uGtLt.exclusiveMaximum === 100");
 
+// integer_format string for 64-bit integers
+assertEqual(AllValidateRules.i64StringGt.type, "integerString", "AllValidateRules.i64StringGt.type === integerString");
+assertEqual(AllValidateRules.i64StringGt.integerFormat, "int64", "AllValidateRules.i64StringGt.integerFormat === int64");
+assertEqual(AllValidateRules.i64StringGt.exclusiveMinimum, "0", "AllValidateRules.i64StringGt.exclusiveMinimum === '0'");
+assertEqual(AllValidateRules.optionalI64StringGt.type, "integerString", "AllValidateRules.optionalI64StringGt.type === integerString");
+assertEqual(AllValidateRules.optionalI64StringGt.integerFormat, "int64", "AllValidateRules.optionalI64StringGt.integerFormat === int64");
+assertEqual(AllValidateRules.optionalI64StringGt.exclusiveMinimum, "0", "AllValidateRules.optionalI64StringGt.exclusiveMinimum === '0'");
+assertEqual(AllValidateRules.u64StringLte.type, "integerString", "AllValidateRules.u64StringLte.type === integerString");
+assertEqual(AllValidateRules.u64StringLte.integerFormat, "uint64", "AllValidateRules.u64StringLte.integerFormat === uint64");
+assertEqual(AllValidateRules.u64StringLte.maximum, "100", "AllValidateRules.u64StringLte.maximum === '100'");
+assertEqual(AllValidateRules.i64NumberGt.type, "integer", "AllValidateRules.i64NumberGt.type === integer");
+assertEqual(AllValidateRules.i64NumberGt.exclusiveMinimum, 0, "AllValidateRules.i64NumberGt.exclusiveMinimum === 0");
+assert((AllValidateRules.i64StringInNotIn as { enum: readonly string[] }).enum.includes("9007199254740993"), "AllValidateRules.i64StringInNotIn.enum includes large integer string");
+assert((AllValidateRules.i64StringInNotIn as { notIn: readonly string[] }).notIn.includes("-1"), "AllValidateRules.i64StringInNotIn.notIn includes -1 string");
+
 // float exclusiveMaximum (lt)
 assertEqual((AllValidateRules.fLt as { exclusiveMaximum: number }).exclusiveMaximum, 99.5, "AllValidateRules.fLt.exclusiveMaximum === 99.5");
 
@@ -378,10 +393,18 @@ const av: AllValidate = {
   rStrNotIn: ["ok"],
   rIntIn: [1, 2],
   rUintNotIn: [1, 2],
+  i64StringGt: "1",
+  u64StringLte: "100",
+  i64NumberGt: 1,
+  i64StringInNotIn: "9007199254740993",
 };
 assertEqual(av.uGte, 1, "AllValidate.uGte assigned correctly");
 assertEqual(av.sIn, "a", "AllValidate.sIn assigned correctly");
 assertEqual(av.oStatus, undefined, "AllValidate.oStatus optional — omitted === undefined");
+assertEqual(typeof av.i64StringGt, "string", "AllValidate.i64StringGt renders as string");
+assertEqual(av.optionalI64StringGt, undefined, "AllValidate.optionalI64StringGt optional — omitted === undefined");
+assertEqual(typeof av.u64StringLte, "string", "AllValidate.u64StringLte renders as string");
+assertEqual(typeof av.i64NumberGt, "number", "AllValidate.i64NumberGt remains number");
 assertEqual(av.iGtLt, 0, "AllValidate.iGtLt assigned correctly");
 assertEqual(av.sPattern, "Hello", "AllValidate.sPattern assigned correctly");
 
@@ -394,7 +417,7 @@ assertEqual(treeLeaf.child.child.value, "deepest", "TreeNode.child.child.value d
 
 // --- summary ---
 
-assertEqual(passed, 114, "expected exactly 114 assertions before count guard");
+assertEqual(passed, 131, "expected exactly 131 assertions before count guard");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
