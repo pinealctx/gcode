@@ -1,13 +1,13 @@
 module github.com/pinealctx/gcode
 
-go 1.26.2
+go 1.26.4
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260209202127-80ab13bee0bf.1
 	buf.build/go/protovalidate v1.1.3
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/gin-gonic/gin v1.12.0
-	github.com/pinealctx/x v0.2.0
+	github.com/pinealctx/x v0.3.1
 	github.com/urfave/cli/v2 v2.27.7
 	google.golang.org/protobuf v1.36.11
 )
@@ -38,6 +38,7 @@ require (
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/tidwall/btree v1.8.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect

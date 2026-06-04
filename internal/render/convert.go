@@ -77,7 +77,7 @@ func writeApplyToMethod(b *strings.Builder, msg transform.GoMessage, srcMsg *tra
 	fmt.Fprintf(b, "func (%s *%s) ApplyTo(p *%s) {\n", recv, msg.GoName, srcMsg.GoName)
 
 	for _, f := range msg.Fields {
-		if conditionFields.Contains(f.Name) {
+		if conditionFields.Has(f.Name) {
 			continue
 		}
 		src, ok := srcFieldByName[f.Name]

@@ -23,7 +23,7 @@ func writeToMapMethod(b *strings.Builder, msg transform.GoMessage) {
 	conditionFields := ds.NewSet(msg.ConditionFields...)
 
 	for _, f := range msg.Fields {
-		if conditionFields.Contains(f.Name) {
+		if conditionFields.Has(f.Name) {
 			// condition_fields are WHERE conditions, not SET values.
 			continue
 		}

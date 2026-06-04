@@ -849,6 +849,62 @@ func TestFileJSONIgnorePrecedence(t *testing.T) {
 	}
 }
 
+func TestFileJSONIntegerFormatString(t *testing.T) {
+	t.Parallel()
+
+	gf := transform.GoFile{
+		Source:  "int64-json.proto",
+		Package: "foopb",
+		Messages: []transform.GoMessage{
+			{
+				GoName: "Msg",
+				Fields: []transform.GoField{
+					{
+						Field: model.Field{
+							Name:        "broker_id",
+							Number:      1,
+							Cardinality: model.CardinalitySingular,
+							Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64},
+							JSONName:    "brokerId",
+							JSONOptions: &model.JSONFieldOptions{IntegerFormat: model.IntegerFormatString},
+						},
+						GoName: "BrokerId",
+						GoType: "int64",
+					},
+					{
+						Field: model.Field{
+							Name:        "seq",
+							Number:      2,
+							Cardinality: model.CardinalitySingular,
+							Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarUint64},
+							JSONName:    "seq",
+							JSONOptions: &model.JSONFieldOptions{
+								Omitempty:     true,
+								IntegerFormat: model.IntegerFormatString,
+							},
+						},
+						GoName: "Seq",
+						GoType: "uint64",
+					},
+				},
+			},
+		},
+	}
+
+	got, err := File(gf, testModule, Context{})
+	if err != nil {
+		t.Fatalf("File() error: %v", err)
+	}
+	src := string(got)
+
+	if !strings.Contains(src, `json:"brokerId,string"`) {
+		t.Errorf("expected json:\"brokerId,string\" in output:\n%s", src)
+	}
+	if !strings.Contains(src, `json:"seq,string,omitempty"`) {
+		t.Errorf("expected json:\"seq,string,omitempty\" in output:\n%s", src)
+	}
+}
+
 // TestFileMarshalOptionalField verifies that optional scalar fields generate
 // nil-check guards and dereference the pointer when writing wire bytes.
 func TestFileMarshalOptionalField(t *testing.T) {

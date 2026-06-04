@@ -281,6 +281,15 @@ func appendJSONAnnotations(opts []string, f model.Field) []string {
 	if f.JSONOptions.Omitempty {
 		opts = append(opts, "(gcode.field).json.omitempty = true")
 	}
+	switch f.JSONOptions.IntegerFormat {
+	case model.IntegerFormatUnspecified:
+	case model.IntegerFormatNumber:
+		opts = append(opts, "(gcode.field).json.integer_format = INTEGER_FORMAT_NUMBER")
+	case model.IntegerFormatString:
+		opts = append(opts, "(gcode.field).json.integer_format = INTEGER_FORMAT_STRING")
+	default:
+		panic(fmt.Sprintf("appendJSONAnnotations: unexpected integer format %q", f.JSONOptions.IntegerFormat))
+	}
 	return opts
 }
 
@@ -383,10 +392,10 @@ func buildUpdateMessage(msg model.Message, opt model.UpdateMessageOptions) (stri
 
 	fieldNum := 1
 	for _, f := range msg.Fields {
-		if ignoreSet.Contains(f.Name) {
+		if ignoreSet.Has(f.Name) {
 			continue
 		}
-		line, err := derivedFieldLine(f, !conditionSet.Contains(f.Name), fieldNum)
+		line, err := derivedFieldLine(f, !conditionSet.Has(f.Name), fieldNum)
 		if err != nil {
 			return "", fmt.Errorf("field %q: %w", f.Name, err)
 		}
@@ -414,11 +423,11 @@ func buildCreateMessage(msg model.Message, opt model.CreateMessageOptions) (stri
 
 	fieldNum := 1
 	for _, f := range msg.Fields {
-		if ignoreSet.Contains(f.Name) {
+		if ignoreSet.Has(f.Name) {
 			continue
 		}
 		// required_fields forces non-optional; otherwise use original optionality.
-		makeOptional := !requiredSet.Contains(f.Name)
+		makeOptional := !requiredSet.Has(f.Name)
 		line, err := derivedFieldLine(f, makeOptional, fieldNum)
 		if err != nil {
 			return "", fmt.Errorf("field %q: %w", f.Name, err)

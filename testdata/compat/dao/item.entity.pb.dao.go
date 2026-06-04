@@ -9,11 +9,12 @@ import (
 )
 
 type Item struct {
-	Id         int64       `json:"id" gorm:"column:id"`
+	Id         int64       `json:"id,string" gorm:"column:id"`
 	Name       string      `json:"name" gorm:"column:name"`
 	Kind       ItemKind    `json:"kind" gorm:"column:kind"`
 	Dimensions *Dimensions `json:"dimensions" gorm:"column:dimensions"`
 	CreatedAt  int64       `json:"createdAt" gorm:"column:created_at"`
+	ExternalId uint64      `json:"externalId,string" gorm:"column:external_id"`
 }
 
 func (Item) TableName() string { return "items" }
@@ -39,6 +40,9 @@ func (x *Item) Size() int {
 	}
 	if x.CreatedAt != 0 {
 		n += 1 + runtime.SizeInt64(x.CreatedAt)
+	}
+	if x.ExternalId != 0 {
+		n += 1 + runtime.SizeUint64(x.ExternalId)
 	}
 	return n
 }
@@ -74,6 +78,10 @@ func (x *Item) MarshalAppend(b []byte) ([]byte, error) {
 	if x.CreatedAt != 0 {
 		b = runtime.AppendTag(b, 5, runtime.WireVarint)
 		b = runtime.AppendVarint(b, uint64(x.CreatedAt))
+	}
+	if x.ExternalId != 0 {
+		b = runtime.AppendTag(b, 6, runtime.WireVarint)
+		b = runtime.AppendVarint(b, x.ExternalId)
 	}
 	return b, nil
 }
@@ -210,6 +218,25 @@ func (x *Item) unmarshalFrom(b []byte, lenient bool, depth int) (int, error) {
 				return 0, fmt.Errorf("field 5: %w", runtime.ErrTruncated)
 			}
 			x.CreatedAt = int64(v)
+			off += n
+		case 6:
+			if seen[0]&32 != 0 {
+				if !lenient {
+					return 0, fmt.Errorf("field 6: %w", runtime.ErrDuplicateField)
+				}
+			}
+			seen[0] |= 32
+			if wireType != runtime.WireVarint {
+				return 0, fmt.Errorf("field 6: %w", runtime.ErrWireType)
+			}
+			v, n := runtime.ConsumeVarint(b[off:])
+			if n < 0 {
+				if n == -2 {
+					return 0, fmt.Errorf("field 6: %w", runtime.ErrOverflow)
+				}
+				return 0, fmt.Errorf("field 6: %w", runtime.ErrTruncated)
+			}
+			x.ExternalId = v
 			off += n
 		default:
 			n = runtime.SkipField(b[off:], wireType)

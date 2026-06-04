@@ -808,7 +808,7 @@ import { Status } from "./person.pb.js"
 | Proto 类型                    | TypeScript 类型     | 说明                        |
 | ----------------------------- | ------------------- | --------------------------- |
 | int32, uint32, float, double  | `number`            |                             |
-| int64, uint64                 | `string`            | 避免 JS 精度丢失             |
+| int64, uint64, sint64, fixed64, sfixed64 | `number` | 大整数 ID 用 `json.integer_format = INTEGER_FORMAT_STRING` |
 | bool                          | `boolean`           |                             |
 | string                        | `string`            |                             |
 | bytes                         | `string`            | base64 编码                 |

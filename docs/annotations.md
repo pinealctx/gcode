@@ -15,6 +15,7 @@ This document provides detailed documentation for all annotations supported by g
 - [Field-level annotations](#field-level-annotations)
   - [(gcode.field).json.omitempty](#gcodefieldjsonomitempty)
   - [(gcode.field).json.ignore](#gcodefieldjsonignore)
+  - [(gcode.field).json.integer_format](#gcodefieldjsoninteger_format)
   - [(gcode.field).gorm.column](#gcodefieldgormcolumn)
   - [(gcode.field).validate_message](#gcodefieldvalidate_message)
 - [Validate annotations (buf/validate)](#validate-annotations-bufvalidate)
@@ -427,6 +428,50 @@ type User struct {
 ```
 
 > **Bidirectional ignore**: `json:"-"` ignores the field in both Marshal and Unmarshal — not just during serialization. Suitable for passwords, internal state, or any field that should never be exposed externally.
+
+---
+
+### (gcode.field).json.integer_format
+
+Controls how singular 64-bit integer scalar fields are represented at the JSON and TypeScript boundary.
+
+By default, 64-bit integer scalar fields use JSON numbers and TypeScript `number`. This is appropriate for timestamps, counters, and other values that stay within JavaScript's safe integer range.
+
+Use `INTEGER_FORMAT_STRING` for opaque large integers that must not lose precision in JavaScript, such as Snowflake IDs, database `bigint` IDs, large sequence values, or order numbers.
+
+**Supported field types**: singular `int64`, `uint64`, `sint64`, `fixed64`, and `sfixed64`. Repeated fields, 32-bit integers, floats, bools, strings, bytes, enums, and messages are rejected during generation when `integer_format` is set.
+
+**Proto example**:
+
+```proto
+message Broker {
+  int64 created_at = 1; // default: JSON number, TS number
+
+  uint64 broker_id = 2 [
+    (gcode.field).json.integer_format = INTEGER_FORMAT_STRING
+  ];
+}
+```
+
+**Generated Go result**:
+
+```go
+type Broker struct {
+    CreatedAt int64  `json:"createdAt"`
+    BrokerID  uint64 `json:"brokerId,string"`
+}
+```
+
+**Generated TypeScript result**:
+
+```ts
+export interface Broker {
+  createdAt: number
+  brokerId: string
+}
+```
+
+`json:",string"` is handled by Go's standard `encoding/json`: JSON strings such as `"9007199254740993"` are parsed into Go `uint64`/`int64`, and Go marshaling emits strings for that field. Empty string is not a valid integer; optional fields should be omitted when unset rather than sent as `""`.
 
 ---
 

@@ -85,7 +85,7 @@ func TestGenProtoSnapshot(t *testing.T) {
 					}
 					if gl != dl {
 						diff.WriteString("line ")
-						diff.WriteString(strconv.Itoa(i+1))
+						diff.WriteString(strconv.Itoa(i + 1))
 						diff.WriteString(":\n  golden:    ")
 						diff.WriteString(gl)
 						diff.WriteString("\n  generated: ")

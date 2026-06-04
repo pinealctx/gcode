@@ -459,6 +459,30 @@ func TestValidationInt64Type(t *testing.T) {
 	assertContains(t, s, `id: { required: true, type: "integer" }`)
 }
 
+func TestValidationIntegerFormatStringType(t *testing.T) {
+	t.Parallel()
+
+	msg := transform.GoMessage{
+		GoName: "BigID",
+		Fields: []transform.GoField{
+			{
+				Field: model.Field{
+					JSONName:    "id",
+					Cardinality: model.CardinalitySingular,
+					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64},
+					JSONOptions: &model.JSONFieldOptions{IntegerFormat: model.IntegerFormatString},
+					ValidateOptions: &model.ValidateFieldOptions{
+						Required: true,
+					},
+				},
+			},
+		},
+	}
+
+	s := renderRules(msg)
+	assertContains(t, s, `id: { required: true, type: "string" }`)
+}
+
 func TestValidationRepeatedWithEnumItems(t *testing.T) {
 	t.Parallel()
 

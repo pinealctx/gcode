@@ -5,14 +5,14 @@ import { Address, Status } from "./person.entity.pb.js"
 
 export interface AllScalars {
   fSint32: number
-  fSint64: string
+  fSint64: number
   fSfixed32: number
-  fSfixed64: string
+  fSfixed64: number
   fDouble: number
   fFixed32: number
-  fFixed64: string
+  fFixed64: number
   fUint32: number
-  fUint64: string
+  fUint64: number
   fFloat: number
   fBytes: string
 }

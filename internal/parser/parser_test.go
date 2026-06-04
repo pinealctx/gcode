@@ -384,6 +384,74 @@ message Event {
 	}
 }
 
+func TestParseJSONIntegerFormatRejectsInvalidFields(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		field string
+	}{
+		{
+			name:  "string",
+			field: `string name = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];`,
+		},
+		{
+			name:  "int32",
+			field: `int32 age = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];`,
+		},
+		{
+			name:  "int32_number",
+			field: `int32 age = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_NUMBER];`,
+		},
+		{
+			name:  "bytes",
+			field: `bytes data = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];`,
+		},
+		{
+			name: "enum",
+			field: `Status status = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+  }`,
+		},
+		{
+			name:  "repeated_int64",
+			field: `repeated int64 ids = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];`,
+		},
+		{
+			name: "message",
+			field: `Child child = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];
+  message Child { string name = 1; }`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			workspace := t.TempDir()
+			writeProtoFile(t, workspace, "invalid.proto", `syntax = "proto3";
+
+package test.invalid;
+
+import "gcode/options.proto";
+
+message M {
+  `+tt.field+`
+}
+`)
+			_, err := Parse(t.Context(), []string{workspace}, []string{"invalid.proto"})
+			if err == nil {
+				t.Fatal("expected Parse to reject invalid json.integer_format usage")
+			}
+			var parseErr ParseError
+			if !errors.As(err, &parseErr) {
+				t.Fatalf("error = %T %v, want ParseError in chain", err, err)
+			}
+		})
+	}
+}
+
 func writeProtoFile(t *testing.T, dir string, name string, content string) {
 	t.Helper()
 
@@ -410,6 +478,12 @@ message User {
   string phone = 2 [(gcode.field).json.omitempty = true];
   string token = 3 [(gcode.field).json.ignore = true];
   string name  = 4;
+  int64 broker_id = 5 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];
+  uint64 created_at = 6 [(gcode.field).json.integer_format = INTEGER_FORMAT_NUMBER];
+  uint64 external_id = 7 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];
+  sint64 delta = 8 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];
+  fixed64 fixed_key = 9 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];
+  sfixed64 signed_fixed_key = 10 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];
 }
 
 message Config {
@@ -468,6 +542,39 @@ message Config {
 	name := user.Fields[3]
 	if name.GormOptions != nil || name.JSONOptions != nil {
 		t.Errorf("name should have no annotations, got gorm=%+v json=%+v", name.GormOptions, name.JSONOptions)
+	}
+
+	// broker_id: JSON string-format 64-bit integer
+	brokerID := user.Fields[4]
+	if brokerID.JSONOptions == nil || brokerID.JSONOptions.IntegerFormat != model.IntegerFormatString {
+		t.Errorf("brokerID.JSONOptions = %+v, want integer_format=string", brokerID.JSONOptions)
+	}
+
+	// created_at: explicit JSON number-format 64-bit integer
+	createdAt := user.Fields[5]
+	if createdAt.JSONOptions == nil || createdAt.JSONOptions.IntegerFormat != model.IntegerFormatNumber {
+		t.Errorf("createdAt.JSONOptions = %+v, want integer_format=number", createdAt.JSONOptions)
+	}
+
+	// external_id: JSON string-format unsigned 64-bit integer
+	externalID := user.Fields[6]
+	if externalID.JSONOptions == nil || externalID.JSONOptions.IntegerFormat != model.IntegerFormatString {
+		t.Errorf("externalID.JSONOptions = %+v, want integer_format=string", externalID.JSONOptions)
+	}
+
+	delta := user.Fields[7]
+	if delta.JSONOptions == nil || delta.JSONOptions.IntegerFormat != model.IntegerFormatString {
+		t.Errorf("delta.JSONOptions = %+v, want integer_format=string", delta.JSONOptions)
+	}
+
+	fixedKey := user.Fields[8]
+	if fixedKey.JSONOptions == nil || fixedKey.JSONOptions.IntegerFormat != model.IntegerFormatString {
+		t.Errorf("fixedKey.JSONOptions = %+v, want integer_format=string", fixedKey.JSONOptions)
+	}
+
+	signedFixedKey := user.Fields[9]
+	if signedFixedKey.JSONOptions == nil || signedFixedKey.JSONOptions.IntegerFormat != model.IntegerFormatString {
+		t.Errorf("signedFixedKey.JSONOptions = %+v, want integer_format=string", signedFixedKey.JSONOptions)
 	}
 
 	// --- Config: no gorm annotation ---

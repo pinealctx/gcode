@@ -683,6 +683,64 @@ func TestProtoFieldLine_OptionalScalar(t *testing.T) {
 	}
 }
 
+func TestGenProtoPreservesJSONIntegerFormatString(t *testing.T) {
+	t.Parallel()
+
+	f := model.Field{
+		Name:        "broker_id",
+		Cardinality: model.CardinalitySingular,
+		Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64},
+		JSONOptions: &model.JSONFieldOptions{IntegerFormat: model.IntegerFormatString},
+	}
+
+	entityLine, err := entityFieldLine(f, 1)
+	if err != nil {
+		t.Fatalf("entityFieldLine() error: %v", err)
+	}
+	want := `int64 broker_id = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];`
+	if entityLine != want {
+		t.Errorf("entity line = %q, want %q", entityLine, want)
+	}
+
+	derivedLine, err := derivedFieldLine(f, true, 1)
+	if err != nil {
+		t.Fatalf("derivedFieldLine() error: %v", err)
+	}
+	want = `optional int64 broker_id = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];`
+	if derivedLine != want {
+		t.Errorf("derived line = %q, want %q", derivedLine, want)
+	}
+}
+
+func TestGenProtoPreservesJSONIntegerFormatNumber(t *testing.T) {
+	t.Parallel()
+
+	f := model.Field{
+		Name:        "created_at",
+		Cardinality: model.CardinalitySingular,
+		Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64},
+		JSONOptions: &model.JSONFieldOptions{IntegerFormat: model.IntegerFormatNumber},
+	}
+
+	entityLine, err := entityFieldLine(f, 1)
+	if err != nil {
+		t.Fatalf("entityFieldLine() error: %v", err)
+	}
+	want := `int64 created_at = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_NUMBER];`
+	if entityLine != want {
+		t.Errorf("entity line = %q, want %q", entityLine, want)
+	}
+
+	derivedLine, err := derivedFieldLine(f, true, 1)
+	if err != nil {
+		t.Fatalf("derivedFieldLine() error: %v", err)
+	}
+	want = `optional int64 created_at = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_NUMBER];`
+	if derivedLine != want {
+		t.Errorf("derived line = %q, want %q", derivedLine, want)
+	}
+}
+
 func TestProtoBaseName_Subdirectory(t *testing.T) {
 	t.Parallel()
 

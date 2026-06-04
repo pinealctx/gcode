@@ -293,12 +293,15 @@ func mapField(field protoreflect.FieldDescriptor, filePath string, locations pro
 	var gormOpts *model.GormFieldOptions
 	var jsonOpts *model.JSONFieldOptions
 	var validateMsg string
-	if col, omitempty, ignore, vmsg := readFieldOptions(field.Options(), exts.fieldExt); col != "" || omitempty || ignore || vmsg != "" {
+	if col, omitempty, ignore, integerFormat, vmsg := readFieldOptions(field.Options(), exts.fieldExt); col != "" || omitempty || ignore || integerFormat != model.IntegerFormatUnspecified || vmsg != "" {
 		if col != "" {
 			gormOpts = &model.GormFieldOptions{Column: col}
 		}
-		if omitempty || ignore {
-			jsonOpts = &model.JSONFieldOptions{Omitempty: omitempty, Ignore: ignore}
+		if omitempty || ignore || integerFormat != model.IntegerFormatUnspecified {
+			if err := validateIntegerFormatOption(field, integerFormat); err != nil {
+				return model.Field{}, err
+			}
+			jsonOpts = &model.JSONFieldOptions{Omitempty: omitempty, Ignore: ignore, IntegerFormat: integerFormat}
 		}
 		validateMsg = vmsg
 	}
@@ -327,6 +330,28 @@ func mapField(field protoreflect.FieldDescriptor, filePath string, locations pro
 		LeadingComment:  commentFromLocation(locations.ByDescriptor(field)),
 		Location:        locationFromSource(filePath, locations.ByDescriptor(field)),
 	}, nil
+}
+
+func validateIntegerFormatOption(field protoreflect.FieldDescriptor, format model.IntegerFormat) error {
+	if format == model.IntegerFormatUnspecified {
+		return nil
+	}
+	if field.IsList() {
+		return errorx.NewSentinelf[parserTag]("field %q: json.integer_format is only supported on singular 64-bit integer scalar fields", field.FullName())
+	}
+	switch field.Kind() {
+	case protoreflect.Int64Kind, protoreflect.Uint64Kind, protoreflect.Sint64Kind,
+		protoreflect.Fixed64Kind, protoreflect.Sfixed64Kind:
+		return nil
+	case protoreflect.BoolKind, protoreflect.EnumKind, protoreflect.Int32Kind,
+		protoreflect.Sint32Kind, protoreflect.Uint32Kind, protoreflect.Fixed32Kind,
+		protoreflect.Sfixed32Kind, protoreflect.FloatKind, protoreflect.DoubleKind,
+		protoreflect.StringKind, protoreflect.BytesKind, protoreflect.MessageKind,
+		protoreflect.GroupKind:
+		return errorx.NewSentinelf[parserTag]("field %q: json.integer_format is only supported on 64-bit integer scalar fields, got %s", field.FullName(), field.Kind())
+	default:
+		panic(fmt.Sprintf("validateIntegerFormatOption: unexpected field kind %v", field.Kind()))
+	}
 }
 
 func mapFieldType(field protoreflect.FieldDescriptor) (model.FieldType, error) {

@@ -242,21 +242,21 @@ func readMessageOptions(opts proto.Message, ext protoreflect.ExtensionType) (tab
 
 // readFieldOptions extracts gcode field-level annotations from a compiled
 // FieldOptions proto using the provided extension type.
-func readFieldOptions(opts proto.Message, ext protoreflect.ExtensionType) (gormColumn string, jsonOmitempty, jsonIgnore bool, validateMessage string) {
+func readFieldOptions(opts proto.Message, ext protoreflect.ExtensionType) (gormColumn string, jsonOmitempty, jsonIgnore bool, integerFormat model.IntegerFormat, validateMessage string) {
 	if opts == nil {
-		return "", false, false, ""
+		return "", false, false, model.IntegerFormatUnspecified, ""
 	}
 	fieldOpts, castOK := opts.(*descriptorpb.FieldOptions)
 	if !castOK || fieldOpts == nil {
-		return "", false, false, ""
+		return "", false, false, model.IntegerFormatUnspecified, ""
 	}
 	if !proto.HasExtension(fieldOpts, ext) {
-		return "", false, false, ""
+		return "", false, false, model.IntegerFormatUnspecified, ""
 	}
 	val := proto.GetExtension(fieldOpts, ext)
 	gcodeMsg, dynOK := val.(*dynamicpb.Message)
 	if !dynOK || gcodeMsg == nil {
-		return "", false, false, ""
+		return "", false, false, model.IntegerFormatUnspecified, ""
 	}
 
 	if gormMsg := getMessageField(gcodeMsg, "gorm"); gormMsg != nil {
@@ -265,9 +265,31 @@ func readFieldOptions(opts proto.Message, ext protoreflect.ExtensionType) (gormC
 	if jsonMsg := getMessageField(gcodeMsg, "json"); jsonMsg != nil {
 		jsonOmitempty = getBoolField(jsonMsg, "omitempty")
 		jsonIgnore = getBoolField(jsonMsg, "ignore")
+		integerFormat = getIntegerFormatField(jsonMsg, "integer_format")
 	}
 	validateMessage = getStringField(gcodeMsg, "validate_message")
-	return gormColumn, jsonOmitempty, jsonIgnore, validateMessage
+	return gormColumn, jsonOmitempty, jsonIgnore, integerFormat, validateMessage
+}
+
+// getIntegerFormatField retrieves a gcode.IntegerFormat enum field.
+func getIntegerFormatField(msg *dynamicpb.Message, name protoreflect.Name) model.IntegerFormat {
+	if msg == nil {
+		return model.IntegerFormatUnspecified
+	}
+	fd := msg.Descriptor().Fields().ByName(name)
+	if fd == nil || !msg.Has(fd) {
+		return model.IntegerFormatUnspecified
+	}
+	switch msg.Get(fd).Enum() {
+	case 1:
+		return model.IntegerFormatNumber
+	case 2:
+		return model.IntegerFormatString
+	case 0:
+		return model.IntegerFormatUnspecified
+	default:
+		panic(fmt.Sprintf("getIntegerFormatField: unexpected IntegerFormat value %d", msg.Get(fd).Enum()))
+	}
 }
 
 // readSchemaFileOption reports whether the file carries (gcode.schema) = {};.

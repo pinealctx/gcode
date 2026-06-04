@@ -115,7 +115,7 @@ func writeDerivedValidation(b *strings.Builder, recv string, msg transform.GoMes
 		}
 
 		fieldExpr := recv + "." + f.GoName
-		isRequired := requiredSet.Contains(f.Name)
+		isRequired := requiredSet.Has(f.Name)
 
 		switch {
 		case isRequired && f.Type.Kind == model.FieldKindMessage:

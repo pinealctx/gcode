@@ -16,10 +16,18 @@ message GormFieldOptions {
   string column = 1;
 }
 
+// IntegerFormat configures how 64-bit integer scalar fields are represented in JSON.
+enum IntegerFormat {
+  INTEGER_FORMAT_UNSPECIFIED = 0;
+  INTEGER_FORMAT_NUMBER      = 1;
+  INTEGER_FORMAT_STRING      = 2;
+}
+
 // JSONFieldOptions configures JSON tag generation for a field.
 message JSONFieldOptions {
-  bool omitempty = 1;
-  bool ignore    = 2;
+  bool          omitempty      = 1;
+  bool          ignore         = 2;
+  IntegerFormat integer_format = 3;
 }
 
 // GcodeFieldOptions groups all gcode field-level annotations.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pinealctx/gcode/internal/model"
 	"github.com/pinealctx/gcode/internal/transform"
 )
 
@@ -36,6 +37,12 @@ func jsonTagValue(f transform.GoField) string {
 		return "-"
 	}
 	name := f.JSONName
+	if f.JSONOptions != nil && f.JSONOptions.IntegerFormat == model.IntegerFormatString {
+		if f.JSONOptions.Omitempty {
+			return name + ",string,omitempty"
+		}
+		return name + ",string"
+	}
 	if f.JSONOptions != nil && f.JSONOptions.Omitempty {
 		return name + ",omitempty"
 	}

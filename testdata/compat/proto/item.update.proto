@@ -14,7 +14,7 @@ import "common.proto";
 message ItemUpdate {
   option (gcode.update_source_opts) = { source: "Item", condition_fields: ["id"] };
 
-  int64 id = 1;
+  int64 id = 1 [(gcode.field).json.integer_format = INTEGER_FORMAT_STRING];
   optional string name = 2 [(buf.validate.field).string.min_len = 1, (buf.validate.field).string.max_len = 200];
   optional ItemKind kind = 3 [(buf.validate.field).enum.defined_only = true];
   Dimensions dimensions = 4 [(buf.validate.field).required = true];

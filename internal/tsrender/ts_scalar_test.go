@@ -19,12 +19,12 @@ func TestTSScalarType(t *testing.T) {
 		{model.ScalarSfixed32, "number"},
 		{model.ScalarUint32, "number"},
 		{model.ScalarFixed32, "number"},
-		// 64-bit integers → string
-		{model.ScalarInt64, "string"},
-		{model.ScalarSint64, "string"},
-		{model.ScalarSfixed64, "string"},
-		{model.ScalarUint64, "string"},
-		{model.ScalarFixed64, "string"},
+		// 64-bit integers default to number; field-level json.integer_format can override.
+		{model.ScalarInt64, "number"},
+		{model.ScalarSint64, "number"},
+		{model.ScalarSfixed64, "number"},
+		{model.ScalarUint64, "number"},
+		{model.ScalarFixed64, "number"},
 		// Floating point → number
 		{model.ScalarFloat, "number"},
 		{model.ScalarDouble, "number"},

@@ -37,6 +37,7 @@ import {
 } from "../ts/all_validate.pb.ts";
 
 import { type AllScalarsCreate } from "../ts/all_types.create.pb.ts";
+import { type Item } from "../ts/item.entity.pb.ts";
 
 import { type AllScalarsUpdate, AllRepeatedUpdateRules } from "../ts/all_types.update.pb.ts";
 
@@ -105,7 +106,7 @@ const person: Person = {
   scores: [95, 87],
   tags: ["dev"],
   rating: 4.5,
-  createdAt: "2024-01-01",
+  createdAt: 1704067200,
   avatar: "aW1hZ2U=",
   email: "alice@example.com",
   role: "admin",
@@ -116,10 +117,22 @@ assertEqual(person.status, Status.STATUS_ACTIVE, "Person.status is Status enum v
 
 // --- Scalar type mappings (proto → TS) ---
 
-assertEqual(typeof person.createdAt, "string", "int64 field renders as string");
+assertEqual(typeof person.createdAt, "number", "default int64 field renders as number");
 assertEqual(typeof person.avatar, "string", "bytes field renders as string");
 assertEqual(typeof person.active, "boolean", "bool field renders as boolean");
 assertEqual(typeof person.rating, "number", "float field renders as number");
+
+const item: Item = {
+  id: "9007199254740993",
+  name: "Widget",
+  kind: 1,
+  dimensions: { width: 1, height: 2 },
+  createdAt: 1704067200,
+  externalId: "18446744073709551615",
+};
+assertEqual(typeof item.id, "string", "integer_format string int64 field renders as string");
+assertEqual(typeof item.createdAt, "number", "default timestamp int64 field renders as number");
+assertEqual(typeof item.externalId, "string", "integer_format string uint64 field renders as string");
 
 // optional fields can be omitted
 const personPartial: Person = {
@@ -131,7 +144,7 @@ const personPartial: Person = {
   scores: [],
   tags: [],
   rating: 3.0,
-  createdAt: "2024-06-15",
+  createdAt: 1718409600,
   avatar: "Ymlu",
   email: "bob@example.com",
   role: "user",
@@ -180,19 +193,19 @@ assertEqual(delResp.ok, false, "DeletePersonResponse.ok assigned correctly");
 
 const scalars: AllScalars = {
   fSint32: -1,
-  fSint64: "-9007199254740993",
+  fSint64: -9007199254740991,
   fSfixed32: 0,
-  fSfixed64: "0",
+  fSfixed64: 0,
   fDouble: 3.14,
   fFixed32: 0,
-  fFixed64: "0",
+  fFixed64: 0,
   fUint32: 0,
-  fUint64: "0",
+  fUint64: 0,
   fFloat: 1.5,
   fBytes: "aGVsbG8=",
 };
 assertEqual(typeof scalars.fSint32, "number", "AllScalars.fSint32 is number");
-assertEqual(typeof scalars.fSint64, "string", "AllScalars.fSint64 is string (int64 → string)");
+assertEqual(typeof scalars.fSint64, "number", "AllScalars.fSint64 is number by default");
 assertEqual(typeof scalars.fDouble, "number", "AllScalars.fDouble is number");
 assertEqual(typeof scalars.fBytes, "string", "AllScalars.fBytes is string (bytes → string)");
 
@@ -286,13 +299,13 @@ assertEqual(createAll.fSint32, undefined, "AllScalarsCreate all fields optional 
 
 const createAllFull: AllScalarsCreate = {
   fSint32: -1,
-  fSint64: "-1",
+  fSint64: -1,
   fSfixed32: 0,
-  fSfixed64: "0",
+  fSfixed64: 0,
   fFixed32: 0,
-  fFixed64: "0",
+  fFixed64: 0,
   fUint32: 0,
-  fUint64: "0",
+  fUint64: 0,
   fFloat: 1.0,
   fBytes: "dGVzdA==",
 };
@@ -344,7 +357,7 @@ assertEqual(PersonUpdateByNameRules.nickname.maxLength, 10, "PersonUpdateByNameR
 
 const av: AllValidate = {
   uGte: 1,
-  uLte: "500",
+  uLte: 500,
   uIn: 2,
   uNotIn: 1,
   fGt: 0.1,
@@ -381,7 +394,7 @@ assertEqual(treeLeaf.child.child.value, "deepest", "TreeNode.child.child.value d
 
 // --- summary ---
 
-assertEqual(passed, 111, "expected exactly 111 assertions before count guard");
+assertEqual(passed, 114, "expected exactly 114 assertions before count guard");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
