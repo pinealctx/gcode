@@ -449,6 +449,7 @@ func TestValidationInt64Type(t *testing.T) {
 					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt64},
 					ValidateOptions: &model.ValidateFieldOptions{
 						Required: true,
+						GTInt:    intPtr(0),
 					},
 				},
 			},
@@ -456,7 +457,7 @@ func TestValidationInt64Type(t *testing.T) {
 	}
 
 	s := renderRules(msg)
-	assertContains(t, s, `id: { required: true, type: "integer" }`)
+	assertContains(t, s, `id: { required: true, type: "integer", exclusiveMinimum: 0 }`)
 }
 
 func TestValidationIntegerFormatStringType(t *testing.T) {
@@ -473,6 +474,9 @@ func TestValidationIntegerFormatStringType(t *testing.T) {
 					JSONOptions: &model.JSONFieldOptions{IntegerFormat: model.IntegerFormatString},
 					ValidateOptions: &model.ValidateFieldOptions{
 						Required: true,
+						GTInt:    intPtr(0),
+						InInt:    []int64{1, 9007199254740993},
+						NotInInt: []int64{0, -1},
 					},
 				},
 			},
@@ -480,7 +484,110 @@ func TestValidationIntegerFormatStringType(t *testing.T) {
 	}
 
 	s := renderRules(msg)
-	assertContains(t, s, `id: { required: true, type: "string" }`)
+	assertContains(t, s, `id: { required: true, type: "integerString", integerFormat: "int64", exclusiveMinimum: "0", enum: ["1", "9007199254740993"], notIn: ["0", "-1"] }`)
+}
+
+func TestValidationIntegerFormatStringFormatsAndUnsignedConstraints(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		jsonName string
+		scalar   model.ScalarKind
+		validate *model.ValidateFieldOptions
+		wantRule string
+	}{
+		{
+			name:     "uint64 lte",
+			jsonName: "externalId",
+			scalar:   model.ScalarUint64,
+			validate: &model.ValidateFieldOptions{
+				LTEUint: uintPtr(100),
+				InUint:  []uint64{2, 9007199254740993},
+			},
+			wantRule: `externalId: { required: false, type: "integerString", integerFormat: "uint64", maximum: "100", enum: ["2", "9007199254740993"] }`,
+		},
+		{
+			name:     "sint64",
+			jsonName: "delta",
+			scalar:   model.ScalarSint64,
+			validate: &model.ValidateFieldOptions{
+				GTEInt: intPtr(-10),
+			},
+			wantRule: `delta: { required: false, type: "integerString", integerFormat: "sint64", minimum: "-10" }`,
+		},
+		{
+			name:     "fixed64",
+			jsonName: "fixedKey",
+			scalar:   model.ScalarFixed64,
+			validate: &model.ValidateFieldOptions{
+				NotInUint: []uint64{0, 9007199254740993},
+			},
+			wantRule: `fixedKey: { required: false, type: "integerString", integerFormat: "fixed64", notIn: ["0", "9007199254740993"] }`,
+		},
+		{
+			name:     "sfixed64",
+			jsonName: "signedFixedKey",
+			scalar:   model.ScalarSfixed64,
+			validate: &model.ValidateFieldOptions{
+				LTInt: intPtr(100),
+			},
+			wantRule: `signedFixedKey: { required: false, type: "integerString", integerFormat: "sfixed64", exclusiveMaximum: "100" }`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			msg := transform.GoMessage{
+				GoName: "BigIDs",
+				Fields: []transform.GoField{
+					{
+						Field: model.Field{
+							JSONName:        tt.jsonName,
+							Cardinality:     model.CardinalitySingular,
+							Type:            model.FieldType{Kind: model.FieldKindScalar, Scalar: tt.scalar},
+							JSONOptions:     &model.JSONFieldOptions{IntegerFormat: model.IntegerFormatString},
+							ValidateOptions: tt.validate,
+						},
+					},
+				},
+			}
+
+			s := renderRules(msg)
+			assertContains(t, s, tt.wantRule)
+		})
+	}
+}
+
+func TestValidationIntegerFormatStringUnsupportedScalarPanics(t *testing.T) {
+	t.Parallel()
+
+	msg := transform.GoMessage{
+		GoName: "Bad",
+		Fields: []transform.GoField{
+			{
+				Field: model.Field{
+					JSONName:    "bad",
+					Cardinality: model.CardinalitySingular,
+					Type:        model.FieldType{Kind: model.FieldKindScalar, Scalar: model.ScalarInt32},
+					JSONOptions: &model.JSONFieldOptions{IntegerFormat: model.IntegerFormatString},
+					ValidateOptions: &model.ValidateFieldOptions{
+						GTInt: intPtr(0),
+					},
+				},
+			},
+		},
+	}
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected unsupported integer_format scalar to panic")
+		}
+	}()
+
+	_ = renderRules(msg)
 }
 
 func TestValidationRepeatedWithEnumItems(t *testing.T) {

@@ -471,6 +471,35 @@ export interface Broker {
 }
 ```
 
+When the field also has `buf.validate` integer constraints, generated TypeScript Rules metadata uses explicit integer-string semantics:
+
+```ts
+export const BrokerRules = {
+  brokerId: {
+    required: false,
+    type: "integerString",
+    integerFormat: "uint64",
+    exclusiveMinimum: "0",
+    maximum: "18446744073709551615"
+  }
+} as const
+```
+
+`type: "integerString"` means the JSON value is a string whose content must be a decimal integer. `integerFormat` identifies the protobuf scalar: `int64`, `uint64`, `sint64`, `fixed64`, or `sfixed64`. Signed formats (`int64`, `sint64`, `sfixed64`) allow a leading minus sign; unsigned formats (`uint64`, `fixed64`) do not. Empty strings, non-digits, decimals, and scientific notation are invalid.
+
+Integer constraints in Rules metadata are emitted as strings for integer-string fields:
+
+| Validate rule | Rules key | Value form |
+| ------------- | --------- | ---------- |
+| `gt`          | `exclusiveMinimum` | decimal string |
+| `gte`         | `minimum`          | decimal string |
+| `lt`          | `exclusiveMaximum` | decimal string |
+| `lte`         | `maximum`          | decimal string |
+| `in`          | `enum`             | decimal string array |
+| `not_in`      | `notIn`            | decimal string array |
+
+Frontend validators should compare these values as integers using `BigInt` or decimal-string comparison, not `Number`, to avoid precision loss.
+
 `json:",string"` is handled by Go's standard `encoding/json`: JSON strings such as `"9007199254740993"` are parsed into Go `uint64`/`int64`, and Go marshaling emits strings for that field. Empty string is not a valid integer; optional fields should be omitted when unset rather than sent as `""`.
 
 ---

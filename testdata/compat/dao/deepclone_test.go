@@ -556,11 +556,13 @@ func TestDeepCloneAllValidate(t *testing.T) {
 	t.Parallel()
 
 	oStatus := dao.Status_STATUS_ACTIVE
+	optionalI64StringGt := int64(42)
 
 	orig := &dao.AllValidate{
-		OStatus: &oStatus,
-		BMinmax: []byte{1, 2, 3},
-		RItems:  []int32{10, 20, 30},
+		OStatus:             &oStatus,
+		BMinmax:             []byte{1, 2, 3},
+		RItems:              []int32{10, 20, 30},
+		OptionalI64StringGt: &optionalI64StringGt,
 	}
 
 	clone := orig.DeepClone()
@@ -571,6 +573,12 @@ func TestDeepCloneAllValidate(t *testing.T) {
 	}
 	if *clone.OStatus != dao.Status_STATUS_ACTIVE {
 		t.Errorf("OStatus value mismatch: got %v", *clone.OStatus)
+	}
+	if clone.OptionalI64StringGt == orig.OptionalI64StringGt {
+		t.Error("OptionalI64StringGt pointer shared between clone and original")
+	}
+	if *clone.OptionalI64StringGt != 42 {
+		t.Errorf("OptionalI64StringGt value mismatch: got %d", *clone.OptionalI64StringGt)
 	}
 
 	// Singular bytes must be independently copied.
@@ -587,6 +595,10 @@ func TestDeepCloneAllValidate(t *testing.T) {
 	*clone.OStatus = dao.Status_STATUS_INACTIVE
 	if *orig.OStatus != dao.Status_STATUS_ACTIVE {
 		t.Errorf("mutating clone.OStatus affected original")
+	}
+	*clone.OptionalI64StringGt = 100
+	if *orig.OptionalI64StringGt != 42 {
+		t.Errorf("mutating clone.OptionalI64StringGt affected original")
 	}
 	clone.BMinmax[0] = 99
 	if orig.BMinmax[0] != 1 {

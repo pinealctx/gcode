@@ -15,6 +15,7 @@
 - [field 级注解](#field-级注解)
   - [(gcode.field).json.omitempty](#gcodefield-jsonomiempty)
   - [(gcode.field).json.ignore](#gcodefield-jsonignore)
+  - [(gcode.field).json.integer_format](#gcodefield-jsoninteger_format)
   - [(gcode.field).gorm.column](#gcodefieldgormcolumn)
   - [(gcode.field).validate_message](#gcodefield-validate_message)
 - [validate 注解（buf/validate）](#validate-注解bufvalidate)
@@ -428,6 +429,79 @@ type User struct {
 ```
 
 > **双向忽略**：`json:"-"` 在序列化（Marshal）和反序列化（Unmarshal）时都忽略该字段，不只是序列化时忽略。适合密码、内部状态等不应暴露给外部的字段。
+
+---
+
+### (gcode.field).json.integer_format
+
+控制 singular 64-bit integer scalar 字段在 JSON 和 TypeScript 边界上的表示方式。
+
+默认情况下，64-bit integer scalar 字段使用 JSON number 和 TypeScript `number`。这适合时间戳、计数器以及其他不会超过 JavaScript 安全整数范围的值。
+
+对于不能在 JavaScript 中丢失精度的大整数 ID（如 Snowflake ID、数据库 `bigint` ID、大序列号、订单号），使用 `INTEGER_FORMAT_STRING`。
+
+**支持的字段类型**：singular `int64`、`uint64`、`sint64`、`fixed64`、`sfixed64`。repeated 字段、32-bit integer、float、bool、string、bytes、enum、message 在设置 `integer_format` 时会被生成阶段拒绝。
+
+**proto 示例**：
+
+```proto
+message Broker {
+  int64 created_at = 1; // 默认：JSON number，TS number
+
+  uint64 broker_id = 2 [
+    (gcode.field).json.integer_format = INTEGER_FORMAT_STRING
+  ];
+}
+```
+
+**生成的 Go 结果**：
+
+```go
+type Broker struct {
+    CreatedAt int64  `json:"createdAt"`
+    BrokerID  uint64 `json:"brokerId,string"`
+}
+```
+
+**生成的 TypeScript 结果**：
+
+```ts
+export interface Broker {
+  createdAt: number
+  brokerId: string
+}
+```
+
+如果字段同时带有 `buf.validate` 整数约束，生成的 TypeScript Rules 元数据会显式使用 integer-string 语义：
+
+```ts
+export const BrokerRules = {
+  brokerId: {
+    required: false,
+    type: "integerString",
+    integerFormat: "uint64",
+    exclusiveMinimum: "0",
+    maximum: "18446744073709551615"
+  }
+} as const
+```
+
+`type: "integerString"` 表示 JSON 值是 string，且字符串内容必须是十进制整数。`integerFormat` 标识 protobuf scalar：`int64`、`uint64`、`sint64`、`fixed64`、`sfixed64`。有符号格式（`int64`、`sint64`、`sfixed64`）允许前导负号；无符号格式（`uint64`、`fixed64`）不允许负号。空串、非数字、小数、科学计数法都不合法。
+
+integer-string 字段的 Rules 整数约束值以字符串输出：
+
+| Validate 规则 | Rules key | 值形式 |
+| ------------- | --------- | ------ |
+| `gt`          | `exclusiveMinimum` | 十进制字符串 |
+| `gte`         | `minimum`          | 十进制字符串 |
+| `lt`          | `exclusiveMaximum` | 十进制字符串 |
+| `lte`         | `maximum`          | 十进制字符串 |
+| `in`          | `enum`             | 十进制字符串数组 |
+| `not_in`      | `notIn`            | 十进制字符串数组 |
+
+前端 validator 应使用 `BigInt` 或十进制字符串比较这些值，不应使用 `Number`，避免精度丢失。
+
+`json:",string"` 由 Go 标准库 `encoding/json` 处理：例如 `"9007199254740993"` 这样的 JSON string 会被解析为 Go `uint64`/`int64`，Go marshal 时也会把该字段输出为 string。空串不是合法整数；optional 字段未设置时应省略，而不是发送 `""`。
 
 ---
 

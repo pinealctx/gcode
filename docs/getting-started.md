@@ -691,12 +691,13 @@ For detailed documentation and examples, see [Annotations Reference](annotations
 
 ### Field-level annotations
 
-| Annotation                       | Type   | Description                                                          |
-| -------------------------------- | ------ | -------------------------------------------------------------------- |
-| `(gcode.field).json.omitempty`   | bool   | Generate `json:"field,omitempty"`                                    |
-| `(gcode.field).json.ignore`      | bool   | Generate `json:"-"`                                                  |
-| `(gcode.field).gorm.column`      | string | Override gorm column name                                            |
-| `(gcode.field).validate_message` | string | Override the default error message for all constraints on this field |
+| Annotation                          | Type   | Description                                                                       |
+| ----------------------------------- | ------ | --------------------------------------------------------------------------------- |
+| `(gcode.field).json.omitempty`      | bool   | Generate `json:"field,omitempty"`                                                 |
+| `(gcode.field).json.ignore`         | bool   | Generate `json:"-"`                                                               |
+| `(gcode.field).json.integer_format` | enum   | Represent singular 64-bit integers as JSON/TS strings with `INTEGER_FORMAT_STRING` |
+| `(gcode.field).gorm.column`         | string | Override gorm column name                                                         |
+| `(gcode.field).validate_message`    | string | Override the default error message for all constraints on this field              |
 
 ### Validate annotations (buf/validate)
 
@@ -815,6 +816,8 @@ import { Status } from "./person.pb.js"
 | repeated T                    | `T[]`               |                              |
 | optional T                    | `T \| undefined`    | Shorthand: `field?: T`       |
 | message                       | `interface`         |                              |
+
+With `json.integer_format = INTEGER_FORMAT_STRING`, the TypeScript interface field is `string`. Validation Rules metadata uses `type: "integerString"` plus `integerFormat` (`int64`, `uint64`, `sint64`, `fixed64`, or `sfixed64`). Integer constraints such as `minimum`, `exclusiveMinimum`, `maximum`, `exclusiveMaximum`, `enum`, and `notIn` are emitted as decimal strings and should be compared with `BigInt` or decimal-string comparison, not `Number`.
 
 ### Verify generated output
 

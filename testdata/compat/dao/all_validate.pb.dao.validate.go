@@ -178,5 +178,36 @@ func (x *AllValidate) Validate() error {
 			return &validateruntime.ValidationError{Field: "e_status", Rule: "not_in", Message: validateruntime.MsgOr("", "must not be one of [0, 2]")}
 		}
 	}
+	if x.I64StringGt <= 0 {
+		return &validateruntime.ValidationError{Field: "i64_string_gt", Rule: "gt", Message: validateruntime.MsgOr("", "must be > 0")}
+	}
+	if x.OptionalI64StringGt != nil {
+		if *x.OptionalI64StringGt <= 0 {
+			return &validateruntime.ValidationError{Field: "optional_i64_string_gt", Rule: "gt", Message: validateruntime.MsgOr("", "must be > 0")}
+		}
+	}
+	if x.U64StringLte > 100 {
+		return &validateruntime.ValidationError{Field: "u64_string_lte", Rule: "lte", Message: validateruntime.MsgOr("", "must be <= 100")}
+	}
+	if x.I64NumberGt <= 0 {
+		return &validateruntime.ValidationError{Field: "i64_number_gt", Rule: "gt", Message: validateruntime.MsgOr("", "must be > 0")}
+	}
+	{
+		found := false
+		for _, v := range []int64{1, 9007199254740993} {
+			if x.I64StringInNotIn == v {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return &validateruntime.ValidationError{Field: "i64_string_in_not_in", Rule: "in", Message: validateruntime.MsgOr("", "must be one of [1, 9007199254740993]")}
+		}
+	}
+	for _, v := range []int64{0, -1} {
+		if x.I64StringInNotIn == v {
+			return &validateruntime.ValidationError{Field: "i64_string_in_not_in", Rule: "not_in", Message: validateruntime.MsgOr("", "must not be one of [0, -1]")}
+		}
+	}
 	return nil
 }
